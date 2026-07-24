@@ -1,0 +1,278 @@
+@if (!session()) {
+  <main class="landing-page">
+    <nav class="landing-nav"><a class="landing-brand" href="#"><span class="brand-mark">T</span><span><strong>TNL TRACK</strong><small>Sales & delivery</small></span></a><div><a href="#tracking">Track order</a><a href="#staff-login">Staff sign in</a></div></nav>
+    <section class="hero">
+      <app-landing-backdrop />
+      <div class="hero-copy"><span class="hero-kicker">Reliable delivery, clearly tracked</span><h1>Your order,<br><em>always in sight.</em></h1><p>Follow every milestone from preparation to delivery with one simple tracking number.</p><a class="hero-action" href="#tracking">Track my order <span>→</span></a><div class="hero-proof"><span><strong>Live</strong> delivery updates</span><span><strong>Secure</strong> order lookup</span><span><strong>Simple</strong> status history</span></div></div>
+      <div class="hero-visual"><div class="route-card"><span class="route-label">Delivery journey</span><div class="route-line"><i></i><i></i><i></i><i></i></div><div class="route-stops"><span>Preparing</span><span>Dispatched</span><span>In transit</span><strong>Delivered</strong></div></div><div class="floating-package"><span>◆</span><div><small>Shipment protected</small><strong>Handled with care</strong></div></div></div>
+    </section>
+    <section class="public-tracking" id="tracking">
+      <div><span class="hero-kicker">Track my order</span><h2>Where is your delivery?</h2><p>Enter the tracking number included in your order confirmation.</p></div>
+      <div class="tracking-card">
+        <form (ngSubmit)="track()"><label>Tracking number<div><input name="publicTracking" [(ngModel)]="trackingNumber" placeholder="e.g. TNL-ABC123-4F2A" required><button [disabled]="loading()">Track order →</button></div></label></form>
+        @if(error()){<div class="public-error">{{error()}}</div>}
+        @if(trackingResult();as result){<div class="public-result"><header><span><small>Tracking number</small><strong>{{result.trackingNumber}}</strong></span><i>{{titleCase(result.deliveryStatus||result.orderStatus)}}</i></header><p>{{result.deliveryAddress}}</p><div class="public-timeline">@for(event of result.events;track event.occurredAt){<div><i></i><span><strong>{{titleCase(event.status)}}</strong><small>{{event.occurredAt|date:'medium'}}@if(event.notes){ · {{event.notes}}}</small></span></div>}@empty{<p>Your order has been received. Delivery events will appear here.</p>}</div></div>}
+      </div>
+    </section>
+    <section class="staff-section" id="staff-login"><div><span class="hero-kicker">Team workspace</span><h2>Run operations in one place.</h2><p>Authorized administrators and agents can sign in to manage customers, orders, inventory, campaigns, and deliveries.</p></div><section class="login-card"><div><span class="eyebrow">Secure workspace</span><h2>Staff sign in</h2></div>@if(error()){<div class="error-banner">{{error()}}</div>}<form (ngSubmit)="login()"><label>Email<input type="email" name="email" [(ngModel)]="loginEmail" required></label><label>Password<input type="password" name="password" [(ngModel)]="loginPassword" required></label><button class="primary" [disabled]="loading()">{{loading()?'Signing in…':'Sign in'}}</button></form><div class="demo-accounts"><span>Demo accounts</span><button (click)="useAccount('ADMIN')">Admin</button><button (click)="useAccount('AGENT')">Agent</button></div></section></section>
+    <footer class="landing-footer"><strong>TNL TRACK</strong><span>Clear operations. Confident deliveries.</span></footer>
+  </main>
+} @else {
+<div class="app-shell">
+  @if(notice()){<div class="app-toast" role="status"><span>✓</span><strong>{{notice()}}</strong><button type="button" aria-label="Dismiss notification" (click)="notice.set('')">×</button></div>}
+  @if(mobileNavOpen()){<button class="nav-backdrop" type="button" aria-label="Close navigation" (click)="mobileNavOpen.set(false)"></button>}
+  <aside class="sidebar" [class.mobile-open]="mobileNavOpen()" [class.admin-sidebar]="session()!.role === 'ADMIN'">
+    <button class="brand" (click)="selectView('Overview')">
+      <span class="brand-mark">T</span>
+      <span><strong>TNL</strong><small>TRACK</small></span>
+    </button>
+
+    <nav aria-label="Primary navigation">
+      <span class="nav-label">Workspace</span>
+      @for (item of visibleNavigation(); track item) {
+        <button [class.active]="view() === item" (click)="selectView(item)">
+          <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
+        </button>
+      }
+      @if (session()!.role === 'ADMIN') {
+        <span class="nav-label secondary">Manage</span>
+        @for (item of ['Leads', 'Campaigns', 'Agents']; track item) {
+          <button [class.active]="view() === item" (click)="selectView(item)">
+            <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
+          </button>
+        }
+      }
+    </nav>
+
+    <div class="identity">
+      <span class="avatar">{{ initials() }}</span>
+      <span><strong>{{ session()!.fullName }}</strong><small>{{ session()!.role }}</small></span>
+      <button title="Sign out" (click)="logout()">↪</button>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <button class="hamburger" type="button" aria-label="Open navigation" [attr.aria-expanded]="mobileNavOpen()" (click)="mobileNavOpen.set(!mobileNavOpen())"><app-icon name="menu" /></button>
+      <div><span class="eyebrow">{{ session()!.role }} workspace</span><h1>{{ isNewOrderPage() ? 'New Order' : view() }}</h1></div>
+      <div class="header-actions">
+        <div class="notification-center">
+          <button class="bell" type="button" aria-label="Notifications" [attr.aria-expanded]="notificationPanelOpen()" (click)="toggleNotifications()">
+            <app-icon name="bell" />
+            @if (unreadNotifications().length) { <b class="notification-badge">{{ unreadNotifications().length > 9 ? '9+' : unreadNotifications().length }}</b> }
+          </button>
+          @if (notificationPanelOpen()) {
+            <section class="notification-menu">
+              <header><div><span class="eyebrow">Activity</span><h2>Notifications</h2></div>@if(unreadNotifications().length){<button type="button" (click)="markNotificationsRead()">Mark all read</button>}</header>
+              <div class="notification-list">
+                @for (item of summary().notifications; track item.id) {
+                  <button type="button" class="notification-item" [class.unread]="isNotificationUnread(item.createdAt)" (click)="openNotification(item.type)">
+                    <span class="notification-icon"><app-icon [name]="item.type === 'ORDER' ? 'orders' : 'customers'" /></span>
+                    <span><strong>{{ item.title }}</strong><small>{{ item.message }} · {{ item.createdAt | date:'short' }}</small></span>
+                    @if(isNotificationUnread(item.createdAt)){<i></i>}
+                  </button>
+                } @empty { <div class="notification-empty">No order or customer activity yet.</div> }
+              </div>
+            </section>
+          }
+        </div>
+        @if(!isNewOrderPage()){<button class="primary icon-button" (click)="openNewOrder()"><app-icon name="plus" />New order</button>}
+      </div>
+    </header>
+
+    <section class="content">
+      @if (error()) { <div class="error-banner workspace-error">{{ error() }} <button (click)="error.set('')">×</button></div> }
+      @if (loading()) { <div class="loading-bar"><i></i></div> }
+      @if (isNewOrderPage()) {
+        <router-outlet />
+      } @else {
+      @if (view() === 'Overview') {
+        <div class="welcome">
+          <div><span class="eyebrow">{{ today | date:'EEEE · MMMM d' }}</span><h2>Good {{ greeting() }}, {{ firstName() }}.</h2><p>Here’s what needs your attention across sales and delivery.</p></div>
+          <div class="live"><i></i><strong>{{ summary().activeDeliveries }}</strong><small>active deliveries</small></div>
+        </div>
+
+        <div class="metric-grid">
+          @for (metric of metrics(); track metric.label; let index = $index) {
+            <button type="button" class="metric metric-card" [class]="'metric metric-card metric-tone-'+index" (click)="openMetric(metric)" [attr.aria-label]="'Open '+metric.label"><div class="metric-head"><span class="metric-icon"><app-icon [name]="metric.icon" /></span><span class="metric-label">{{metric.label}}</span><app-icon class="metric-arrow" name="chevronRight" /></div><strong class="metric-value">{{metric.value}}</strong><div class="metric-foot"><b>{{metric.change}}</b><span>{{metric.note}}</span></div></button>
+          }
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel chart-panel">
+            <div class="panel-title"><div><span class="eyebrow">Performance</span><h3>Revenue overview</h3></div><span class="period-button">Last 6 months</span></div>
+            <div class="chart">
+              @for (bar of revenueBars(); track bar.key; let last = $last) {
+                <div><span [style.height.%]="bar.value" [class.current]="last" [attr.title]="bar.revenue | currency:'PHP':'symbol-narrow'"></span><small>{{ bar.month }}</small></div>
+              }
+            </div>
+          </article>
+          <article class="panel attention">
+            <div class="panel-title"><div><span class="eyebrow">Priority</span><h3>Needs attention</h3></div><b class="count">{{ attentionItems().length }}</b></div>
+            @for (item of attentionItems(); track item.title) {
+              <div class="attention-row"><app-icon class="attention-icon" name="alert" /><span><strong>{{ item.title }}</strong><small>{{ item.detail }}</small></span><button (click)="openAttentionItem(item.destination)">{{ item.action }}</button></div>
+            } @empty { <div class="empty">Nothing needs attention right now.</div> }
+          </article>
+        </div>
+        <ng-container *ngTemplateOutlet="ordersTable; context: { rows: recentOrders() }" />
+      }
+
+      @if (view() === 'Orders') {
+        <ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Orders, clearly in motion.', description: 'Review approvals, payments, and delivery progress from one place.' }" />
+        <div class="order-tools">
+          <label class="order-search"><app-icon name="search" /><input [(ngModel)]="orderSearch" placeholder="Search order, customer, or product" aria-label="Search orders"></label>
+          <label class="order-filter"><span>Status</span><select [(ngModel)]="orderStatus" aria-label="Filter orders by status"><option>All</option><option>Open</option><option>Pending</option><option>Approved</option><option>In transit</option><option>Delivered</option><option>Cancelled</option></select></label>
+        </div>
+        <ng-container *ngTemplateOutlet="ordersTable; context: { rows: filteredOrders() }" />
+      }
+
+      @if (view() === 'Customers') {
+        <div class="page-heading"><ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Relationships that compound.', description: 'Keep customer context, ownership, and order history close.' }" /><button class="primary icon-button" (click)="openCustomerForm()"><app-icon name="plus" />New customer</button></div>
+        <div class="tools"><label><span>⌕</span><input [(ngModel)]="customerSearch" placeholder="Search name, email, phone, address, or agent"></label></div>
+        <article class="panel customer-list">
+          @for (customer of filteredCustomers(); track customer.id) {
+            <div class="customer-row"><span class="customer-avatar">{{ customer.fullName.slice(0, 2).toUpperCase() }}</span><span class="customer-name"><strong>{{ customer.fullName }}</strong><small>{{ customer.email }}</small></span><span><small>Phone</small><strong>{{ customer.phone }}</strong></span><span><small>Address</small><strong>{{ customer.address }}</strong></span><span><small>Agent</small><strong>{{ customer.assignedAgentName || 'Unassigned' }}</strong></span><span class="table-actions"><button class="row-action" (click)="openCustomerForm(customer)">Edit</button>@if(session()!.role==='ADMIN'){<button class="row-action reject" (click)="deleteCustomer(customer)">Delete</button>}</span></div>
+          } @empty { <div class="empty">No customers match your search.</div> }
+        </article>
+      }
+
+      @if (view() === 'Categories') {
+        <div class="page-heading"><ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Product categories.', description: 'Organize the catalog and protect category relationships.' }" /><button class="primary icon-button" (click)="openCategoryForm()"><app-icon name="plus" />New category</button></div>
+        <div class="tools"><label><span>⌕</span><input [(ngModel)]="categorySearch" placeholder="Search categories"></label></div>
+        <article class="panel management-table">
+          <div class="management-row header"><span>Category</span><span>Description</span><span>Products</span><span>Actions</span></div>
+          @for (category of searchedCategories(); track category.id) {
+            <div class="management-row"><strong>{{ category.name }}</strong><span>{{ category.description || '—' }}</span><span>{{ category.productCount }}</span><span><button class="row-action" (click)="openCategoryForm(category)">Edit</button><button class="row-action reject" (click)="deleteCategory(category)">Delete</button></span></div>
+          } @empty { <div class="empty">No categories found.</div> }
+        </article>
+      }
+
+      @if (view() === 'Products') {
+        <div class="page-heading"><ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Product management.', description: 'Manage catalog details while inventory remains transaction-controlled.' }" /><button class="primary icon-button" (click)="openProductForm()"><app-icon name="plus" />New product</button></div>
+        <div class="tools"><label><span>⌕</span><input [(ngModel)]="productSearch" placeholder="Search product, SKU, or category"></label></div>
+        <article class="panel management-table products-table">
+          <div class="management-row header"><span>Product</span><span>Category</span><span>Price</span><span>Available</span><span>Actions</span></div>
+          @for (product of searchedProducts(); track product.id) {
+            <div class="management-row"><span><strong>{{ product.name }}</strong><small>{{ product.sku }}</small></span><span>{{ product.category }}</span><strong>{{ product.price | currency:'PHP':'symbol-narrow' }}</strong><span>{{ product.stockOnHand - product.stockReserved }}</span><span><button class="row-action" (click)="openProductForm(product)">Edit</button><button class="row-action reject" (click)="deleteProduct(product)">Delete</button></span></div>
+          } @empty { <div class="empty">No products found.</div> }
+        </article>
+      }
+
+      @if (view() === 'Inventory') {
+        <ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Know what’s available.', description: 'On-hand, reserved, and reorder signals—without spreadsheet guesswork.' }" />
+        <div class="tools"><select [(ngModel)]="inventoryHealth" aria-label="Filter inventory by stock health"><option value="ALL">All inventory</option><option value="LOW">Low stock</option><option value="HEALTHY">Healthy</option></select></div>
+        <div class="inventory-grid">
+          @for (item of filteredInventory(); track item.id) {
+            <article class="inventory-card"><div><span class="eyebrow">{{ item.sku }}</span><h3>{{ item.name }}</h3></div><span class="stock-pill" [class.low]="item.stockOnHand <= item.lowStockThreshold">{{ item.stockOnHand <= item.lowStockThreshold ? 'Low stock' : 'Healthy' }}</span><div class="stock-number"><strong>{{ item.stockOnHand }}</strong><small>on hand · {{ item.stockReserved }} reserved</small></div><div class="stock-track"><i [style.width.%]="stockWidth(item.stockOnHand)"></i></div><footer><span>Alert {{ item.lowStockThreshold }} · Reorder {{ item.reorderLevel }}</span><span><button (click)="editInventorySettings(item)">Settings</button><button (click)="adjustInventory(item)">Adjust stock</button></span></footer></article>
+          } @empty { <div class="empty panel">No inventory items match this stock filter.</div> }
+        </div>
+      }
+
+      @if (view() === 'Tracking') {
+        <ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Follow every handoff.', description: 'Enter a tracking number to see the latest verified delivery events.' }" />
+        <article class="tracking-card">
+          <label class="tracking-search"><input [(ngModel)]="trackingNumber" placeholder="Enter tracking number"><button (click)="track()">Track order</button></label>
+          @if (trackingResult(); as result) {
+          <div class="tracking-summary"><div><span class="eyebrow">Tracking number</span><h3>{{ result.trackingNumber }}</h3></div><span [class]="'status ' + statusClass(result.deliveryStatus || result.orderStatus)">{{ titleCase(result.deliveryStatus || result.orderStatus) }}</span><div><small>Delivery address</small><strong>{{ result.deliveryAddress }}</strong></div></div>
+          <div class="timeline">
+            @for (event of result.events; track event.occurredAt) {
+              <div class="timeline-step complete"><i></i><span><strong>{{ titleCase(event.status) }}</strong><small>{{ event.occurredAt | date:'medium' }} · {{ event.notes }}</small></span></div>
+            }
+          </div>
+          } @else { <div class="empty">Enter a tracking number to load live delivery events.</div> }
+        </article>
+      }
+
+      @if (view() === 'Leads') {
+        <div class="page-heading"><ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Lead management.', description: 'Qualify prospects, preserve attribution, and convert them into customers.' }" /><button class="primary icon-button" (click)="openLeadForm()"><app-icon name="plus" />New lead</button></div>
+        <article class="panel management-table"><div class="management-row header"><span>Lead</span><span>Source / agent</span><span>Status</span><span>Actions</span></div>@for(item of leads();track item.id){<div class="management-row"><span><strong>{{item.fullName}}</strong><small>{{item.email}} · {{item.phone}}</small></span><span>{{item.source}}<small>{{item.assignedAgentName||'Unassigned'}}</small></span><span>{{titleCase(item.status)}}</span><span>@if(item.status!=='CONVERTED'){<button class="row-action" (click)="openLeadForm(item)">Edit</button><button class="row-action approve" (click)="convertLead(item)">Convert</button><button class="row-action reject" (click)="removeLead(item)">Delete</button>}</span></div>}@empty{<div class="empty">No leads found.</div>}</article>
+      }
+      @if (view() === 'Campaigns') {
+        <div class="page-heading"><ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Campaign management.', description: 'Manage campaign content, schedules, and lifecycle status.' }" /><button class="primary icon-button" (click)="openCampaignForm()"><app-icon name="plus" />New campaign</button></div>
+        <article class="panel management-table"><div class="management-row header"><span>Campaign</span><span>Audience</span><span>Schedule</span><span>Actions</span></div>@for(item of campaigns();track item.id){<div class="management-row"><span><strong>{{item.name}}</strong><small>{{titleCase(item.status)}}</small></span><span>{{item.targetAudience}}</span><span>{{item.startDate|date:'mediumDate'}} – {{item.endDate|date:'mediumDate'}}</span><span><button class="row-action approve" (click)="sendCampaign(item)">Send email</button><button class="row-action" (click)="openCampaignForm(item)">Edit</button><button class="row-action reject" (click)="removeCampaign(item)">Delete</button></span></div>}@empty{<div class="empty">No campaigns found.</div>}</article>
+      }
+      @if (view() === 'Agents') {
+        <div class="page-heading"><ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Agent management.', description: 'Manage agent access, contact details, and commission rates.' }" /><button class="primary icon-button" (click)="openAgentForm()"><app-icon name="plus" />New agent</button></div>
+        <article class="panel management-table"><div class="management-row header"><span>Agent / status</span><span>Contact</span><span>Commission</span><span>Actions</span></div>@for(item of agents();track item.id){<div class="management-row"><span><strong>{{item.fullName}}</strong><small>{{item.active?'Active':'Inactive'}}</small></span><span>{{item.email}}<small>{{item.phone}}</small></span><span>{{item.commissionRate}}%</span><span><button class="row-action" (click)="openAgentForm(item)">Edit</button>@if(item.active){<button class="row-action reject" (click)="removeAgent(item)">Deactivate</button>}@else{<button class="row-action approve" (click)="activateAgent(item)">Activate</button>}</span></div>}@empty{<div class="empty">No agents found.</div>}</article>
+      }
+      @if (view() === 'Commissions') {
+        <ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Commission history.', description: 'Delivered-order commissions calculated using the captured agent rate.' }" />
+        <article class="panel management-table"><div class="management-row header"><span>Order</span><span>Customer</span><span>Agent / rate</span><span>Amount</span></div>@for(item of commissions();track item.id){<div class="management-row"><strong>{{item.orderId}}</strong><span>{{item.customerName}}</span><span>{{item.agentName}} · {{item.rate}}%</span><strong>{{item.amount|currency:'PHP':'symbol-narrow'}}</strong></div>}@empty{<div class="empty">No commissions have been posted.</div>}</article>
+      }
+      }
+    </section>
+  </main>
+</div>
+
+<ng-template #pageIntro let-title="title" let-description="description">
+  <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>{{ title }}</h2><p>{{ description }}</p></div>
+</ng-template>
+
+<ng-template #ordersTable let-rows="rows">
+  <article class="panel order-panel">
+    <div class="panel-title"><div><span class="eyebrow">Operations</span><h3>Recent orders</h3></div>@if (view() === 'Overview') { <button (click)="selectView('Orders')">View all →</button> }</div>
+    <div class="order-table">
+      <div class="order-row header"><span>Order</span><span>Customer</span><span>Amount</span><span>Status</span><span>Payment</span><span>Action</span></div>
+      @for (order of rows; track order.id) {
+        <div class="order-row"><strong>{{ order.trackingNumber }}</strong><span><b>{{ order.customerName }}</b><small>{{ orderItemSummary(order) }}</small></span><strong>{{ orderAmount(order) | currency:'PHP':'symbol-narrow':'1.0-0' }}</strong><span><i [class]="'status ' + statusClass(displayStatus(order))">{{ displayStatus(order) }}</i></span><span>{{ titleCase(order.paymentStatus) }}</span><span class="table-actions"><button class="row-action" (click)="selectedOrder.set(order)">View</button>@if(order.orderStatus==='PENDING'){<button class="row-action" (click)="openNewOrder(order)">Edit</button>}@if (session()!.role === 'ADMIN' && order.orderStatus === 'PENDING') { <button class="row-action approve" (click)="decideOrder(order, 'APPROVE')">Approve</button><button class="row-action reject" (click)="decideOrder(order, 'REJECT')">Reject</button> }@if(order.orderStatus!=='APPROVED'&&order.orderStatus!=='COMPLETED'){<button class="row-action reject" (click)="removeOrder(order)">Delete</button>}</span></div>
+      } @empty { <div class="empty">No orders match those filters.</div> }
+    </div>
+  </article>
+</ng-template>
+
+@if (showOrderForm()) {
+  <div class="modal-backdrop" (click)="closeNewOrder()">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="new-order-title" (click)="$event.stopPropagation()">
+      <div class="modal-title"><div><span class="eyebrow">Order intake</span><h2 id="new-order-title">{{editingOrderId?'Edit pending order':'Create a new order'}}</h2></div><button (click)="closeNewOrder()">×</button></div>
+      <form (ngSubmit)="submitOrder()">
+        <div class="form-grid">
+          <label>Customer<select name="customer" [(ngModel)]="newOrder.customerId">@for (customer of customers(); track customer.id) { <option [ngValue]="customer.id">{{ customer.fullName }}</option> }</select></label>
+          @if(session()!.role==='ADMIN'){<label>Assigned agent<select name="agent" [(ngModel)]="newOrder.agentId" required>@for(agent of activeAgents();track agent.id){<option [ngValue]="agent.id">{{agent.fullName}}</option>}</select></label>}
+          <label>Payment method<select name="payment" [(ngModel)]="newOrder.paymentMethod"><option>Cash</option><option>Cash on delivery</option><option>Bank transfer</option><option>Card</option></select></label>
+          <div class="wide line-items"><div class="line-items-heading"><span>Order items</span><button type="button" class="row-action approve" (click)="addOrderItem()">＋ Add item</button></div>@for(item of newOrder.items;track $index;let index=$index){<div class="line-item-row"><select [name]="'product'+index" [(ngModel)]="item.productId">@for(product of products();track product.id){<option [ngValue]="product.id">{{product.name}} · {{product.stockOnHand-product.stockReserved}} available</option>}</select><input [name]="'quantity'+index" type="number" min="1" [(ngModel)]="item.quantity"><button type="button" class="row-action reject" [disabled]="newOrder.items.length===1" (click)="removeOrderItem(index)">Remove</button></div>}</div>
+          <label class="wide">Delivery address<input name="address" [(ngModel)]="newOrder.deliveryAddress"></label>
+        </div>
+        <p class="form-note">Stock availability is checked before submission. A tracking number is generated automatically.</p>
+        <footer><button type="button" class="secondary-button" (click)="closeNewOrder()">Cancel</button><button class="primary" type="submit">Create order</button></footer>
+      </form>
+    </section>
+  </div>
+}
+@if (selectedOrder(); as order) {
+  <div class="modal-backdrop" (click)="selectedOrder.set(null)"><section class="modal order-details" (click)="$event.stopPropagation()"><div class="modal-title"><div><span class="eyebrow">Order management</span><h2>{{order.trackingNumber}}</h2></div><button (click)="selectedOrder.set(null)">×</button></div>
+    <div class="detail-grid"><div><small>Customer</small><strong>{{order.customerName}}</strong></div><div><small>Assigned agent</small><strong>{{order.agentName}}</strong></div><div><small>Order status</small><strong>{{titleCase(order.orderStatus)}}</strong></div><div><small>Delivery</small><strong>{{titleCase(order.deliveryStatus)}}</strong></div><div><small>Payment</small><strong>{{titleCase(order.paymentStatus)}} · {{order.paymentMethod}}</strong>@if(order.paymentMethod==='Cash'&&order.cashReceived!==null){<small>Received {{order.cashReceived|currency:'PHP':'symbol-narrow'}} · Change {{order.cashChange|currency:'PHP':'symbol-narrow'}}</small>}</div><div><small>Amount</small><strong>{{orderAmount(order)|currency:'PHP':'symbol-narrow'}}</strong></div><div class="wide"><small>Items</small>@for(item of order.items;track item.productId){<strong>{{item.productName}} ({{item.sku}}) × {{item.quantity}} — {{item.quantity*item.unitPrice|currency:'PHP':'symbol-narrow'}}</strong>}</div><div class="wide"><small>Delivery address</small><strong>{{order.deliveryAddress}}</strong></div></div>
+    <footer class="order-actions">@if(order.orderStatus==='PENDING'){<button class="secondary-button" (click)="openNewOrder(order);selectedOrder.set(null)">Edit order</button>}@if(session()!.role==='ADMIN'){<button class="secondary-button" (click)="updatePayment(order)">Payment status</button>}@if(order.orderStatus==='APPROVED'){<button class="secondary-button" (click)="advanceDelivery(order)">Advance delivery</button>}@if(order.orderStatus!=='APPROVED'&&order.orderStatus!=='COMPLETED'){<button class="danger-button" (click)="removeOrder(order)">Delete order</button>}</footer>
+  </section></div>
+}
+@if (showCategoryForm()) {
+  <div class="modal-backdrop" (click)="showCategoryForm.set(false)">
+    <section class="modal compact" (click)="$event.stopPropagation()">
+      <div class="modal-title"><div><span class="eyebrow">Catalog</span><h2>{{ editingCategoryId ? 'Edit category' : 'New category' }}</h2></div><button (click)="showCategoryForm.set(false)">×</button></div>
+      <form (ngSubmit)="saveCategory()"><div class="form-grid one-column"><label>Category name<input name="categoryName" [(ngModel)]="categoryForm.name" required></label><label>Description<textarea name="categoryDescription" [(ngModel)]="categoryForm.description" rows="4"></textarea></label></div><footer><button type="button" class="secondary-button" (click)="showCategoryForm.set(false)">Cancel</button><button class="primary">Save category</button></footer></form>
+    </section>
+  </div>
+}
+@if (showProductForm()) {
+  <div class="modal-backdrop" (click)="showProductForm.set(false)">
+    <section class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-title"><div><span class="eyebrow">Catalog</span><h2>{{ editingProductId ? 'Edit product' : 'New product' }}</h2></div><button (click)="showProductForm.set(false)">×</button></div>
+      <form (ngSubmit)="saveProduct()"><div class="form-grid"><label>Product name<input name="productName" [(ngModel)]="productForm.name" required></label><label>SKU<input name="sku" [(ngModel)]="productForm.sku" required></label><label>Category<select name="categoryId" [(ngModel)]="productForm.categoryId">@for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }</select></label><label>Price<input name="price" type="number" min="0.01" step="0.01" [(ngModel)]="productForm.price" required></label><label class="wide">Description<textarea name="productDescription" [(ngModel)]="productForm.description" rows="4"></textarea></label></div><p class="form-note">Stock quantities are managed only through Inventory Management.</p><footer><button type="button" class="secondary-button" (click)="showProductForm.set(false)">Cancel</button><button class="primary">Save product</button></footer></form>
+    </section>
+  </div>
+}
+@if (showCustomerForm()) {
+  <div class="modal-backdrop" (click)="showCustomerForm.set(false)"><section class="modal" (click)="$event.stopPropagation()"><div class="modal-title"><div><span class="eyebrow">CRM</span><h2>{{editingCustomerId?'Edit customer':'New customer'}}</h2></div><button type="button" (click)="showCustomerForm.set(false)">×</button></div><form (ngSubmit)="saveCustomer()"><div class="form-grid"><label>Full name<input name="customerName" [(ngModel)]="customerForm.fullName" required minlength="2"></label><label>Email<input name="customerEmail" type="email" [(ngModel)]="customerForm.email" required></label><label>Phone<input name="customerPhone" [(ngModel)]="customerForm.phone" required minlength="7"></label>@if(session()!.role==='ADMIN'){<label>Assigned agent<select name="customerAgent" [(ngModel)]="customerForm.assignedAgentId"><option [ngValue]="null">Unassigned</option>@for(agent of activeAgents();track agent.id){<option [ngValue]="agent.id">{{agent.fullName}}</option>}</select></label>}<label class="wide">Address<textarea name="customerAddress" [(ngModel)]="customerForm.address" rows="4" required minlength="5"></textarea></label></div>@if(session()!.role==='AGENT'){<p class="form-note">This customer will remain assigned to your agent account.</p>}<footer><button type="button" class="secondary-button" (click)="showCustomerForm.set(false)">Cancel</button><button class="primary">Save customer</button></footer></form></section></div>
+}
+@if (showLeadForm()) {
+  <div class="modal-backdrop" (click)="showLeadForm.set(false)"><section class="modal" (click)="$event.stopPropagation()"><div class="modal-title"><div><span class="eyebrow">CRM</span><h2>{{editingLeadId?'Edit lead':'New lead'}}</h2></div><button (click)="showLeadForm.set(false)">×</button></div><form (ngSubmit)="saveLead()"><div class="form-grid"><label>Full name<input name="leadName" [(ngModel)]="leadForm.fullName" required></label><label>Email<input name="leadEmail" type="email" [(ngModel)]="leadForm.email" required></label><label>Phone<input name="leadPhone" [(ngModel)]="leadForm.phone" required></label><label>Source<input name="leadSource" [(ngModel)]="leadForm.source" required></label><label>Assigned agent<select name="leadAgent" [(ngModel)]="leadForm.assignedAgentId"><option [ngValue]="null">Unassigned</option>@for(agent of activeAgents();track agent.id){<option [ngValue]="agent.id">{{agent.fullName}}</option>}</select></label><label>Status<select name="leadStatus" [(ngModel)]="leadForm.status"><option value="NEW">New</option><option value="CONTACTED">Contacted</option><option value="QUALIFIED">Qualified</option><option value="LOST">Lost</option></select></label></div><footer><button type="button" class="secondary-button" (click)="showLeadForm.set(false)">Cancel</button><button class="primary">Save lead</button></footer></form></section></div>
+}
+@if (showCampaignForm()) {
+  <div class="modal-backdrop" (click)="showCampaignForm.set(false)"><section class="modal" (click)="$event.stopPropagation()"><div class="modal-title"><div><span class="eyebrow">Marketing</span><h2>{{editingCampaignId?'Edit campaign':'New campaign'}}</h2></div><button (click)="showCampaignForm.set(false)">×</button></div><form (ngSubmit)="saveCampaign()"><div class="form-grid"><label>Campaign name<input name="campaignName" [(ngModel)]="campaignForm.name" required minlength="2"></label><label>Target audience<input name="campaignAudience" [(ngModel)]="campaignForm.targetAudience" required minlength="2"></label><label>Start date<input name="campaignStart" type="date" [(ngModel)]="campaignForm.startDate" required></label><label>End date<input name="campaignEnd" type="date" [(ngModel)]="campaignForm.endDate" required></label><label>Status<select name="campaignStatus" [(ngModel)]="campaignForm.status"><option value="DRAFT">Draft</option><option value="SCHEDULED">Scheduled</option><option value="ACTIVE">Active</option><option value="COMPLETED">Completed</option></select></label><label class="wide">Campaign content<textarea name="campaignContent" [(ngModel)]="campaignForm.content" rows="6" required minlength="2"></textarea></label></div><footer><button type="button" class="secondary-button" (click)="showCampaignForm.set(false)">Cancel</button><button class="primary">Save campaign</button></footer></form></section></div>
+}
+@if (showAgentForm()) {
+  <div class="modal-backdrop" (click)="showAgentForm.set(false)"><section class="modal" (click)="$event.stopPropagation()"><div class="modal-title"><div><span class="eyebrow">Access</span><h2>{{editingAgentId?'Edit agent':'New agent'}}</h2></div><button (click)="showAgentForm.set(false)">×</button></div><form (ngSubmit)="saveAgent()"><div class="form-grid"><label>Full name<input name="agentName" [(ngModel)]="agentForm.fullName" required></label><label>Email<input name="agentEmail" type="email" [(ngModel)]="agentForm.email" required></label><label>Phone<input name="agentPhone" [(ngModel)]="agentForm.phone" required></label><label>Commission rate (%)<input name="commissionRate" type="number" min="0" max="100" step="0.01" [(ngModel)]="agentForm.commissionRate" required></label><label class="wide">Password {{editingAgentId?'(leave blank to keep current password)':''}}<input name="agentPassword" type="password" minlength="8" [(ngModel)]="agentForm.password" [required]="!editingAgentId"></label></div><footer><button type="button" class="secondary-button" (click)="showAgentForm.set(false)">Cancel</button><button class="primary">Save agent</button></footer></form></section></div>
+}
+@if(actionDialog();as dialog){
+  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog($event)" />
+}
+}

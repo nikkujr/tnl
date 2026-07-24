@@ -1,0 +1,37 @@
+import cors from "cors";
+import express from "express";
+import helmet from "helmet";
+import { config } from "./config.js";
+import authRoutes from "./features/auth/route.js";
+import categoryRoutes from "./features/categories/route.js";
+import agentRoutes from "./features/agents/route.js";
+import campaignRoutes from "./features/campaigns/route.js";
+import commissionRoutes from "./features/commissions/route.js";
+import leadRoutes from "./features/leads/route.js";
+import customerRoutes from "./features/customers/route.js";
+import dashboardRoutes from "./features/dashboard/route.js";
+import orderRoutes from "./features/orders/route.js";
+import productRoutes from "./features/products/route.js";
+import trackingRoutes from "./features/tracking/route.js";
+import { errorHandler, notFound } from "./shared/http.js";
+
+export const app = express();
+app.disable("x-powered-by");
+app.use(helmet());
+app.use(cors({ origin: config.corsOrigins, credentials: false }));
+app.use(express.json({ limit: "1mb" }));
+
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/agents", agentRoutes);
+app.use("/api/v1/campaigns", campaignRoutes);
+app.use("/api/v1/commissions", commissionRoutes);
+app.use("/api/v1/leads", leadRoutes);
+app.use("/api/v1/categories", categoryRoutes);
+app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/customers", customerRoutes);
+app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/tracking", trackingRoutes);
+app.use(notFound);
+app.use(errorHandler);

@@ -1,0 +1,17 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()">
+  <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="action-dialog-title" (click)="$event.stopPropagation()">
+    <header><span class="dialog-icon" [class.danger]="config.tone==='danger'"><app-icon [name]="config.tone==='danger'?'delete':'check'" /></span><button type="button" aria-label="Close dialog" (click)="cancelled.emit()"><app-icon name="close" /></button></header>
+    <h2 id="action-dialog-title">{{config.title}}</h2>
+    <p>{{config.message}}</p>
+    <form (ngSubmit)="submit()">
+      @for(field of config.fields??[];track field.key){
+        @if(isVisible(field)){<label>{{field.label}}
+          @if(field.type==='select'){<select [name]="field.key" [(ngModel)]="field.value" [required]="field.required??false">@for(option of field.options??[];track option){<option [value]="option">{{option.replaceAll('_',' ')}}</option>}</select>}
+          @if(field.type==='number'){<input [name]="field.key" type="number" [(ngModel)]="field.value" [min]="field.min??null" [max]="field.max??null" [required]="field.required??false">}
+          @if(field.type==='text'){<input [name]="field.key" type="text" [(ngModel)]="field.value" [required]="field.required??false">}
+        </label>}
+      }
+      <footer><button type="button" class="cancel" (click)="cancelled.emit()">Cancel</button><button class="confirm" [class.danger]="config.tone==='danger'">{{config.confirmLabel}}</button></footer>
+    </form>
+  </section>
+</div>

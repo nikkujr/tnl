@@ -1,0 +1,159 @@
+/* Motion language for the authenticated workspace */
+.app-shell .topbar > div:first-of-type {
+  animation: admin-title-in .42s cubic-bezier(.22,1,.36,1) both;
+}
+
+.app-shell .content > *:not(.loading-bar) {
+  animation: admin-page-in .42s cubic-bezier(.22,1,.36,1) both;
+}
+
+.admin-sidebar .brand {
+  animation: admin-sidebar-in .48s ease-out both;
+}
+
+.admin-sidebar nav button {
+  animation: admin-sidebar-in .42s cubic-bezier(.22,1,.36,1) both;
+}
+
+.admin-sidebar nav button:nth-of-type(1) { animation-delay: .03s; }
+.admin-sidebar nav button:nth-of-type(2) { animation-delay: .06s; }
+.admin-sidebar nav button:nth-of-type(3) { animation-delay: .09s; }
+.admin-sidebar nav button:nth-of-type(4) { animation-delay: .12s; }
+.admin-sidebar nav button:nth-of-type(5) { animation-delay: .15s; }
+.admin-sidebar nav button:nth-of-type(6) { animation-delay: .18s; }
+.admin-sidebar nav button:nth-of-type(7) { animation-delay: .21s; }
+.admin-sidebar nav button:nth-of-type(8) { animation-delay: .24s; }
+.admin-sidebar nav button:nth-of-type(9) { animation-delay: .27s; }
+.admin-sidebar nav button:nth-of-type(10) { animation-delay: .3s; }
+
+.metric-grid .metric-card {
+  animation: admin-card-in .5s cubic-bezier(.22,1,.36,1) both;
+}
+
+.metric-grid .metric-card:nth-child(1) { animation-delay: .03s; }
+.metric-grid .metric-card:nth-child(2) { animation-delay: .08s; }
+.metric-grid .metric-card:nth-child(3) { animation-delay: .13s; }
+.metric-grid .metric-card:nth-child(4) { animation-delay: .18s; }
+
+.dashboard-grid > .panel {
+  animation: admin-card-in .52s .16s cubic-bezier(.22,1,.36,1) both;
+}
+
+.dashboard-grid > .panel:nth-child(2) {
+  animation-delay: .22s;
+}
+
+.management-row:not(.header),
+.order-row:not(.header),
+.customer-row,
+.inventory-card {
+  transition: transform .18s ease, background-color .18s ease,
+    border-color .18s ease, box-shadow .18s ease;
+}
+
+.management-row:not(.header):hover,
+.order-row:not(.header):hover,
+.customer-row:hover {
+  position: relative;
+  z-index: 1;
+  transform: translateX(3px);
+}
+
+.inventory-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 13px 30px rgba(64,58,105,.1);
+}
+
+.row-action,
+.primary,
+.secondary-button,
+.danger-button {
+  transition: transform .16s ease, color .16s ease, background-color .16s ease,
+    border-color .16s ease, box-shadow .16s ease;
+}
+
+.row-action:not(:disabled):hover,
+.secondary-button:not(:disabled):hover,
+.danger-button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.modal-backdrop {
+  animation: admin-backdrop-in .18s ease-out both;
+}
+
+.modal,
+.dialog-card {
+  animation: admin-dialog-in .3s cubic-bezier(.22,1,.36,1) both;
+}
+
+.notification-menu {
+  transform-origin: top right;
+  animation: admin-menu-in .22s cubic-bezier(.22,1,.36,1) both;
+}
+
+.app-toast {
+  animation: admin-toast-in .28s cubic-bezier(.22,1,.36,1) both;
+}
+
+.status,
+.stock-pill,
+.count {
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.order-row:hover .status,
+.inventory-card:hover .stock-pill {
+  transform: scale(1.04);
+}
+
+@keyframes admin-page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes admin-title-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes admin-sidebar-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes admin-card-in {
+  from { opacity: 0; transform: translateY(16px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes admin-dialog-in {
+  from { opacity: 0; transform: translateY(12px) scale(.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-menu-in {
+  from { opacity: 0; transform: translateY(-7px) scale(.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-toast-in {
+  from { opacity: 0; transform: translateY(-10px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

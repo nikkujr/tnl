@@ -1,0 +1,25 @@
+import { Router } from "express";
+import { z } from "zod";
+import { db } from "../../database/connection.js";
+import { authenticate, authorize } from "../../shared/auth.js";
+import { HttpError, validate } from "../../shared/http.js";
+import { sendCampaignEmail } from "../../shared/email.js";
+const router = Router();
+router.use(authenticate, authorize("ADMIN"));
+router.get("/", async (_req, res, next) => { try { const [rows] = await db.query("SELECT id,name,target_audience targetAudience,content,start_date startDate,end_date endDate,status FROM campaigns ORDER BY start_date DESC"); res.json({ data: rows }); } catch (e) { next(e); } });
+const body = z.object({ name: z.string().min(2).max(180), targetAudience: z.string().min(2).max(500), content: z.string().min(2), startDate: z.string().date(), endDate: z.string().date(), status: z.enum(["DRAFT","SCHEDULED","ACTIVE","COMPLETED"]).default("DRAFT") }).refine((v) => v.endDate > v.startDate, { message: "End date must be later than start date" });
+router.post("/", validate(z.object({ body, query: z.any(), params: z.any() })), async (req,res,next)=>{try{const [r]=await db.execute<any>("INSERT INTO campaigns(name,target_audience,content,start_date,end_date,status) VALUES(?,?,?,?,?,?)",[req.body.name,req.body.targetAudience,req.body.content,req.body.startDate,req.body.endDate,req.body.status]);res.status(201).json({data:{id:r.insertId,...req.body}});}catch(e:any){if(e?.code==="ER_DUP_ENTRY")return next(new HttpError(409,"Campaign name already exists"));next(e);}});
+router.put("/:id", validate(z.object({ body, query:z.any(), params:z.object({id:z.coerce.number().int().positive()}) })), async(req,res,next)=>{try{const id=Number(req.params.id);const[r]=await db.execute<any>("UPDATE campaigns SET name=?,target_audience=?,content=?,start_date=?,end_date=?,status=? WHERE id=?",[req.body.name,req.body.targetAudience,req.body.content,req.body.startDate,req.body.endDate,req.body.status,id]);if(!r.affectedRows)throw new HttpError(404,"Campaign not found");res.json({data:{id,...req.body}});}catch(e:any){if(e?.code==="ER_DUP_ENTRY")return next(new HttpError(409,"Campaign name already exists"));next(e);}});
+router.post("/:id/send", validate(z.object({body:z.object({}),query:z.any(),params:z.object({id:z.coerce.number().int().positive()})})), async(req,res,next)=>{try{
+  const id=Number(req.params.id);
+  const[campaigns]=await db.query<any[]>("SELECT name,content FROM campaigns WHERE id=?",[id]);
+  if(!campaigns.length)throw new HttpError(404,"Campaign not found");
+  const[contacts]=await db.query<any[]>("SELECT DISTINCT LOWER(email) email FROM customers WHERE email IS NOT NULL AND email<>''");
+  const recipients=contacts.map((contact)=>contact.email);
+  if(!recipients.length)throw new HttpError(409,"No customer email addresses are available");
+  const delivery=await sendCampaignEmail(campaigns[0],recipients);
+  await db.execute("UPDATE campaigns SET status='ACTIVE' WHERE id=? AND status IN ('DRAFT','SCHEDULED')",[id]);
+  res.json({data:delivery});
+}catch(e){next(e);}});
+router.delete("/:id", validate(z.object({body:z.any(),query:z.any(),params:z.object({id:z.coerce.number().int().positive()})})), async(req,res,next)=>{try{const [r]=await db.execute<any>("DELETE FROM campaigns WHERE id=?",[Number(req.params.id)]);if(!r.affectedRows)throw new HttpError(404,"Campaign not found");res.status(204).send();}catch(e){next(e);}});
+export default router;

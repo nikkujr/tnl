@@ -1,0 +1,120 @@
+.admin-sidebar nav button {
+  position: relative;
+  isolation: isolate;
+  min-height: 46px;
+  margin-block: 4px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  transition: color .2s ease, border-color .2s ease, background-color .2s ease,
+    box-shadow .2s ease, transform .2s ease;
+}
+
+.admin-sidebar nav button::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(105deg, rgba(185,178,238,.2), rgba(113,103,201,.08));
+  opacity: 0;
+  transform: translateX(-14px);
+  transition: opacity .2s ease, transform .25s cubic-bezier(.22,1,.36,1);
+}
+
+.admin-sidebar nav button:hover {
+  border-color: rgba(214,210,241,.12);
+  background: rgba(255,255,255,.045);
+  transform: translateX(2px);
+}
+
+.admin-sidebar nav button.active {
+  color: #fff;
+  border-color: rgba(214,210,241,.22);
+  background: rgba(155,146,220,.12);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.025),
+    0 8px 20px rgba(17,15,37,.18);
+}
+
+.admin-sidebar nav button.active::before {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.admin-sidebar nav button.active::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cfc9ff;
+  box-shadow: 0 0 0 4px rgba(207,201,255,.11), 0 0 14px rgba(207,201,255,.75);
+  transform: translateY(-50%);
+}
+
+.admin-sidebar nav button .icon {
+  width: 31px;
+  height: 31px;
+  margin: -5px 0 -5px -5px;
+  padding: 6px;
+  border-radius: 9px;
+  color: #bdb7dc;
+  transition: color .2s ease, background-color .2s ease, box-shadow .2s ease,
+    transform .2s ease;
+}
+
+.admin-sidebar nav button:hover .icon {
+  color: #dedaff;
+}
+
+.admin-sidebar nav button.active .icon {
+  color: #fff;
+  background: linear-gradient(145deg, #9188df, #6e63c4);
+  box-shadow: 0 5px 13px rgba(24,20,66,.32), inset 0 1px rgba(255,255,255,.18);
+  transform: rotate(-3deg) scale(1.03);
+}
+
+.admin-sidebar .nav-label {
+  margin-top: 4px;
+  color: #aaa5c5;
+}
+
+.admin-sidebar .nav-label.secondary {
+  position: relative;
+  padding-top: 18px;
+}
+
+.admin-sidebar .nav-label.secondary::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 10px;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(201,197,223,.22), transparent);
+}
+
+@media (max-width: 960px) and (min-width: 681px) {
+  .admin-sidebar nav button {
+    overflow: visible;
+  }
+
+  .admin-sidebar nav button.active::after {
+    top: 5px;
+    right: 5px;
+    width: 5px;
+    height: 5px;
+  }
+
+  .admin-sidebar nav button .icon {
+    margin: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .admin-sidebar nav button:hover {
+    transform: none;
+  }
+}
