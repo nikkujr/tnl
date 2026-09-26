@@ -9,7 +9,14 @@ export class HttpError extends Error {
 
 export const validate = (schema: ZodType): RequestHandler => (req, _res, next) => {
   const result = schema.safeParse({ body: req.body, query: req.query, params: req.params });
-  if (!result.success) return next(new HttpError(400, "Validation failed", result.error.flatten()));
+  if (!result.success) {
+    const messages = result.error.issues.map((issue) => {
+      const field = issue.path.filter((segment) => segment !== "body").join(".");
+      return field ? `${field}: ${issue.message}` : issue.message;
+    });
+    const summary = messages.length ? `Validation failed — ${messages.join("; ")}` : "Validation failed";
+    return next(new HttpError(400, summary, result.error.flatten()));
+  }
   const validated = result.data as { body?: unknown };
   if (validated.body !== undefined) req.body = validated.body;
   next();

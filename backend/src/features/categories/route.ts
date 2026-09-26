@@ -53,14 +53,24 @@ router.put("/:id", validate(paramsSchema), async (req, res, next) => {
 });
 
 router.delete("/:id", async (req, res, next) => {
+  const connection = await db.getConnection();
   try {
     const id = Number(req.params.id);
-    const [rows] = await db.query<any[]>("SELECT COUNT(*) productCount FROM products WHERE category_id=? AND active=TRUE", [id]);
-    if (rows[0].productCount > 0) throw new HttpError(409, "Reassign or delete associated products before deleting this category");
-    const [result] = await db.execute<any>("DELETE FROM categories WHERE id=?", [id]);
+    await connection.beginTransaction();
+    const [active] = await connection.query<any[]>("SELECT COUNT(*) productCount FROM products WHERE category_id=? AND active=TRUE", [id]);
+    if (active[0].productCount > 0) throw new HttpError(409, "Reassign or delete associated products before deleting this category");
+    const [blocked] = await connection.query<any[]>(
+      `SELECT COUNT(*) productCount FROM products p WHERE p.category_id=? AND p.active=FALSE
+       AND (EXISTS (SELECT 1 FROM order_items oi WHERE oi.product_id=p.id) OR EXISTS (SELECT 1 FROM inventory_movements im WHERE im.product_id=p.id))`,
+      [id]
+    );
+    if (blocked[0].productCount > 0) throw new HttpError(409, "This category has archived products with order or inventory history and cannot be deleted");
+    await connection.execute("DELETE FROM products WHERE category_id=? AND active=FALSE", [id]);
+    const [result] = await connection.execute<any>("DELETE FROM categories WHERE id=?", [id]);
     if (!result.affectedRows) throw new HttpError(404, "Category not found");
+    await connection.commit();
     res.status(204).send();
-  } catch (error) { next(error); }
+  } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
 });
 
 export default router;

@@ -9,9 +9,9 @@ await db.execute(
   ["admin@tnl.local", passwordHash, "Nico Alvarez", "ADMIN", 0]
 );
 await db.execute(
-  `INSERT INTO users(email,password_hash,full_name,role,commission_rate)
-   VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE full_name=VALUES(full_name),active=TRUE`,
-  ["agent@tnl.local", passwordHash, "Jamie Co", "AGENT", 5]
+  `INSERT INTO users(email,phone,password_hash,full_name,role,commission_rate)
+   VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE full_name=VALUES(full_name),active=TRUE`,
+  ["agent@tnl.local", "09051234567", passwordHash, "Jamie Co", "AGENT", 5]
 );
 
 const [[admin], [agent]] = await Promise.all([
@@ -42,7 +42,7 @@ for (const product of [
 await db.execute(
   `INSERT INTO customers(full_name,email,phone,address,assigned_agent_id)
    VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE assigned_agent_id=VALUES(assigned_agent_id)`,
-  ["Mara Santos", "mara@northmail.co", "+63 917 555 0112", "128 Maginhawa Street, Quezon City", agent[0].id]
+  ["Mara Santos", "mara@northmail.co", "09175550112", "128 Maginhawa Street, Quezon City", agent[0].id]
 );
 
 console.log(`Seed complete. Admin user id: ${admin[0].id}; agent user id: ${agent[0].id}`);

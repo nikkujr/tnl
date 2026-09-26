@@ -3,6 +3,13 @@ import { z } from "zod";
 import { db } from "../../database/connection.js";
 import { authenticate, authorize } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
+import { normalizePhPhone } from "../../shared/phone.js";
+
+const phoneField = z.string().transform((value, ctx) => {
+  const normalized = normalizePhPhone(value);
+  if (!normalized) { ctx.addIssue({ code: "custom", message: "Enter a valid PH mobile number, e.g. 09171234567" }); return z.NEVER; }
+  return normalized;
+});
 
 const router = Router();
 router.use(authenticate);
@@ -28,7 +35,7 @@ router.get("/", async (req, res, next) => {
 });
 
 const createSchema = z.object({
-  body: z.object({ fullName: z.string().min(2).max(160), email: z.email(), phone: z.string().min(7).max(40), address: z.string().min(5).max(500), assignedAgentId: z.number().int().positive().nullable().optional() }),
+  body: z.object({ fullName: z.string().min(2).max(160), email: z.email(), phone: phoneField, address: z.string().min(5).max(500), assignedAgentId: z.number().int().positive().nullable().optional() }),
   query: z.any(), params: z.any()
 });
 router.post("/", validate(createSchema), async (req, res, next) => {
@@ -64,14 +71,18 @@ router.put("/:id", validate(z.object({
 });
 
 router.delete("/:id", authorize("ADMIN"), async (req, res, next) => {
+  const connection = await db.getConnection();
   try {
     const id = Number(req.params.id);
-    const [orders] = await db.query<any[]>("SELECT COUNT(*) orderCount FROM orders WHERE customer_id=?", [id]);
+    await connection.beginTransaction();
+    const [orders] = await connection.query<any[]>("SELECT COUNT(*) orderCount FROM orders WHERE customer_id=?", [id]);
     if (orders[0].orderCount > 0) throw new HttpError(409, "Customer has order history and cannot be deleted");
-    const [result] = await db.execute<any>("DELETE FROM customers WHERE id=?", [id]);
+    await connection.execute("UPDATE leads SET converted_customer_id=NULL WHERE converted_customer_id=?", [id]);
+    const [result] = await connection.execute<any>("DELETE FROM customers WHERE id=?", [id]);
     if (!result.affectedRows) throw new HttpError(404, "Customer not found");
+    await connection.commit();
     res.status(204).send();
-  } catch (error) { next(error); }
+  } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
 });
 
 export default router;
