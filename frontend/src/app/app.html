@@ -31,14 +31,14 @@
     <nav aria-label="Primary navigation">
       <span class="nav-label">Workspace</span>
       @for (item of visibleNavigation(); track item) {
-        <button [class.active]="view() === item" (click)="selectView(item)">
+        <button [class.active]="isNavActive(item)" (click)="selectView(item)">
           <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
         </button>
       }
       @if (session()!.role === 'ADMIN') {
         <span class="nav-label secondary">Manage</span>
         @for (item of ['Leads', 'Campaigns', 'Agents']; track item) {
-          <button [class.active]="view() === item" (click)="selectView(item)">
+          <button [class.active]="isNavActive(item)" (click)="selectView(item)">
             <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
           </button>
         }
@@ -55,7 +55,7 @@
   <main>
     <header class="topbar">
       <button class="hamburger" type="button" aria-label="Open navigation" [attr.aria-expanded]="mobileNavOpen()" (click)="mobileNavOpen.set(!mobileNavOpen())"><app-icon name="menu" /></button>
-      <div><span class="eyebrow">{{ session()!.role }} workspace</span><h1>{{ isNewOrderPage() ? 'New Order' : isOrderDetailPage() ? 'Order details' : isAgentDetailPage() ? 'Agent details' : view() }}</h1></div>
+      <div><span class="eyebrow">{{ session()!.role }} workspace</span><h1>{{ isNewOrderPage() ? 'New Order' : isOrderDetailPage() ? 'Order details' : isAgentDetailPage() ? 'Agent details' : isImportsPage() ? 'Import sales data' : isOrdersListPage() ? 'Orders' : view() }}</h1></div>
       <div class="header-actions">
         <div class="notification-center" #notificationCenter>
           <button class="bell" type="button" aria-label="Notifications" [attr.aria-expanded]="notificationPanelOpen()" (click)="toggleNotifications()">
@@ -77,14 +77,14 @@
             </section>
           }
         </div>
-        @if(!isNewOrderPage()&&!isOrderDetailPage()&&!isAgentDetailPage()){<button class="primary icon-button" (click)="openNewOrder()"><app-icon name="plus" />New order</button>}
+        @if(!isNewOrderPage()&&!isOrderDetailPage()&&!isAgentDetailPage()&&!isImportsPage()){<button class="primary icon-button" (click)="openNewOrder()"><app-icon name="plus" />New order</button>}
       </div>
     </header>
 
     <section class="content">
       @if (error()) { <div class="error-banner workspace-error">{{ error() }} <button (click)="error.set('')">×</button></div> }
       @if (loading()) { <div class="loading-bar"><i></i></div> }
-      @if (isNewOrderPage() || isOrderDetailPage() || isAgentDetailPage()) {
+      @if (isNewOrderPage() || isOrderDetailPage() || isAgentDetailPage() || isImportsPage() || isOrdersListPage()) {
         <router-outlet />
       } @else {
       @if (view() === 'Overview') {
@@ -116,15 +116,6 @@
           </article>
         </div>
         <ng-container *ngTemplateOutlet="ordersTable; context: { rows: recentOrders() }" />
-      }
-
-      @if (view() === 'Orders') {
-        <ng-container *ngTemplateOutlet="pageIntro; context: { title: 'Orders, clearly in motion.', description: 'Review approvals, payments, and delivery progress from one place.' }" />
-        <div class="order-tools">
-          <label class="order-search"><app-icon name="search" /><input [(ngModel)]="orderSearch" placeholder="Search order, customer, or product" aria-label="Search orders"></label>
-          <label class="order-filter"><span>Status</span><select [(ngModel)]="orderStatus" aria-label="Filter orders by status"><option>All</option><option>Open</option><option>Pending</option><option>Approved</option><option>In transit</option><option>Delivered</option><option>Cancelled</option></select></label>
-        </div>
-        <ng-container *ngTemplateOutlet="ordersTable; context: { rows: filteredOrders() }" />
       }
 
       @if (view() === 'Customers') {

@@ -1,0 +1,90 @@
+<div class="orders-page">
+  <header class="page-head">
+    <div class="page-head-row">
+      <div>
+        <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Orders' }]" />
+        <h2>Orders, clearly in motion.</h2>
+        <p>Review approvals, payments, and delivery progress from one place.</p>
+      </div>
+      @if (session().role === 'ADMIN') { <button class="secondary-button" (click)="goToImports()">Import sales data</button> }
+    </div>
+  </header>
+
+  @if (error()) { <div class="alert">{{ error() }}<button (click)="error.set('')">×</button></div> }
+  @if (notice()) { <div class="alert success">{{ notice() }}</div> }
+
+  @if (stats(); as s) {
+  <div class="metric-grid">
+    <div class="metric-card metric-tone-0"><div class="metric-head"><span class="metric-icon"><app-icon name="commissions" /></span><span class="metric-label">Revenue</span></div><strong class="metric-value">{{ money(s.totalRevenue) }}</strong><div class="metric-foot"><b>Paid</b><span>recognized</span></div></div>
+    <div class="metric-card metric-tone-1"><div class="metric-head"><span class="metric-icon"><app-icon name="orders" /></span><span class="metric-label">Total orders</span></div><strong class="metric-value">{{ s.totalOrders }}</strong><div class="metric-foot"><b>{{ s.pendingOrders }} pending</b><span>now</span></div></div>
+    <div class="metric-card metric-tone-2"><div class="metric-head"><span class="metric-icon"><app-icon name="check" /></span><span class="metric-label">Completed</span></div><strong class="metric-value">{{ s.completedOrders }}</strong><div class="metric-foot"><b>Fulfilled</b><span>orders</span></div></div>
+    <div class="metric-card metric-tone-3"><div class="metric-head"><span class="metric-icon"><app-icon name="gauge" /></span><span class="metric-label">Avg. order value</span></div><strong class="metric-value">{{ money(s.averageOrderValue) }}</strong><div class="metric-foot"><b>Per paid</b><span>order</span></div></div>
+  </div>
+
+  <div class="dashboard-grid">
+    <article class="panel chart-panel">
+      <div class="panel-title"><div><span class="eyebrow">Last 12 months</span><h3>Orders &amp; revenue trend</h3></div></div>
+      <div class="chart">
+        @for (bar of monthlyBars(); track bar.month; let last = $last) {
+          <div><span [style.height.%]="bar.height" [class.current]="last" [attr.title]="bar.orders + ' orders · ' + money(bar.revenue)"></span><small>{{ bar.label }}</small></div>
+        } @empty { <p class="empty-inline">No order history yet.</p> }
+      </div>
+    </article>
+    <article class="panel attention">
+      <div class="panel-title"><div><span class="eyebrow">Breakdown</span><h3>Orders by status</h3></div></div>
+      <div class="status-bars">
+        @for (bar of statusBars(); track bar.status) {
+          <div class="status-bar-row">
+            <span class="status-bar-label">{{ bar.status }}</span>
+            <div class="status-bar-track"><span [style.width.%]="bar.width" [style.background]="bar.color"></span></div>
+            <strong>{{ bar.count }}</strong>
+          </div>
+        } @empty { <p class="empty-inline">No orders yet.</p> }
+      </div>
+    </article>
+  </div>
+  }
+
+  <div class="order-tools">
+    <label class="order-search"><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search order, customer, or product" aria-label="Search orders"></label>
+    <label class="order-filter"><span>Status</span>
+      <select [(ngModel)]="status" (ngModelChange)="onStatusChange()" aria-label="Filter orders by status">
+        @for (option of statusOptions; track option) { <option [value]="option">{{ option }}</option> }
+      </select>
+    </label>
+  </div>
+
+  <article class="panel order-panel">
+    <div class="order-table">
+      <div class="order-row header"><span>Order</span><span>Customer</span><span>Amount</span><span>Status</span><span>Payment</span><span>Action</span></div>
+      @for (order of orders(); track order.id) {
+        <div class="order-row">
+          <strong>{{ order.trackingNumber }}</strong>
+          <span><b>{{ order.customerName }}</b><small>{{ orderItemSummary(order) }}</small></span>
+          <strong>{{ orderAmount(order) | currency:'PHP':'symbol-narrow':'1.0-0' }}</strong>
+          <span><i [class]="'status ' + statusClass(displayStatus(order))">{{ displayStatus(order) }}</i></span>
+          <span>{{ titleCase(order.paymentStatus) }}</span>
+          <span class="table-actions">
+            <button class="row-action" (click)="viewOrder(order)">View</button>
+            @if (order.orderStatus === 'PENDING') { <button class="row-action" (click)="editOrder(order)">Edit</button> }
+            @if (session().role === 'ADMIN' && order.orderStatus === 'PENDING') {
+              <button class="row-action approve" (click)="decideOrder(order, 'APPROVE')">Approve</button>
+              <button class="row-action reject" (click)="decideOrder(order, 'REJECT')">Reject</button>
+            }
+            @if (order.orderStatus !== 'APPROVED' && order.orderStatus !== 'COMPLETED') { <button class="row-action reject" (click)="removeOrder(order)">Delete</button> }
+          </span>
+        </div>
+      } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No orders match those filters.' }}</div> }
+    </div>
+  </article>
+
+  <div class="pagination">
+    <button class="ghost-button" [disabled]="page === 1" (click)="goToPage(-1)">← Previous</button>
+    <span>Page {{ page }} of {{ totalPages() }} · {{ total }} orders</span>
+    <button class="ghost-button" [disabled]="page >= totalPages()" (click)="goToPage(1)">Next →</button>
+  </div>
+</div>
+
+@if (actionDialog(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog()" />
+}

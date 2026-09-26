@@ -65,27 +65,114 @@ async function loadProducts(connection: any, items: Array<{ productId: number; q
   return rows;
 }
 
+const STATUS_FILTERS: Record<string, string> = {
+  Open: "o.order_status IN ('PENDING','APPROVED')",
+  Pending: "o.order_status='PENDING'",
+  Approved: "o.order_status='APPROVED' AND (o.delivery_status IS NULL OR o.delivery_status NOT IN ('DELIVERED','IN_TRANSIT'))",
+  "In transit": "o.delivery_status='IN_TRANSIT'",
+  Delivered: "o.delivery_status='DELIVERED'",
+  Cancelled: "o.order_status='CANCELLED'"
+};
+
 router.get("/", async (req, res, next) => {
   try {
-    const scope = req.user!.role === "AGENT" ? " WHERE o.agent_id=?" : "";
+    const page = Math.max(1, Number(req.query.page ?? 1));
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 20)));
+    const offset = (page - 1) * limit;
+    const search = String(req.query.search ?? "").trim();
+    const status = String(req.query.status ?? "All");
+
+    const filters: string[] = [];
+    const args: unknown[] = [];
+    if (req.user!.role === "AGENT") { filters.push("o.agent_id=?"); args.push(req.user!.id); }
+    if (search) {
+      filters.push("(o.tracking_number LIKE ? OR c.full_name LIKE ? OR EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id=o.id AND oi.product_name LIKE ?))");
+      args.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (STATUS_FILTERS[status]) filters.push(STATUS_FILTERS[status]);
+    const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
+
+    const [countRows] = await db.query<any[]>(
+      `SELECT COUNT(*) total FROM orders o JOIN customers c ON c.id=o.customer_id${where}`,
+      args
+    );
     const [orders] = await db.query<any[]>(
       `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,
        c.full_name customerName,o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
        o.cash_change cashChange,o.delivery_address deliveryAddress,
        o.created_at createdAt,u.full_name agentName
-       FROM orders o JOIN customers c ON c.id=o.customer_id JOIN users u ON u.id=o.agent_id${scope}
-       ORDER BY o.created_at DESC`,
-      req.user!.role === "AGENT" ? [req.user!.id] : []
+       FROM orders o JOIN customers c ON c.id=o.customer_id JOIN users u ON u.id=o.agent_id${where}
+       ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
+      [...args, limit, offset]
     );
-    if (!orders.length) return res.json({ data: [] });
+    if (!orders.length) return res.json({ data: [], meta: { page, limit, total: countRows[0].total } });
     const ids = orders.map((order) => order.id);
     const [items] = await db.query<any[]>(
       `SELECT order_id orderId,product_id productId,product_name productName,sku,quantity,unit_price unitPrice
        FROM order_items WHERE order_id IN (${ids.map(() => "?").join(",")}) ORDER BY id`,
       ids
     );
-    res.json({ data: orders.map((order) => ({ ...order, items: items.filter((item) => item.orderId === order.id) })) });
+    res.json({
+      data: orders.map((order) => ({ ...order, items: items.filter((item) => item.orderId === order.id) })),
+      meta: { page, limit, total: countRows[0].total }
+    });
+  } catch (error) { next(error); }
+});
+
+router.get("/stats", async (req, res, next) => {
+  try {
+    const scope = req.user!.role === "AGENT" ? " WHERE o.agent_id=?" : "";
+    const args = req.user!.role === "AGENT" ? [req.user!.id] : [];
+    const revenueExpr = `CASE WHEN o.payment_status='PAID' THEN (SELECT COALESCE(SUM(oi.quantity*oi.unit_price),0) FROM order_items oi WHERE oi.order_id=o.id) ELSE 0 END`;
+    const [totalsRows] = await db.query<any[]>(
+      `SELECT COUNT(*) totalOrders,
+       SUM(o.order_status='PENDING') pendingOrders,
+       SUM(o.order_status='COMPLETED') completedOrders,
+       SUM(o.order_status IN ('CANCELLED','REJECTED')) cancelledOrders,
+       SUM(o.payment_status='PAID') paidOrders,
+       COALESCE(SUM(${revenueExpr}),0) totalRevenue
+       FROM orders o${scope}`,
+      args
+    );
+    const [statusRows] = await db.query<any[]>(
+      `SELECT
+        CASE
+          WHEN o.delivery_status='DELIVERED' THEN 'Delivered'
+          WHEN o.delivery_status='IN_TRANSIT' THEN 'In transit'
+          WHEN o.order_status='PENDING' THEN 'Pending'
+          WHEN o.order_status='APPROVED' THEN 'Approved'
+          WHEN o.order_status='COMPLETED' THEN 'Completed'
+          WHEN o.order_status='CANCELLED' THEN 'Cancelled'
+          ELSE 'Rejected'
+        END status, COUNT(*) count
+       FROM orders o${scope} GROUP BY status`,
+      args
+    );
+    const monthlyScope = req.user!.role === "AGENT" ? " AND o.agent_id=?" : "";
+    const [monthlyRows] = await db.query<any[]>(
+      `SELECT DATE_FORMAT(o.created_at,'%Y-%m') month, COUNT(*) orders, COALESCE(SUM(${revenueExpr}),0) revenue
+       FROM orders o
+       WHERE o.created_at>=DATE_FORMAT(DATE_SUB(CURRENT_DATE,INTERVAL 11 MONTH),'%Y-%m-01')${monthlyScope}
+       GROUP BY month ORDER BY month`,
+      args
+    );
+    const totals = totalsRows[0];
+    const totalOrders = Number(totals.totalOrders ?? 0);
+    const paidOrders = Number(totals.paidOrders ?? 0);
+    const totalRevenue = Number(totals.totalRevenue ?? 0);
+    res.json({
+      data: {
+        totalOrders,
+        pendingOrders: Number(totals.pendingOrders ?? 0),
+        completedOrders: Number(totals.completedOrders ?? 0),
+        cancelledOrders: Number(totals.cancelledOrders ?? 0),
+        totalRevenue,
+        averageOrderValue: paidOrders > 0 ? totalRevenue / paidOrders : 0,
+        statusBreakdown: statusRows.map((row) => ({ status: row.status, count: Number(row.count) })),
+        monthlyTrend: monthlyRows.map((row) => ({ month: row.month, orders: Number(row.orders), revenue: Number(row.revenue) }))
+      }
+    });
   } catch (error) { next(error); }
 });
 

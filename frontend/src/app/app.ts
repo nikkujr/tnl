@@ -28,10 +28,10 @@ import {
   TrackingResult
 } from './core/api.service';
 
-type View = 'Overview' | 'Orders' | 'Customers' | 'Categories' | 'Products' | 'Inventory' | 'Tracking' | 'Leads' | 'Campaigns' | 'Agents' | 'Commissions';
+type View = 'Overview' | 'Customers' | 'Categories' | 'Products' | 'Inventory' | 'Tracking' | 'Leads' | 'Campaigns' | 'Agents' | 'Commissions';
 
 const VIEW_ROUTES: Record<View, string> = {
-  Overview: 'dashboard', Orders: 'orders', Customers: 'customers',
+  Overview: 'dashboard', Customers: 'customers',
   Categories: 'categories', Products: 'products', Inventory: 'inventory',
   Tracking: 'tracking', Leads: 'leads', Campaigns: 'campaigns',
   Agents: 'agents', Commissions: 'commissions'
@@ -68,6 +68,8 @@ export class App implements OnInit, OnDestroy {
   readonly isOrderDetailPage = computed(() => this.viewingOrderId() !== null);
   readonly viewingAgentId = signal<number | null>(null);
   readonly isAgentDetailPage = computed(() => this.viewingAgentId() !== null);
+  readonly isImportsPage = signal(false);
+  readonly isOrdersListPage = signal(false);
   readonly showCategoryForm = signal(false);
   readonly showProductForm = signal(false);
   readonly showLeadForm = signal(false);
@@ -104,9 +106,7 @@ export class App implements OnInit, OnDestroy {
 
   loginEmail = 'admin@tnl.local';
   loginPassword = 'TnlDemo123!';
-  orderSearch = '';
   customerSearch = '';
-  orderStatus = 'All';
   trackingNumber = '';
   categorySearch = '';
   productSearch = '';
@@ -137,7 +137,7 @@ export class App implements OnInit, OnDestroy {
     return months.map((item) => ({ ...item, value: item.revenue === 0 ? 0 : Math.max(6, (item.revenue / maximum) * 100) }));
   });
 
-  readonly visibleNavigation = computed<View[]>(() =>
+  readonly visibleNavigation = computed<Array<View | 'Orders'>>(() =>
     this.session()?.role === 'ADMIN'
       ? ['Overview', 'Orders', 'Customers', 'Categories', 'Products', 'Inventory', 'Tracking']
       : ['Overview', 'Orders', 'Customers', 'Commissions', 'Tracking']
@@ -148,11 +148,11 @@ export class App implements OnInit, OnDestroy {
   readonly metrics = computed(() => {
     const summary = this.summary();
     return [
-      { label: 'Revenue', value: this.money(summary.revenue), change: 'Paid', note: 'recognized', icon:'commissions' as AppIconName, destination:'Orders' as View },
-      { label: 'Open orders', value: String(summary.openOrders), change: `${summary.pendingOrders} pending`, note: 'now', icon:'orders' as AppIconName, destination:'Orders' as View, filter:'Open' },
+      { label: 'Revenue', value: this.money(summary.revenue), change: 'Paid', note: 'recognized', icon:'commissions' as AppIconName, destination:'Orders' as const },
+      { label: 'Open orders', value: String(summary.openOrders), change: `${summary.pendingOrders} pending`, note: 'now', icon:'orders' as AppIconName, destination:'Orders' as const, filter:'Open' },
       this.session()?.role === 'ADMIN'
         ? { label: 'Customers', value: String(summary.totalCustomers), change: 'Live', note: 'records', icon:'customers' as AppIconName, destination:'Customers' as View }
-        : { label: 'Completed', value: String(summary.completedOrders), change: 'Your', note: 'orders', icon:'check' as AppIconName, destination:'Orders' as View },
+        : { label: 'Completed', value: String(summary.completedOrders), change: 'Your', note: 'orders', icon:'check' as AppIconName, destination:'Orders' as const },
       { label: 'Low stock', value: String(summary.lowStockProducts), change: `${summary.totalProducts} total`, note: 'products', icon:'inventory' as AppIconName, destination:'Inventory' as View, filter:'LOW' }
     ];
   });
@@ -163,7 +163,7 @@ export class App implements OnInit, OnDestroy {
       : [];
     const pending = this.orders().find((order) => order.orderStatus === 'PENDING');
     return pending
-      ? [...lowStock, { title: pending.trackingNumber, detail: 'Awaiting approval', action: 'Review', destination: 'Orders' as View }]
+      ? [...lowStock, { title: pending.trackingNumber, detail: 'Awaiting approval', action: 'Review', destination: 'Orders' as const }]
       : lowStock;
   });
 
@@ -172,13 +172,17 @@ export class App implements OnInit, OnDestroy {
     this.isNewOrderPage.set(browserUrl.startsWith('/orders/new'));
     this.viewingOrderId.set(this.matchOrderDetailId(browserUrl));
     this.viewingAgentId.set(this.matchDetailId(browserUrl, 'agents'));
+    this.isImportsPage.set(browserUrl.startsWith('/imports'));
+    this.isOrdersListPage.set(browserUrl.split(/[?#]/)[0] === '/orders');
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd)).subscribe((event) => {
-      const wasSubPage = this.isNewOrderPage() || this.isOrderDetailPage() || this.isAgentDetailPage();
+      const wasSubPage = this.isNewOrderPage() || this.isOrderDetailPage() || this.isAgentDetailPage() || this.isImportsPage() || this.isOrdersListPage();
       this.isNewOrderPage.set(event.urlAfterRedirects.startsWith('/orders/new'));
       this.viewingOrderId.set(this.matchOrderDetailId(event.urlAfterRedirects));
       this.viewingAgentId.set(this.matchDetailId(event.urlAfterRedirects, 'agents'));
+      this.isImportsPage.set(event.urlAfterRedirects.startsWith('/imports'));
+      this.isOrdersListPage.set(event.urlAfterRedirects.split(/[?#]/)[0] === '/orders');
       if (this.session()) this.applyWorkspaceRoute(event.urlAfterRedirects);
-      if (wasSubPage && !this.isNewOrderPage() && !this.isOrderDetailPage() && !this.isAgentDetailPage()) {const flash=sessionStorage.getItem('tnl_flash');if(flash){sessionStorage.removeItem('tnl_flash');this.showSuccess(flash);}this.loadWorkspace();}
+      if (wasSubPage && !this.isNewOrderPage() && !this.isOrderDetailPage() && !this.isAgentDetailPage() && !this.isImportsPage() && !this.isOrdersListPage()) {const flash=sessionStorage.getItem('tnl_flash');if(flash){sessionStorage.removeItem('tnl_flash');this.showSuccess(flash);}this.loadWorkspace();}
     });
     const token = sessionStorage.getItem('tnl_access_token');
     const storedUser = sessionStorage.getItem('tnl_user');
@@ -321,16 +325,6 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  filteredOrders(): Order[] {
-    const query = this.orderSearch.toLowerCase();
-    return this.orders().filter((order) =>
-      `${order.trackingNumber} ${order.customerName} ${order.items.map((item)=>item.productName).join(' ')}`.toLowerCase().includes(query) &&
-      (this.orderStatus === 'All' ||
-        (this.orderStatus === 'Open' && ['PENDING','APPROVED'].includes(order.orderStatus)) ||
-        this.displayStatus(order) === this.orderStatus)
-    );
-  }
-
   filteredCustomers(): Customer[] {
     const query=this.customerSearch.trim().toLowerCase();
     return this.customers().filter((customer)=>`${customer.fullName} ${customer.email} ${customer.phone} ${customer.address} ${customer.assignedAgentName??''}`.toLowerCase().includes(query));
@@ -342,10 +336,19 @@ export class App implements OnInit, OnDestroy {
     return this.products();
   }
 
+  isNavActive(item: string): boolean {
+    if (item === 'Orders') return this.isOrdersListPage();
+    if (this.isNewOrderPage() || this.isOrderDetailPage() || this.isAgentDetailPage() || this.isImportsPage() || this.isOrdersListPage()) return false;
+    return this.view() === item;
+  }
   selectView(view: string): void {
     this.mobileNavOpen.set(false);
     this.notificationPanelOpen.set(false);
     this.error.set('');
+    if (view === 'Orders') {
+      this.router.navigateByUrl('/orders');
+      return;
+    }
     const destination = view as View;
     if (!this.isViewAllowed(destination)) {
       this.router.navigateByUrl('/dashboard');
@@ -377,7 +380,15 @@ export class App implements OnInit, OnDestroy {
       this.isNewOrderPage.set(true);
       return;
     }
-    if (/^orders\/\d+$/.test(path) || /^agents\/\d+$/.test(path)) {
+    if (/^orders\/\d+$/.test(path) || /^agents\/\d+$/.test(path) || path === 'imports' || /^imports\/\d+$/.test(path)) {
+      return;
+    }
+    if (path === 'orders') {
+      const editId = rawQuery ? Number(new URLSearchParams(rawQuery).get('edit')) : 0;
+      if (editId) {
+        this.api.getOrder(editId).subscribe({ next: ({ data }) => this.openNewOrder(data) });
+        this.router.navigateByUrl('/orders', { replaceUrl: true });
+      }
       return;
     }
     const requested = ROUTE_VIEWS[path] ?? null;
@@ -387,14 +398,6 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.view.set(requested);
-    if (path === 'orders' && rawQuery) {
-      const editId = Number(new URLSearchParams(rawQuery).get('edit'));
-      if (editId) {
-        const order = this.orders().find((candidate) => candidate.id === editId);
-        if (order) this.openNewOrder(order);
-        this.router.navigateByUrl('/orders', { replaceUrl: true });
-      }
-    }
     if (path === 'customers' && rawQuery) {
       const focusId = Number(new URLSearchParams(rawQuery).get('focus'));
       if (focusId) {
@@ -412,9 +415,9 @@ export class App implements OnInit, OnDestroy {
   }
   private isViewAllowed(view: View): boolean {
     if (this.session()?.role === 'ADMIN') {
-      return ['Overview','Orders','Customers','Categories','Products','Inventory','Tracking','Leads','Campaigns','Agents'].includes(view);
+      return ['Overview','Customers','Categories','Products','Inventory','Tracking','Leads','Campaigns','Agents'].includes(view);
     }
-    return ['Overview','Orders','Customers','Commissions','Tracking'].includes(view);
+    return ['Overview','Customers','Commissions','Tracking'].includes(view);
   }
   toggleNotifications(): void {
     this.notificationPanelOpen.update((open) => !open);
@@ -457,13 +460,14 @@ export class App implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.notificationRefreshTimer) clearInterval(this.notificationRefreshTimer);
   }
-  openAttentionItem(destination: View): void {
+  openAttentionItem(destination: View | 'Orders'): void {
     if (destination === 'Inventory') this.inventoryHealth = 'LOW';
+    if (destination === 'Orders') { this.router.navigateByUrl('/orders?status=Pending'); return; }
     this.selectView(destination);
   }
-  openMetric(metric: { destination: View; filter?: string }): void {
+  openMetric(metric: { destination: View | 'Orders'; filter?: string }): void {
     if (metric.destination === 'Inventory') this.inventoryHealth = metric.filter ?? 'ALL';
-    if (metric.destination === 'Orders') this.orderStatus = metric.filter ?? 'All';
+    if (metric.destination === 'Orders') { this.router.navigateByUrl(`/orders${metric.filter ? `?status=${metric.filter}` : ''}`); return; }
     this.selectView(metric.destination);
   }
   openCustomerForm(customer?:Customer):void{

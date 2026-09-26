@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService, OrderDetail, SessionUser } from '../../core/api.service';
 import { AppIconComponent, AppIconName } from '../../shared/app-icon.component';
 import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-dialog.component';
+import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { DELIVERY_STEPS, DeliveryStatus, nextDeliveryStep } from '../../shared/delivery-steps';
 import { buildPaymentDialogFields, PaymentStatus, validateCashPayment } from '../../shared/order-payment';
 
@@ -19,7 +20,7 @@ const HISTORY_ICONS: Record<string, AppIconName> = {
 
 @Component({
   selector: 'app-order-detail-page',
-  imports: [CurrencyPipe, DatePipe, AppIconComponent, ActionDialogComponent],
+  imports: [CurrencyPipe, DatePipe, AppIconComponent, ActionDialogComponent, BreadcrumbComponent],
   templateUrl: './order-detail.page.html',
   styleUrls: ['./order-detail.page.scss']
 })

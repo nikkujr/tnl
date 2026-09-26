@@ -4,12 +4,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AgentDetail, ApiService } from '../../core/api.service';
 import { AppIconComponent } from '../../shared/app-icon.component';
+import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 
 type SectionKey = 'customers' | 'orders' | 'commissions';
 
 @Component({
   selector: 'app-agent-detail-page',
-  imports: [CurrencyPipe, DatePipe, RouterLink, AppIconComponent],
+  imports: [CurrencyPipe, DatePipe, RouterLink, AppIconComponent, BreadcrumbComponent],
   templateUrl: './agent-detail.page.html',
   styleUrls: ['./agent-detail.page.scss']
 })

@@ -1,6 +1,6 @@
 <div class="order-page">
   <div class="page-head">
-    <div><span class="breadcrumb">Orders / New order</span><h2>Create a customer order</h2><p>Build a multi-item order, confirm ownership and delivery, then submit it for approval.</p></div>
+    <div><app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: 'New order' }]" /><h2>Create a customer order</h2><p>Build a multi-item order, confirm ownership and delivery, then submit it for approval.</p></div>
     <button class="ghost-button" (click)="cancel()">← Back to orders</button>
   </div>
 

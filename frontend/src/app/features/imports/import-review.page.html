@@ -1,0 +1,94 @@
+<div class="import-page">
+  <header class="page-head">
+    <div>
+      <app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: 'Import', link: '/imports' }, { label: batch()?.fileName || 'Review' }]" />
+      <h2>{{ batch()?.fileName || 'Import review' }}</h2>
+      @if (batch(); as b) {
+        <p>{{ b.readyRows }} ready · {{ b.attentionRows }} need attention · {{ b.totalRows - b.readyRows - b.attentionRows }} skipped · {{ b.totalRows }} total rows</p>
+      }
+    </div>
+    <div class="head-actions">
+      <button class="cancel-button" (click)="cancelBatch()">Discard import</button>
+      <button class="brand-button" [disabled]="confirming() || !batch() || batch()!.attentionRows > 0 || batch()!.readyRows === 0 || batch()!.status !== 'NEEDS_REVIEW'" (click)="confirm()">
+        {{ confirming() ? 'Importing…' : 'Confirm import (' + (batch()?.readyRows ?? 0) + ')' }}
+      </button>
+    </div>
+  </header>
+
+  @if (error()) { <div class="alert">{{ error() }}</div> }
+  @if (batch() && batch()!.status !== 'NEEDS_REVIEW') { <div class="page-loading">This batch is {{ batch()!.status | lowercase }} and can no longer be edited.</div> }
+
+  <div class="tools">
+    <label><span>Section</span>
+      <select [(ngModel)]="sectionFilter" (ngModelChange)="onFilterChange()">
+        <option value="">All sections</option>
+        <option value="STORE_SALES">Store sales</option>
+        <option value="HOME_CREDIT">Home Credit</option>
+        <option value="CI_AGENT">C.I / Agent</option>
+        <option value="CI_PAYMENT">C.I payment</option>
+      </select>
+    </label>
+    <label><span>Status</span>
+      <select [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
+        <option value="">All rows</option>
+        <option value="NEEDS_ATTENTION">Needs attention</option>
+        <option value="READY">Ready</option>
+        <option value="SKIPPED">Skipped</option>
+      </select>
+    </label>
+  </div>
+
+  @if (loading()) {
+    <div class="page-loading">Loading…</div>
+  } @else {
+  <div class="review-table">
+    <div class="review-row header">
+      <span>Date</span><span>Section</span><span>Customer</span><span>Product</span><span>Amount</span><span>Payment</span><span>Agent</span><span>Status</span><span>Skip</span>
+    </div>
+    @for (row of rows(); track row.id) {
+      <div class="review-row" [class.attention]="row.status === 'NEEDS_ATTENTION'" [class.skipped]="row.status === 'SKIPPED'">
+        <span><input type="date" [(ngModel)]="row.orderDate" (blur)="onOrderDateBlur(row)"></span>
+        <span class="section-chip">{{ sectionLabel(row.section) }}</span>
+        <span class="editable-cell">
+          <select [ngModel]="customerSelectValue(row)" (ngModelChange)="onCustomerSelect(row, $event)">
+            <option value="__new__">+ New: {{ row.newCustomerName || row.rawCustomerName || '—' }}</option>
+            @for (customer of customers(); track customer.id) { <option [value]="customer.id">{{ customer.fullName }}</option> }
+          </select>
+          @if (customerSelectValue(row) === '__new__') {
+            <input [(ngModel)]="row.newCustomerName" (blur)="onNewCustomerNameBlur(row)" placeholder="Customer name">
+          }
+        </span>
+        <span class="editable-cell">
+          <select [ngModel]="productSelectValue(row)" (ngModelChange)="onProductSelect(row, $event)">
+            <option value="__new__">+ New: {{ row.newProductName || row.rawProductName || '—' }}</option>
+            @for (product of products(); track product.id) { <option [value]="product.id">{{ product.name }}</option> }
+          </select>
+          @if (productSelectValue(row) === '__new__') {
+            <input [(ngModel)]="row.newProductName" (blur)="onNewProductNameBlur(row)" placeholder="Product name">
+          }
+        </span>
+        <span><input class="amount" type="number" min="0" step="0.01" [(ngModel)]="row.unitPrice" (blur)="onAmountBlur(row)"></span>
+        <span class="payment-cell"><strong>{{ row.paymentMethod }}</strong><small>{{ row.paymentStatus === 'PAID' ? 'Paid' : 'Partially paid' }}</small></span>
+        <span>
+          <select [(ngModel)]="row.agentId" (ngModelChange)="onAgentChange(row)">
+            @for (agent of agentOptions(); track agent.id) { <option [value]="agent.id">{{ agent.fullName }}</option> }
+          </select>
+        </span>
+        <span>
+          <i [class]="'status-chip ' + row.status.toLowerCase().replaceAll('_','-')" [title]="row.issue || ''">{{ row.status === 'NEEDS_ATTENTION' ? (row.issue || 'Needs attention') : (row.status === 'READY' ? 'Ready' : 'Skipped') }}</i>
+        </span>
+        <span><input type="checkbox" [checked]="row.status === 'SKIPPED'" (change)="toggleSkip(row, $any($event.target).checked)"></span>
+      </div>
+    } @empty { <div class="empty-items"><p>No rows match this filter.</p></div> }
+  </div>
+  <div class="pagination">
+    <button class="ghost-button" [disabled]="page === 1" (click)="goToPage(-1)">← Previous</button>
+    <span>Page {{ page }} of {{ totalPages() }}</span>
+    <button class="ghost-button" [disabled]="page >= totalPages()" (click)="goToPage(1)">Next →</button>
+  </div>
+  }
+</div>
+
+@if (actionDialog(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog()" />
+}

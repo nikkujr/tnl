@@ -3,7 +3,7 @@
     <div>
       <button type="button" class="ghost-button back-button" (click)="back()">← Back to agents</button>
       @if (agent(); as data) {
-        <span class="breadcrumb">Agents / {{ data.fullName }}</span>
+        <app-breadcrumb [items]="[{ label: 'Agents', link: '/agents' }, { label: data.fullName }]" />
         <h2>{{ data.fullName }}</h2>
         <div class="status-row">
           <span [class]="'status ' + (data.active ? 'approved' : 'cancelled')">{{ data.active ? 'Active' : 'Inactive' }}</span>
@@ -11,7 +11,7 @@
         </div>
         <div class="contact-line">{{ data.email }} · {{ data.phone }} · Joined {{ data.createdAt | date:'mediumDate' }}</div>
       } @else {
-        <span class="breadcrumb">Agents / Agent details</span>
+        <app-breadcrumb [items]="[{ label: 'Agents', link: '/agents' }, { label: 'Agent details' }]" />
         <h2>Agent details</h2>
       }
     </div>

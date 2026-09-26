@@ -23,6 +23,20 @@ CREATE TABLE IF NOT EXISTS customers (
   CONSTRAINT fk_customer_agent FOREIGN KEY (assigned_agent_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS import_batches (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  file_name VARCHAR(255) NOT NULL,
+  uploaded_by BIGINT UNSIGNED NOT NULL,
+  status ENUM('PROCESSING', 'NEEDS_REVIEW', 'CONFIRMED', 'CANCELLED', 'FAILED') NOT NULL DEFAULT 'PROCESSING',
+  total_rows INT UNSIGNED NOT NULL DEFAULT 0,
+  ready_rows INT UNSIGNED NOT NULL DEFAULT 0,
+  attention_rows INT UNSIGNED NOT NULL DEFAULT 0,
+  error_message VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  confirmed_at TIMESTAMP NULL,
+  CONSTRAINT fk_import_batch_user FOREIGN KEY (uploaded_by) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS categories (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(120) NOT NULL UNIQUE,
@@ -64,11 +78,14 @@ CREATE TABLE IF NOT EXISTS orders (
   cash_change DECIMAL(12,2) NULL,
   order_status ENUM('PENDING', 'APPROVED', 'COMPLETED', 'CANCELLED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
   delivery_status ENUM('PREPARING', 'DISPATCHED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED') NULL,
+  origin ENUM('LIVE', 'IMPORTED') NOT NULL DEFAULT 'LIVE',
+  import_batch_id BIGINT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
   CONSTRAINT fk_order_agent FOREIGN KEY (agent_id) REFERENCES users(id),
   CONSTRAINT fk_order_product FOREIGN KEY (product_id) REFERENCES products(id),
+  CONSTRAINT fk_order_import_batch FOREIGN KEY (import_batch_id) REFERENCES import_batches(id),
   CONSTRAINT chk_order_quantity CHECK (quantity IS NULL OR quantity > 0)
 );
 
@@ -159,4 +176,37 @@ CREATE TABLE IF NOT EXISTS order_events (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_event_order FOREIGN KEY (order_id) REFERENCES orders(id),
   CONSTRAINT fk_order_event_actor FOREIGN KEY (actor_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS import_rows (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  batch_id BIGINT UNSIGNED NOT NULL,
+  sheet_name VARCHAR(60) NOT NULL,
+  section ENUM('STORE_SALES', 'HOME_CREDIT', 'CI_AGENT', 'CI_PAYMENT') NOT NULL,
+  row_no INT UNSIGNED NOT NULL,
+  order_date DATE NOT NULL,
+  raw_customer_name VARCHAR(255) NULL,
+  raw_product_name VARCHAR(255) NULL,
+  raw_agent_name VARCHAR(255) NULL,
+  raw_imei VARCHAR(255) NULL,
+  raw_note VARCHAR(255) NULL,
+  raw_or_no VARCHAR(60) NULL,
+  unit_price DECIMAL(12,2) NULL,
+  cash_received DECIMAL(12,2) NULL,
+  payment_status ENUM('PARTIALLY_PAID', 'PAID') NOT NULL DEFAULT 'PAID',
+  payment_method VARCHAR(80) NOT NULL DEFAULT 'Cash',
+  customer_id BIGINT UNSIGNED NULL,
+  new_customer_name VARCHAR(160) NULL,
+  product_id BIGINT UNSIGNED NULL,
+  new_product_name VARCHAR(180) NULL,
+  agent_id BIGINT UNSIGNED NULL,
+  status ENUM('READY', 'NEEDS_ATTENTION', 'SKIPPED') NOT NULL DEFAULT 'READY',
+  issue VARCHAR(255) NULL,
+  created_order_id BIGINT UNSIGNED NULL,
+  CONSTRAINT fk_import_row_batch FOREIGN KEY (batch_id) REFERENCES import_batches(id) ON DELETE CASCADE,
+  CONSTRAINT fk_import_row_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
+  CONSTRAINT fk_import_row_product FOREIGN KEY (product_id) REFERENCES products(id),
+  CONSTRAINT fk_import_row_agent FOREIGN KEY (agent_id) REFERENCES users(id),
+  CONSTRAINT fk_import_row_order FOREIGN KEY (created_order_id) REFERENCES orders(id),
+  CONSTRAINT chk_import_row_price CHECK (unit_price IS NULL OR unit_price > 0)
 );

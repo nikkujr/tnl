@@ -62,5 +62,31 @@ await db.query(
    WHERE o.product_id IS NOT NULL AND oi.id IS NULL`
 );
 
+for (const column of [
+  { name: "origin", definition: "ENUM('LIVE','IMPORTED') NOT NULL DEFAULT 'LIVE' AFTER delivery_status" },
+  { name: "import_batch_id", definition: "BIGINT UNSIGNED NULL AFTER origin" }
+]) {
+  const [columns] = await db.query<any[]>(
+    `SELECT COUNT(*) columnCount FROM information_schema.columns
+     WHERE table_schema=DATABASE() AND table_name='orders' AND column_name=?`,
+    [column.name]
+  );
+  if (Number(columns[0]?.columnCount ?? 0) === 0) {
+    await db.query(`ALTER TABLE orders ADD COLUMN ${column.name} ${column.definition}`);
+    console.log(`Added orders.${column.name} column.`);
+  }
+}
+
+await db.query(
+  `INSERT INTO categories(name,description) VALUES('Uncategorized','Products created automatically from historical data imports')
+   ON DUPLICATE KEY UPDATE name=VALUES(name)`
+);
+
+await db.query(
+  `INSERT INTO users(email,password_hash,full_name,role,commission_rate,active)
+   VALUES('historical-import@tnl.local','!','Store (Historical Import)','ADMIN',0,FALSE)
+   ON DUPLICATE KEY UPDATE full_name=VALUES(full_name)`
+);
+
 console.log(`Applied ${statements.length} schema statements.`);
 await db.end();

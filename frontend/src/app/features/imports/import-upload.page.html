@@ -1,0 +1,39 @@
+<div class="import-page">
+  <header class="page-head">
+    <div>
+      <app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: 'Import' }]" />
+      <h2>Import historical sales data</h2>
+      <p>Upload the daily sales report workbook. You'll review every row before anything is written to the system.</p>
+    </div>
+  </header>
+
+  @if (error()) { <div class="alert">{{ error() }}</div> }
+
+  <section class="surface upload-card">
+    <div class="upload-row">
+      <label class="file-picker">
+        <input type="file" accept=".xlsx" (change)="onFileSelected($event)">
+        <span>{{ selectedFile ? selectedFile.name : 'Choose .xlsx file…' }}</span>
+      </label>
+      <button class="brand-button" [disabled]="uploading()" (click)="upload()">{{ uploading() ? 'Parsing…' : 'Upload & parse' }}</button>
+    </div>
+    <p class="hint">Products or customers that don't already exist will be created automatically (uncategorized) — you'll get to review and edit every one before confirming.</p>
+  </section>
+
+  <section class="surface">
+    <div class="section-head"><h3>Past imports</h3></div>
+    @if (loading()) { <div class="page-loading">Loading…</div> }
+    <div class="batch-table">
+      <div class="batch-row header"><span>File</span><span>Uploaded</span><span>Status</span><span>Rows</span><span></span></div>
+      @for (batch of batches(); track batch.id) {
+        <div class="batch-row">
+          <span>{{ batch.fileName }}</span>
+          <span>{{ batch.createdAt | date:'medium' }}</span>
+          <span><i [class]="'status ' + statusClass(batch.status)">{{ statusLabel(batch.status) }}</i></span>
+          <span>{{ batch.readyRows }} ready · {{ batch.attentionRows }} need attention · {{ batch.totalRows }} total</span>
+          <span><button class="ghost-button" (click)="resume(batch)">{{ batch.status === 'NEEDS_REVIEW' ? 'Review' : 'View' }}</button></span>
+        </div>
+      } @empty { <div class="empty-items"><p>No imports yet.</p></div> }
+    </div>
+  </section>
+</div>

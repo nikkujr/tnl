@@ -1,0 +1,31 @@
+:host { display: block; color: #1d2939; }
+.import-page { max-width: 1100px; margin: 0 auto; padding: 4px 0 50px; }
+.page-head { margin-bottom: 24px; }
+.page-head h2 { margin: 8px 0 6px; font-size: 26px; letter-spacing: -.03em; }
+.page-head p { margin: 0; color: #667085; font-size: 13px; }
+.surface { border: 1px solid #e4e7ec; border-radius: 14px; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.04); margin-bottom: 20px; }
+.upload-card { padding: 22px; }
+.upload-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.file-picker { position: relative; display: flex; align-items: center; padding: 11px 16px; border: 1px dashed #d0d5dd; border-radius: 8px; background: #f9fafb; color: #344054; font-size: 12px; cursor: pointer; }
+.file-picker input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.brand-button { padding: 11px 18px; border: 0; border-radius: 8px; color: #fff; background: #465fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+.brand-button:disabled { opacity: .6; cursor: default; }
+.ghost-button { padding: 8px 12px; border: 1px solid #d0d5dd; border-radius: 8px; color: #344054; background: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
+.hint { margin: 14px 0 0; color: #98a2b3; font-size: 11px; }
+.section-head { padding: 20px 22px; border-bottom: 1px solid #eaecf0; }
+.section-head h3 { margin: 0; font-size: 15px; }
+.page-loading { padding: 12px 22px; color: #344054; }
+.alert { margin-bottom: 18px; padding: 12px 14px; border-radius: 8px; color: #b42318; background: #fef3f2; font-size: 12px; }
+.batch-table { display: grid; }
+.batch-row { display: grid; grid-template-columns: 2fr 1.2fr .9fr 2fr auto; gap: 14px; align-items: center; padding: 14px 22px; border-top: 1px solid #f0f1f3; font-size: 12px; }
+.batch-row.header { border-top: 0; color: #667085; background: #f9fafb; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.status { padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 700; font-style: normal; }
+.status.needs-review { color: #b54708; background: #fffaeb; }
+.status.confirmed { color: #027a48; background: #ecfdf3; }
+.status.processing, .status.failed { color: #b42318; background: #fef3f2; }
+.status.cancelled { color: #667085; background: #f2f4f7; }
+.empty-items { padding: 44px; text-align: center; color: #667085; font-size: 12px; }
+@media (max-width: 720px) {
+  .batch-row { grid-template-columns: 1fr; }
+  .batch-row.header { display: none; }
+}

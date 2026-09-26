@@ -3,7 +3,7 @@
     <div>
       <button type="button" class="ghost-button back-button" (click)="back()"><app-icon name="chevronRight" class="flip" />Back to orders</button>
       @if (order(); as data) {
-        <span class="breadcrumb">Orders / {{ data.trackingNumber }}</span>
+        <app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: data.trackingNumber }]" />
         <h2>{{ data.trackingNumber }}</h2>
         <div class="status-row">
           <span [class]="'status ' + statusClass(displayStatus(data))">{{ displayStatus(data) }}</span>
@@ -11,7 +11,7 @@
           @if (data.deliveryStatus) { <span [class]="'status ' + statusClass(data.deliveryStatus)">{{ titleCase(data.deliveryStatus) }}</span> }
         </div>
       } @else {
-        <span class="breadcrumb">Orders / Order details</span>
+        <app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: 'Order details' }]" />
         <h2>Order details</h2>
       }
     </div>
