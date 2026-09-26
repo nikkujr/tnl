@@ -5,11 +5,28 @@
     <p>{{config.message}}</p>
     <form (ngSubmit)="submit()">
       @for(field of config.fields??[];track field.key){
-        @if(isVisible(field)){<label>{{field.label}}
-          @if(field.type==='select'){<select [name]="field.key" [(ngModel)]="field.value" [required]="field.required??false">@for(option of field.options??[];track option){<option [value]="option">{{option.replaceAll('_',' ')}}</option>}</select>}
-          @if(field.type==='number'){<input [name]="field.key" type="number" [(ngModel)]="field.value" [min]="field.min??null" [max]="field.max??null" [required]="field.required??false">}
-          @if(field.type==='text'){<input [name]="field.key" type="text" [(ngModel)]="field.value" [required]="field.required??false">}
-        </label>}
+        @if(isVisible(field)){
+          @if(field.type==='steps'){
+            <div class="step-field">
+              <span class="step-field-label">{{field.label}}</span>
+              <div class="step-track">
+                @for(step of field.steps??[];track step.value){
+                  <button type="button" class="step-node" [class.complete]="isStepComplete(field,step.value)" [class.selected]="field.value===step.value" (click)="selectStep(field,step.value)">
+                    <span class="step-line" [class.filled]="isStepComplete(field,step.value)"></span>
+                    <span class="step-marker">@if(isStepComplete(field,step.value)){<app-icon name="check" />}@else{<i></i>}</span>
+                    <span class="step-text"><strong>{{step.label}}</strong>@if(step.description){<small>{{step.description}}</small>}</span>
+                  </button>
+                }
+              </div>
+            </div>
+          } @else {
+            <label>{{field.label}}
+              @if(field.type==='select'){<select [name]="field.key" [(ngModel)]="field.value" [required]="field.required??false">@for(option of field.options??[];track option){<option [value]="option">{{option.replaceAll('_',' ')}}</option>}</select>}
+              @if(field.type==='number'){<input [name]="field.key" type="number" [(ngModel)]="field.value" [min]="field.min??null" [max]="field.max??null" [required]="field.required??false">}
+              @if(field.type==='text'){<input [name]="field.key" type="text" [(ngModel)]="field.value" [required]="field.required??false">}
+            </label>
+          }
+        }
       }
       <footer><button type="button" class="cancel" (click)="cancelled.emit()">Cancel</button><button class="confirm" [class.danger]="config.tone==='danger'">{{config.confirmLabel}}</button></footer>
     </form>

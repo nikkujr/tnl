@@ -1,14 +1,15 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { Agent, ApiService, Customer, Product, SessionUser } from '../../core/api.service';
 import { AppIconComponent } from '../../shared/app-icon.component';
+import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-dialog.component';
 
 @Component({
   selector: 'app-new-order-page',
-  imports: [CurrencyPipe, FormsModule, AppIconComponent],
+  imports: [CurrencyPipe, FormsModule, AppIconComponent, ActionDialogComponent],
   templateUrl: './new-order.page.html',
   styleUrls: ['./new-order.page.scss', './new-order-accessibility.scss', './new-order-controls.scss', './new-order-pastel.scss', './new-order-lookups.scss'],
   styles: ['.line-quantity{width:72px;padding:8px 10px;border:1px solid #d0d5dd;border-radius:8px;color:#101828;background:#fff;font:inherit}.icon-button{display:inline-flex;align-items:center;gap:7px}.icon-button app-icon{width:14px;height:14px}.empty-items>app-icon{width:30px;height:30px;margin:auto;color:#98a2b3}.picker header button app-icon{width:20px;height:20px}.search-box app-icon{width:16px;height:16px;color:#667085}']
@@ -24,8 +25,14 @@ export class NewOrderPage implements OnInit {
   readonly itemModalOpen = signal(false);
   readonly customerModalOpen = signal(false);
   readonly agentModalOpen = signal(false);
+  readonly actionDialog = signal<ActionDialogConfig | null>(null);
+  private dialogAction: ((values: Record<string, string | number>) => void) | null = null;
   readonly session = signal<SessionUser>(JSON.parse(sessionStorage.getItem('tnl_user') ?? '{}'));
   readonly items = signal<Array<{ product: Product; quantity: number }>>([]);
+  readonly anyModalOpen = computed(() => this.itemModalOpen() || this.customerModalOpen() || this.agentModalOpen() || this.actionDialog() !== null);
+  private readonly lockBodyScroll = effect(() => {
+    document.body.style.overflow = this.anyModalOpen() ? 'hidden' : '';
+  });
 
   customerId = 0;
   agentId = 0;
@@ -121,6 +128,7 @@ export class NewOrderPage implements OnInit {
     this.selectedProductId = first?.id ?? 0;
     this.selectedQuantity = 1;
     this.productSearch = '';
+    this.error.set('');
     this.itemModalOpen.set(true);
   }
 
@@ -136,7 +144,22 @@ export class NewOrderPage implements OnInit {
   }
 
   removeItem(productId: number): void {
-    this.items.update((items) => items.filter((item) => item.product.id !== productId));
+    const item = this.items().find((entry) => entry.product.id === productId);
+    if (!item) return;
+    this.openDialog({ title: 'Remove item?', message: `${item.product.name} will be removed from this order.`, confirmLabel: 'Remove item', tone: 'danger' }, () => {
+      this.items.update((items) => items.filter((entry) => entry.product.id !== productId));
+    });
+  }
+
+  private openDialog(config: ActionDialogConfig, action: (values: Record<string, string | number>) => void): void {
+    this.dialogAction = action;
+    this.actionDialog.set(config);
+  }
+  closeActionDialog(): void { this.actionDialog.set(null); this.dialogAction = null; }
+  confirmActionDialog(values: Record<string, string | number>): void {
+    const action = this.dialogAction;
+    this.closeActionDialog();
+    action?.(values);
   }
 
   changeItemQuantity(productId: number, value: number): void {

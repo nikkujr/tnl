@@ -4,7 +4,7 @@
     <button class="ghost-button" (click)="cancel()">← Back to orders</button>
   </div>
 
-  @if (error()) { <div class="alert">{{ error() }}</div> }
+  @if (error() && !itemModalOpen()) { <div class="alert">{{ error() }}</div> }
   @if (loading()) { <div class="page-loading">Loading order workspace…</div> } @else {
     <form (ngSubmit)="submit()" class="order-layout">
       <div class="main-column">
@@ -71,6 +71,11 @@
     <header><div><span>Product catalog</span><h2 id="picker-title">Add an order item</h2></div><button (click)="itemModalOpen.set(false)"><app-icon name="close" /></button></header>
     <label class="search-box"><app-icon name="search" /><input [(ngModel)]="productSearch" placeholder="Search product, SKU, or category"></label>
     <div class="product-list">@for(product of availableProducts();track product.id){<button type="button" [class.selected]="selectedProductId===product.id" (click)="selectedProductId=product.id"><span class="product-icon">{{product.name.slice(0,1)}}</span><span><strong>{{product.name}}</strong><small>{{product.sku}} · {{product.category}}</small></span><span><strong>{{product.price|currency:'PHP':'symbol-narrow'}}</strong><small>{{product.stockOnHand-product.stockReserved}} available</small></span></button>}@empty{<div class="no-products">No additional products match your search.</div>}</div>
+    @if(error()){<div class="alert picker-alert">{{error()}}</div>}
     <footer><label>Quantity<input type="number" min="1" [(ngModel)]="selectedQuantity"></label><span></span><button class="ghost-button" (click)="itemModalOpen.set(false)">Cancel</button><button class="brand-button" [disabled]="!selectedProductId" (click)="addSelectedItem()">Add to order</button></footer>
   </section></div>
+}
+
+@if(actionDialog();as dialog){
+  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog($event)" />
 }

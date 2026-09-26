@@ -2,12 +2,21 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AppIconComponent } from './app-icon.component';
 
+export interface ActionDialogStep {
+  value: string;
+  label: string;
+  description?: string;
+}
+
 export interface ActionDialogField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select';
+  type: 'text' | 'number' | 'select' | 'steps';
   value: string | number;
   options?: string[];
+  steps?: ActionDialogStep[];
+  /** For type 'steps': the value already reached on the record, used to mark steps as complete. */
+  currentValue?: string;
   min?: number;
   max?: number;
   required?: boolean;
@@ -42,5 +51,15 @@ export class ActionDialogComponent {
   isVisible(field: ActionDialogField): boolean {
     if (!field.visibleWhen) return true;
     return this.config.fields?.find((candidate) => candidate.key === field.visibleWhen!.key)?.value === field.visibleWhen.value;
+  }
+
+  selectStep(field: ActionDialogField, value: string): void {
+    field.value = value;
+  }
+
+  isStepComplete(field: ActionDialogField, value: string): boolean {
+    const values = (field.steps ?? []).map((step) => step.value);
+    if (field.currentValue === undefined) return false;
+    return values.indexOf(value) <= values.indexOf(field.currentValue);
   }
 }
