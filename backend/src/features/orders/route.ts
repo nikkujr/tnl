@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../database/connection.js";
@@ -7,6 +7,18 @@ import { HttpError, validate } from "../../shared/http.js";
 
 const router = Router();
 router.use(authenticate);
+
+const TRACKING_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function randomTrackingSegment(length: number): string {
+  return Array.from({ length }, () => TRACKING_CHARS[randomInt(TRACKING_CHARS.length)]).join("");
+}
+function generateTrackingNumber(): string {
+  return `TNL-${randomTrackingSegment(6)}-${randomTrackingSegment(4)}`;
+}
+
+async function logOrderEvent(connection: any, orderId: number, actorId: number | null, type: string, message: string): Promise<void> {
+  await connection.execute("INSERT INTO order_events(order_id,actor_id,type,message) VALUES(?,?,?,?)", [orderId, actorId, type, message]);
+}
 
 const itemSchema = z.object({
   productId: z.number().int().positive(),
@@ -77,6 +89,41 @@ router.get("/", async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.get("/:id", validate(z.object({ body: z.any(), query: z.any(), params: z.object({ id: z.coerce.number().int().positive() }) })), async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const scope = req.user!.role === "AGENT" ? " AND o.agent_id=?" : "";
+    const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
+    const [orders] = await db.query<any[]>(
+      `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,
+       c.full_name customerName,c.email customerEmail,c.phone customerPhone,
+       o.order_status orderStatus,o.delivery_status deliveryStatus,
+       o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
+       o.cash_change cashChange,o.delivery_address deliveryAddress,
+       o.created_at createdAt,o.updated_at updatedAt,u.full_name agentName,u.email agentEmail
+       FROM orders o JOIN customers c ON c.id=o.customer_id JOIN users u ON u.id=o.agent_id
+       WHERE o.id=?${scope}`,
+      args
+    );
+    const order = orders[0];
+    if (!order) throw new HttpError(404, "Order not found");
+    const [items] = await db.query<any[]>(
+      "SELECT product_id productId,product_name productName,sku,quantity,unit_price unitPrice FROM order_items WHERE order_id=? ORDER BY id",
+      [id]
+    );
+    const [history] = await db.query<any[]>(
+      `SELECT e.id,e.type,e.message,e.created_at createdAt,u.full_name actorName
+       FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY e.created_at,e.id`,
+      [id]
+    );
+    const [deliveryEvents] = await db.query<any[]>(
+      "SELECT status,notes,occurred_at occurredAt FROM delivery_events WHERE order_id=? ORDER BY occurred_at,id",
+      [id]
+    );
+    res.json({ data: { ...order, items, history, deliveryEvents } });
+  } catch (error) { next(error); }
+});
+
 router.post("/", authorize("ADMIN", "AGENT"), validate(createSchema), async (req, res, next) => {
   const connection = await db.getConnection();
   try {
@@ -95,13 +142,22 @@ router.post("/", authorize("ADMIN", "AGENT"), validate(createSchema), async (req
     }
     const paymentStatus = req.body.paymentMethod === "Cash" ? "PAID" : "UNPAID";
     const cashChange = req.body.paymentMethod === "Cash" ? Number(cashReceived) - orderTotal : null;
-    const trackingNumber = `TNL-${Date.now().toString(36).toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`;
     await connection.beginTransaction();
-    const [result] = await connection.execute<any>(
-      `INSERT INTO orders(tracking_number,customer_id,agent_id,delivery_address,payment_method,payment_status,cash_received,cash_change)
-       VALUES(?,?,?,?,?,?,?,?)`,
-      [trackingNumber, req.body.customerId, agentId, req.body.deliveryAddress, req.body.paymentMethod, paymentStatus, cashReceived, cashChange]
-    );
+    let trackingNumber = generateTrackingNumber();
+    let result: any;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        [result] = await connection.execute<any>(
+          `INSERT INTO orders(tracking_number,customer_id,agent_id,delivery_address,payment_method,payment_status,cash_received,cash_change)
+           VALUES(?,?,?,?,?,?,?,?)`,
+          [trackingNumber, req.body.customerId, agentId, req.body.deliveryAddress, req.body.paymentMethod, paymentStatus, cashReceived, cashChange]
+        );
+        break;
+      } catch (error: any) {
+        if (error?.code === "ER_DUP_ENTRY" && attempt < 4) { trackingNumber = generateTrackingNumber(); continue; }
+        throw error;
+      }
+    }
     for (const item of req.body.items) {
       const product = products.find((candidate) => candidate.id === item.productId);
       if (!product) throw new HttpError(400, "Selected product does not exist");
@@ -110,6 +166,8 @@ router.post("/", authorize("ADMIN", "AGENT"), validate(createSchema), async (req
         [result.insertId, item.productId, item.quantity, product.price, product.name, product.sku]
       );
     }
+    const itemCount = req.body.items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0);
+    await logOrderEvent(connection, result.insertId, req.user!.id, "CREATED", `Order created with ${itemCount} item${itemCount === 1 ? "" : "s"} totaling ₱${orderTotal.toFixed(2)}.`);
     await connection.commit();
     res.status(201).json({ data: { id: result.insertId, trackingNumber, orderStatus: "PENDING", paymentStatus, cashReceived, cashChange } });
   } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
@@ -135,6 +193,7 @@ router.put("/:id", validate(z.object({ body: orderBody, query: z.any(), params: 
       if (!product) throw new HttpError(400, "Selected product does not exist");
       await connection.execute("INSERT INTO order_items(order_id,product_id,quantity,unit_price,product_name,sku) VALUES(?,?,?,?,?,?)", [id, item.productId, item.quantity, product.price, product.name, product.sku]);
     }
+    await logOrderEvent(connection, id, req.user!.id, "EDITED", "Order details and items were updated.");
     await connection.commit();
     res.json({ data: { id, ...req.body } });
   } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
@@ -157,7 +216,11 @@ router.post("/:id/decision", authorize("ADMIN"), validate(decisionSchema), async
       }
       await connection.execute("UPDATE orders SET order_status='APPROVED',delivery_status='PREPARING' WHERE id=?", [orderId]);
       await connection.execute("INSERT INTO delivery_events(order_id,status,notes) VALUES(?,'PREPARING','Order approved and prepared for delivery')", [orderId]);
-    } else await connection.execute("UPDATE orders SET order_status='REJECTED' WHERE id=?", [orderId]);
+      await logOrderEvent(connection, orderId, req.user!.id, "APPROVED", "Order approved; inventory reserved and prepared for delivery.");
+    } else {
+      await connection.execute("UPDATE orders SET order_status='REJECTED' WHERE id=?", [orderId]);
+      await logOrderEvent(connection, orderId, req.user!.id, "REJECTED", "Order rejected.");
+    }
     await connection.commit();
     res.json({ data: { id: orderId, orderStatus: req.body.decision === "APPROVE" ? "APPROVED" : "REJECTED" } });
   } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
@@ -183,6 +246,7 @@ router.patch("/:id/payment-status", authorize("ADMIN"), validate(z.object({ body
     }
     const [result]=await db.execute<any>("UPDATE orders SET payment_status=?,payment_method=?,cash_received=?,cash_change=? WHERE id=?",[req.body.paymentStatus,req.body.paymentMethod,cashReceived,cashChange,id]);
     if(!result.affectedRows)throw new HttpError(404,"Order not found");
+    await logOrderEvent(db,id,req.user!.id,"PAYMENT_UPDATED",`Payment marked as ${req.body.paymentStatus.replaceAll('_',' ').toLowerCase()} via ${req.body.paymentMethod}.`);
     res.json({data:{id,paymentStatus:req.body.paymentStatus,paymentMethod:req.body.paymentMethod,cashReceived,cashChange}});
   } catch(error){next(error);}
 });
@@ -197,6 +261,8 @@ router.patch("/:id/delivery-status", validate(z.object({body:deliveryBody,query:
     if(!order)throw new HttpError(404,"Order not found");if(order.order_status!=="APPROVED"&&order.order_status!=="COMPLETED")throw new HttpError(409,"Only approved orders can progress through delivery");
     await connection.execute("UPDATE orders SET delivery_status=?,order_status=IF(?='DELIVERED','COMPLETED',order_status) WHERE id=?",[req.body.deliveryStatus,req.body.deliveryStatus,id]);
     await connection.execute("INSERT INTO delivery_events(order_id,status,notes,latitude,longitude) VALUES(?,?,?,?,?)",[id,req.body.deliveryStatus,req.body.notes??null,req.body.latitude??null,req.body.longitude??null]);
+    const deliveryLabel=req.body.deliveryStatus.replaceAll('_',' ').toLowerCase();
+    await logOrderEvent(connection,id,req.user!.id,"DELIVERY_UPDATED",`Delivery status set to ${deliveryLabel}.${req.body.notes?` ${req.body.notes}`:""}`);
     if(req.body.deliveryStatus==="DELIVERED"&&order.delivery_status!=="DELIVERED"){
       const[items]=await connection.query<any[]>("SELECT product_id productId,quantity,unit_price unitPrice FROM order_items WHERE order_id=?",[id]);
       let total=0;for(const item of items){await connection.execute("UPDATE products SET stock_on_hand=stock_on_hand-?,stock_reserved=stock_reserved-? WHERE id=?",[item.quantity,item.quantity,item.productId]);total+=item.quantity*item.unitPrice;}

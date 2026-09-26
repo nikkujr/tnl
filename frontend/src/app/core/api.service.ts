@@ -67,6 +67,16 @@ export interface Order {
   createdAt: string;
 }
 export interface OrderItem { productId:number; productName:string; sku:string; quantity:number; unitPrice:number }
+export interface OrderHistoryEvent { id:number; type:string; message:string; createdAt:string; actorName:string|null }
+export interface DeliveryEvent { status:string; notes:string|null; occurredAt:string }
+export interface OrderDetail extends Order {
+  customerEmail: string;
+  customerPhone: string;
+  agentEmail: string;
+  updatedAt: string;
+  history: OrderHistoryEvent[];
+  deliveryEvents: DeliveryEvent[];
+}
 export interface TrackingResult {
   trackingNumber: string;
   orderStatus: string;
@@ -82,8 +92,18 @@ export interface TrackingResult {
 }
 export interface Lead { id:number; fullName:string; email:string; phone:string; source:string; status:string; assignedAgentId:number|null; assignedAgentName:string|null }
 export interface Campaign { id:number; name:string; targetAudience:string; content:string; startDate:string; endDate:string; status:string }
-export interface Agent { id:number; fullName:string; email:string; phone:string; commissionRate:number; active:boolean }
+export interface Agent { id:number; fullName:string; email:string; phone:string; commissionRate:number; active:boolean; closedDeals:number }
 export interface Commission { id:number; amount:number; rate:number; createdAt:string; orderId:string; customerName:string; agentName:string }
+export interface AgentCustomer { id:number; fullName:string; email:string; phone:string; address:string; createdAt:string }
+export interface AgentOrder { id:number; trackingNumber:string; customerName:string; orderStatus:string; deliveryStatus:string|null; paymentStatus:string; createdAt:string; amount:number }
+export interface AgentCommission { id:number; amount:number; rate:number; createdAt:string; orderId:number; trackingNumber:string; customerName:string }
+export interface AgentDetail extends Agent {
+  createdAt: string;
+  customers: AgentCustomer[];
+  orders: AgentOrder[];
+  commissions: AgentCommission[];
+  totalCommission: number;
+}
 export interface CreateOrderInput {
   customerId: number;
   agentId?: number;
@@ -170,6 +190,10 @@ export class ApiService {
     return this.http.get<ApiResponse<Order[]>>(`${this.baseUrl}/orders`);
   }
 
+  getOrder(id: number): Observable<ApiResponse<OrderDetail>> {
+    return this.http.get<ApiResponse<OrderDetail>>(`${this.baseUrl}/orders/${id}`);
+  }
+
   createOrder(input: CreateOrderInput): Observable<ApiResponse<{ id: number; trackingNumber: string; orderStatus: string }>> {
     return this.http.post<ApiResponse<{ id: number; trackingNumber: string; orderStatus: string }>>(`${this.baseUrl}/orders`, input);
   }
@@ -208,6 +232,7 @@ export class ApiService {
   sendCampaign(id:number): Observable<ApiResponse<{messageId:string;recipientCount:number}>> { return this.http.post<ApiResponse<{messageId:string;recipientCount:number}>>(`${this.baseUrl}/campaigns/${id}/send`,{}); }
   deleteCampaign(id:number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/campaigns/${id}`); }
   getAgents(activeOnly = false): Observable<ApiResponse<Agent[]>> { return this.http.get<ApiResponse<Agent[]>>(`${this.baseUrl}/agents`,{params:activeOnly?{activeOnly:'true'}:{}}); }
+  getAgent(id:number): Observable<ApiResponse<AgentDetail>> { return this.http.get<ApiResponse<AgentDetail>>(`${this.baseUrl}/agents/${id}`); }
   createAgent(input:{fullName:string;email:string;phone:string;password:string;commissionRate:number}):Observable<ApiResponse<Agent>>{return this.http.post<ApiResponse<Agent>>(`${this.baseUrl}/agents`,input);}
   updateAgent(id:number,input:{fullName:string;email:string;phone:string;password?:string;commissionRate:number}):Observable<ApiResponse<Agent>>{return this.http.put<ApiResponse<Agent>>(`${this.baseUrl}/agents/${id}`,input);}
   activateAgent(id:number):Observable<ApiResponse<{id:number;active:boolean}>>{return this.http.post<ApiResponse<{id:number;active:boolean}>>(`${this.baseUrl}/agents/${id}/activate`,{});}

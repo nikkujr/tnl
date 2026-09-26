@@ -1,0 +1,17 @@
+<div class="rte" [class.disabled]="disabled">
+  <div class="rte-toolbar">
+    <button type="button" class="rte-btn bold" title="Bold" (mousedown)="$event.preventDefault()" (click)="exec('bold')">B</button>
+    <button type="button" class="rte-btn italic" title="Italic" (mousedown)="$event.preventDefault()" (click)="exec('italic')">I</button>
+    <button type="button" class="rte-btn underline" title="Underline" (mousedown)="$event.preventDefault()" (click)="exec('underline')">U</button>
+    <span class="rte-divider"></span>
+    <button type="button" class="rte-btn" title="Heading" (mousedown)="$event.preventDefault()" (click)="exec('formatBlock','H2')">H2</button>
+    <button type="button" class="rte-btn" title="Paragraph" (mousedown)="$event.preventDefault()" (click)="exec('formatBlock','P')">¶</button>
+    <span class="rte-divider"></span>
+    <button type="button" class="rte-btn" title="Bullet list" (mousedown)="$event.preventDefault()" (click)="exec('insertUnorderedList')">• List</button>
+    <button type="button" class="rte-btn" title="Numbered list" (mousedown)="$event.preventDefault()" (click)="exec('insertOrderedList')">1. List</button>
+    <span class="rte-divider"></span>
+    <button type="button" class="rte-btn" title="Insert link" (mousedown)="$event.preventDefault()" (click)="insertLink()">Link</button>
+    <button type="button" class="rte-btn" title="Clear formatting" (mousedown)="$event.preventDefault()" (click)="exec('removeFormat')">Clear</button>
+  </div>
+  <div #editor class="rte-editable" contenteditable="true" [attr.data-placeholder]="placeholder" (input)="onInput()" (blur)="onBlur()"></div>
+</div>

@@ -1,0 +1,16 @@
+.rte { border: 1px solid #d0d5dd; border-radius: 8px; overflow: hidden; background: #fff; }
+.rte.disabled { opacity: .6; pointer-events: none; }
+.rte-toolbar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 8px; border-bottom: 1px solid #eaecf0; background: #f9fafb; }
+.rte-btn { min-width: 30px; height: 30px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; color: #344054; background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; transition: background .12s ease, border-color .12s ease; }
+.rte-btn:hover { background: #fff; border-color: #d0d5dd; }
+.rte-btn.bold { font-weight: 800; }
+.rte-btn.italic { font-style: italic; }
+.rte-btn.underline { text-decoration: underline; }
+.rte-divider { width: 1px; height: 20px; background: #e4e7ec; margin: 0 4px; }
+
+.rte-editable { min-height: 160px; max-height: 420px; overflow-y: auto; padding: 14px 16px; color: #101828; font-size: 13px; line-height: 1.6; outline: 0; }
+.rte-editable:empty::before { content: attr(data-placeholder); color: #98a2b3; }
+.rte-editable :is(h1, h2, h3) { margin: .6em 0 .3em; line-height: 1.3; }
+.rte-editable p { margin: 0 0 .6em; }
+.rte-editable ul, .rte-editable ol { margin: 0 0 .6em; padding-left: 1.4em; }
+.rte-editable a { color: #465fff; }

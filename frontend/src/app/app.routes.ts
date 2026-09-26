@@ -6,6 +6,14 @@ export const routes: Routes = [
     path: 'orders/new',
     loadComponent: () => import('./features/orders/new-order.page').then((module) => module.NewOrderPage)
   },
+  {
+    path: 'orders/:id',
+    loadComponent: () => import('./features/orders/order-detail.page').then((module) => module.OrderDetailPage)
+  },
+  {
+    path: 'agents/:id',
+    loadComponent: () => import('./features/agents/agent-detail.page').then((module) => module.AgentDetailPage)
+  },
   { path: 'dashboard', component: WorkspaceRouteComponent },
   { path: 'orders', component: WorkspaceRouteComponent },
   { path: 'customers', component: WorkspaceRouteComponent },

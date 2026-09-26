@@ -4,6 +4,13 @@ import { z } from "zod";
 import { db } from "../../database/connection.js";
 import { authenticate, authorize } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
+import { normalizePhPhone } from "../../shared/phone.js";
+
+const phoneField = z.string().transform((value, ctx) => {
+  const normalized = normalizePhPhone(value);
+  if (!normalized) { ctx.addIssue({ code: "custom", message: "Enter a valid PH mobile number, e.g. 09171234567" }); return z.NEVER; }
+  return normalized;
+});
 
 const router = Router();
 router.use(authenticate, authorize("ADMIN"));
@@ -11,12 +18,45 @@ router.get("/", async (req, res, next) => {
   try {
     const search = `%${String(req.query.search ?? "")}%`;
     const activeOnly = String(req.query.activeOnly ?? "") === "true" ? " AND active=TRUE" : "";
-    const [rows] = await db.query(`SELECT id,email,phone,full_name fullName,commission_rate commissionRate,active,created_at createdAt
+    const [rows] = await db.query(`SELECT id,email,phone,full_name fullName,commission_rate commissionRate,active,created_at createdAt,
+      (SELECT COUNT(*) FROM orders o WHERE o.agent_id=users.id AND o.order_status='COMPLETED') closedDeals
       FROM users WHERE role='AGENT'${activeOnly} AND (full_name LIKE ? OR email LIKE ? OR COALESCE(phone,'') LIKE ?) ORDER BY active DESC,full_name`, [search, search, search]);
     res.json({ data: rows });
   } catch (error) { next(error); }
 });
-const body = z.object({ fullName: z.string().min(2).max(160), email: z.email(), phone: z.string().min(7).max(40), password: z.string().min(8).optional(), commissionRate: z.number().min(0).max(100) });
+router.get("/:id", validate(z.object({ body: z.any(), query: z.any(), params: z.object({ id: z.coerce.number().int().positive() }) })), async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [agents] = await db.query<any[]>(
+      `SELECT id,email,phone,full_name fullName,commission_rate commissionRate,active,created_at createdAt,
+       (SELECT COUNT(*) FROM orders o WHERE o.agent_id=users.id AND o.order_status='COMPLETED') closedDeals
+       FROM users WHERE id=? AND role='AGENT'`,
+      [id]
+    );
+    const agent = agents[0];
+    if (!agent) throw new HttpError(404, "Agent not found");
+    const [customers] = await db.query<any[]>(
+      "SELECT id,full_name fullName,email,phone,address,created_at createdAt FROM customers WHERE assigned_agent_id=? ORDER BY created_at DESC",
+      [id]
+    );
+    const [orders] = await db.query<any[]>(
+      `SELECT o.id,o.tracking_number trackingNumber,c.full_name customerName,o.order_status orderStatus,
+       o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.created_at createdAt,
+       (SELECT COALESCE(SUM(oi.quantity*oi.unit_price),0) FROM order_items oi WHERE oi.order_id=o.id) amount
+       FROM orders o JOIN customers c ON c.id=o.customer_id WHERE o.agent_id=? ORDER BY o.created_at DESC`,
+      [id]
+    );
+    const [commissions] = await db.query<any[]>(
+      `SELECT c.id,c.amount,c.rate,c.created_at createdAt,o.id orderId,o.tracking_number trackingNumber,cu.full_name customerName
+       FROM commissions c JOIN orders o ON o.id=c.order_id JOIN customers cu ON cu.id=o.customer_id
+       WHERE c.agent_id=? ORDER BY c.created_at DESC`,
+      [id]
+    );
+    const totalCommission = commissions.reduce((sum, item) => sum + Number(item.amount), 0);
+    res.json({ data: { ...agent, customers, orders, commissions, totalCommission } });
+  } catch (error) { next(error); }
+});
+const body = z.object({ fullName: z.string().min(2).max(160), email: z.email(), phone: phoneField, password: z.string().min(8).optional(), commissionRate: z.number().min(0).max(100) });
 router.post("/", validate(z.object({ body: body.extend({ password: z.string().min(8) }), query: z.any(), params: z.any() })), async (req, res, next) => {
   try {
     const hash = await bcrypt.hash(req.body.password, 12);
