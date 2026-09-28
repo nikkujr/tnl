@@ -82,8 +82,8 @@ export class AgentDetailPage implements OnInit {
 
   back(): void { this.router.navigateByUrl('/agents'); }
 
-  viewCustomer(customerId: number): void {
-    this.router.navigateByUrl(`/customers?focus=${customerId}`);
+  viewCustomer(customerName: string): void {
+    this.router.navigateByUrl(`/customers?focus=${encodeURIComponent(customerName)}`);
   }
 
   toggleSection(key: SectionKey): void {

@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { WorkspaceRouteComponent } from './shared/workspace-route.component';
+import { roleGuard } from './core/role.guard';
 
 export const routes: Routes = [
   {
@@ -22,20 +23,57 @@ export const routes: Routes = [
     path: 'imports/:id',
     loadComponent: () => import('./features/imports/import-review.page').then((module) => module.ImportReviewPage)
   },
-  { path: 'dashboard', component: WorkspaceRouteComponent },
+  {
+    path: 'dashboard',
+    loadComponent: () => import('./features/dashboard/dashboard.page').then((module) => module.DashboardPage)
+  },
   {
     path: 'orders',
     loadComponent: () => import('./features/orders/orders-list.page').then((module) => module.OrdersListPage)
   },
-  { path: 'customers', component: WorkspaceRouteComponent },
-  { path: 'categories', component: WorkspaceRouteComponent },
-  { path: 'products', component: WorkspaceRouteComponent },
-  { path: 'inventory', component: WorkspaceRouteComponent },
-  { path: 'tracking', component: WorkspaceRouteComponent },
-  { path: 'leads', component: WorkspaceRouteComponent },
-  { path: 'campaigns', component: WorkspaceRouteComponent },
-  { path: 'agents', component: WorkspaceRouteComponent },
-  { path: 'commissions', component: WorkspaceRouteComponent },
+  {
+    path: 'customers',
+    loadComponent: () => import('./features/customers/customers.page').then((module) => module.CustomersPage)
+  },
+  {
+    path: 'categories',
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/categories/categories.page').then((module) => module.CategoriesPage)
+  },
+  {
+    path: 'products',
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/products/products.page').then((module) => module.ProductsPage)
+  },
+  {
+    path: 'inventory',
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/inventory/inventory.page').then((module) => module.InventoryPage)
+  },
+  {
+    path: 'tracking',
+    loadComponent: () => import('./features/tracking/tracking.page').then((module) => module.TrackingPage)
+  },
+  {
+    path: 'leads',
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/leads/leads.page').then((module) => module.LeadsPage)
+  },
+  {
+    path: 'campaigns',
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/campaigns/campaigns.page').then((module) => module.CampaignsPage)
+  },
+  {
+    path: 'agents',
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/agents/agents-list.page').then((module) => module.AgentsListPage)
+  },
+  {
+    path: 'commissions',
+    canMatch: [roleGuard(['AGENT'])],
+    loadComponent: () => import('./features/commissions/commissions.page').then((module) => module.CommissionsPage)
+  },
   { path: '', pathMatch: 'full', component: WorkspaceRouteComponent },
   { path: '**', redirectTo: '' }
 ];

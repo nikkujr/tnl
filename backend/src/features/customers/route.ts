@@ -20,17 +20,23 @@ router.get("/", async (req, res, next) => {
     const page = Math.max(1, Number(req.query.page ?? 1));
     const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 20)));
     const offset = (page - 1) * limit;
-    const scope = req.user!.role === "AGENT" ? " AND c.assigned_agent_id=?" : "";
-    const args: unknown[] = [`%${search}%`, `%${search}%`, `%${search}%`];
-    if (req.user!.role === "AGENT") args.push(req.user!.id);
+    const filterAgentId = req.user!.role === "AGENT" ? req.user!.id : Number(req.query.agentId ?? 0) || 0;
+    const scope = filterAgentId ? " AND c.assigned_agent_id=?" : "";
+    const args: unknown[] = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
+    if (filterAgentId) args.push(filterAgentId);
     args.push(limit, offset);
     const [rows] = await db.query(
       `SELECT c.id,c.full_name fullName,c.email,c.phone,c.address,c.assigned_agent_id assignedAgentId,
        u.full_name assignedAgentName FROM customers c LEFT JOIN users u ON u.id=c.assigned_agent_id
-       WHERE (c.full_name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?)${scope}
+       WHERE (c.full_name LIKE ? OR c.email LIKE ? OR c.phone LIKE ? OR c.address LIKE ? OR u.full_name LIKE ?)${scope}
        ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, args
     );
-    res.json({ data: rows, meta: { page, limit } });
+    const countArgs = args.slice(0, args.length - 2);
+    const [counts] = await db.query<any[]>(
+      `SELECT COUNT(*) total FROM customers c LEFT JOIN users u ON u.id=c.assigned_agent_id
+       WHERE (c.full_name LIKE ? OR c.email LIKE ? OR c.phone LIKE ? OR c.address LIKE ? OR u.full_name LIKE ?)${scope}`, countArgs
+    );
+    res.json({ data: rows, meta: { page, limit, total: counts[0].total } });
   } catch (error) { next(error); }
 });
 

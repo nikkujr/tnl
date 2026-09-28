@@ -1,4 +1,5 @@
 @use '@fontsource-variable/inter';
+@use 'styles/design-tokens';
 
 * { box-sizing: border-box; }
 html, body { min-height: 100%; margin: 0; }
@@ -12,3 +13,7 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
+
+// Global so it reaches every lazy-loaded feature page regardless of Angular's
+// per-component style encapsulation — placeholder color must track the active theme.
+input::placeholder, textarea::placeholder { color: var(--color-text-faint, #98a2b3); opacity: 1; }

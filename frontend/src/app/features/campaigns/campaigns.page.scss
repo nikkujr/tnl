@@ -1,0 +1,4 @@
+@use '../../shared/styles/tokens';
+
+:host { display: block; color: var(--ink, #1d2939); }
+.campaigns-page { max-width: 1200px; margin: 0 auto; }

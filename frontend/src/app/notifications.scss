@@ -13,17 +13,18 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid #d8d4e4;
+  border: 1px solid var(--line, #d8d4e4);
   border-radius: 11px;
-  color: #525066;
-  background: #fff;
+  color: var(--muted, #525066);
+  background: var(--color-surface, #fff);
   box-shadow: 0 1px 2px rgba(16, 24, 40, .05);
+  cursor: pointer;
 }
 
 .bell:hover {
-  border-color: #bdb7d3;
-  color: #655bb8;
-  background: #faf9ff;
+  border-color: var(--green, #bdb7d3);
+  color: var(--green, #655bb8);
+  background: var(--color-accent-bg, #faf9ff);
 }
 
 .bell app-icon {
@@ -40,10 +41,10 @@
   display: grid;
   place-items: center;
   padding: 0 4px;
-  border: 2px solid #f8f9fb;
+  border: 2px solid var(--color-bg, #f8f9fb);
   border-radius: 999px;
   color: #fff;
-  background: #e5484d;
+  background: var(--status-danger-text, #e5484d);
   font-size: 9px;
   font-weight: 800;
   line-height: 1;
@@ -56,9 +57,9 @@
   right: 0;
   width: min(390px, calc(100vw - 32px));
   overflow: visible;
-  border: 1px solid #dddbea;
+  border: 1px solid var(--line, #dddbea);
   border-radius: 15px;
-  background: #fff;
+  background: var(--color-surface, #fff);
   box-shadow: 0 22px 60px rgba(28, 25, 55, .2);
 }
 
@@ -69,9 +70,9 @@
   right: 15px;
   width: 11px;
   height: 11px;
-  border-top: 1px solid #dddbea;
-  border-left: 1px solid #dddbea;
-  background: #fff;
+  border-top: 1px solid var(--line, #dddbea);
+  border-left: 1px solid var(--line, #dddbea);
+  background: var(--color-surface, #fff);
   transform: rotate(45deg);
 }
 
@@ -81,9 +82,9 @@
   justify-content: space-between;
   gap: 16px;
   padding: 17px 18px;
-  border-bottom: 1px solid #eceaf3;
+  border-bottom: 1px solid var(--color-border-subtle, #eceaf3);
   border-radius: 15px 15px 0 0;
-  background: #fff;
+  background: var(--color-surface, #fff);
 }
 
 .notification-menu h2 {
@@ -93,7 +94,7 @@
 
 .notification-menu header button {
   border: 0;
-  color: #655bb8;
+  color: var(--green, #655bb8);
   background: transparent;
   font-size: 11px;
   font-weight: 750;
@@ -113,15 +114,16 @@
   align-items: center;
   padding: 14px 17px;
   border: 0;
-  border-bottom: 1px solid #f0eef5;
-  color: #344054;
-  background: #fff;
+  border-bottom: 1px solid var(--color-border-subtle, #f0eef5);
+  color: var(--ink, #344054);
+  background: var(--color-surface, #fff);
   text-align: left;
+  cursor: pointer;
 }
 
 .notification-item:hover,
 .notification-item.unread {
-  background: #faf9ff;
+  background: var(--color-accent-bg, #faf9ff);
 }
 
 .notification-item > span:nth-child(2) {
@@ -135,7 +137,7 @@
 
 .notification-item strong {
   overflow: hidden;
-  color: #101828;
+  color: var(--ink, #101828);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -143,7 +145,7 @@
 
 .notification-item small {
   margin-top: 4px;
-  color: #667085;
+  color: var(--muted, #667085);
   font-size: 10px;
   line-height: 1.45;
 }
@@ -152,7 +154,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #7167c9;
+  background: var(--green, #7167c9);
 }
 
 .notification-icon {
@@ -161,8 +163,8 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  color: #655bb8;
-  background: #f0edff;
+  color: var(--green, #655bb8);
+  background: var(--color-accent-bg, #f0edff);
 }
 
 .notification-icon app-icon {
@@ -172,7 +174,7 @@
 
 .notification-empty {
   padding: 34px 20px;
-  color: #667085;
+  color: var(--muted, #667085);
   text-align: center;
   font-size: 12px;
 }

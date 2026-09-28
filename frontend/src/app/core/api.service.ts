@@ -189,9 +189,12 @@ export class ApiService {
     return this.http.get<ApiResponse<DashboardSummary>>(`${this.baseUrl}/dashboard`);
   }
 
-  getCustomers(search = '', page = 1, limit?: number): Observable<ApiResponse<Customer[]>> {
-    let params = new HttpParams().set('search', search).set('page', page);
-    if (limit) params = params.set('limit', limit);
+  getCustomers(options: { search?: string; page?: number; limit?: number; agentId?: number } = {}): Observable<ApiResponse<Customer[]>> {
+    let params = new HttpParams();
+    if (options.search) params = params.set('search', options.search);
+    if (options.page) params = params.set('page', options.page);
+    if (options.limit) params = params.set('limit', options.limit);
+    if (options.agentId) params = params.set('agentId', options.agentId);
     return this.http.get<ApiResponse<Customer[]>>(`${this.baseUrl}/customers`, { params });
   }
 
@@ -207,14 +210,21 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/customers/${id}`);
   }
 
-  getProducts(search = '', limit?: number): Observable<ApiResponse<Product[]>> {
-    const params: Record<string, string> = { search };
-    if (limit) params['limit'] = String(limit);
+  getProducts(options: { search?: string; page?: number; limit?: number; categoryId?: number } = {}): Observable<ApiResponse<Product[]>> {
+    let params = new HttpParams();
+    if (options.search) params = params.set('search', options.search);
+    if (options.page) params = params.set('page', options.page);
+    if (options.limit) params = params.set('limit', options.limit);
+    if (options.categoryId) params = params.set('categoryId', options.categoryId);
     return this.http.get<ApiResponse<Product[]>>(`${this.baseUrl}/products`, { params });
   }
 
-  getCategories(search = ''): Observable<ApiResponse<Category[]>> {
-    return this.http.get<ApiResponse<Category[]>>(`${this.baseUrl}/categories`, { params: { search } });
+  getCategories(options: { search?: string; page?: number; limit?: number } = {}): Observable<ApiResponse<Category[]>> {
+    let params = new HttpParams();
+    if (options.search) params = params.set('search', options.search);
+    if (options.page) params = params.set('page', options.page);
+    if (options.limit) params = params.set('limit', options.limit);
+    return this.http.get<ApiResponse<Category[]>>(`${this.baseUrl}/categories`, { params });
   }
 
   createCategory(input: { name: string; description: string | null }): Observable<ApiResponse<Category>> {
@@ -296,23 +306,43 @@ export class ApiService {
   track(trackingNumber: string): Observable<ApiResponse<TrackingResult>> {
     return this.http.get<ApiResponse<TrackingResult>>(`${this.baseUrl}/tracking/${encodeURIComponent(trackingNumber)}`);
   }
-  getLeads(): Observable<ApiResponse<Lead[]>> { return this.http.get<ApiResponse<Lead[]>>(`${this.baseUrl}/leads`); }
+  getLeads(options: { search?: string; source?: string } = {}): Observable<ApiResponse<Lead[]>> {
+    let params = new HttpParams();
+    if (options.search) params = params.set('search', options.search);
+    if (options.source) params = params.set('source', options.source);
+    return this.http.get<ApiResponse<Lead[]>>(`${this.baseUrl}/leads`, { params });
+  }
   createLead(input: Omit<Lead,'id'|'assignedAgentName'>): Observable<ApiResponse<Lead>> { return this.http.post<ApiResponse<Lead>>(`${this.baseUrl}/leads`,input); }
   updateLead(id:number,input:Omit<Lead,'id'|'assignedAgentName'>): Observable<ApiResponse<Lead>> { return this.http.put<ApiResponse<Lead>>(`${this.baseUrl}/leads/${id}`,input); }
   convertLead(id:number): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.baseUrl}/leads/${id}/convert`,{}); }
   deleteLead(id:number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/leads/${id}`); }
-  getCampaigns(): Observable<ApiResponse<Campaign[]>> { return this.http.get<ApiResponse<Campaign[]>>(`${this.baseUrl}/campaigns`); }
+  getCampaigns(search = ''): Observable<ApiResponse<Campaign[]>> {
+    let params = new HttpParams();
+    if (search) params = params.set('search', search);
+    return this.http.get<ApiResponse<Campaign[]>>(`${this.baseUrl}/campaigns`, { params });
+  }
   createCampaign(input:Omit<Campaign,'id'>): Observable<ApiResponse<Campaign>> { return this.http.post<ApiResponse<Campaign>>(`${this.baseUrl}/campaigns`,input); }
   updateCampaign(id:number,input:Omit<Campaign,'id'>): Observable<ApiResponse<Campaign>> { return this.http.put<ApiResponse<Campaign>>(`${this.baseUrl}/campaigns/${id}`,input); }
   sendCampaign(id:number): Observable<ApiResponse<{messageId:string;recipientCount:number}>> { return this.http.post<ApiResponse<{messageId:string;recipientCount:number}>>(`${this.baseUrl}/campaigns/${id}/send`,{}); }
   deleteCampaign(id:number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/campaigns/${id}`); }
-  getAgents(activeOnly = false): Observable<ApiResponse<Agent[]>> { return this.http.get<ApiResponse<Agent[]>>(`${this.baseUrl}/agents`,{params:activeOnly?{activeOnly:'true'}:{}}); }
+  getAgents(options: { activeOnly?: boolean; search?: string } = {}): Observable<ApiResponse<Agent[]>> {
+    let params = new HttpParams();
+    if (options.activeOnly) params = params.set('activeOnly', 'true');
+    if (options.search) params = params.set('search', options.search);
+    return this.http.get<ApiResponse<Agent[]>>(`${this.baseUrl}/agents`, { params });
+  }
   getAgent(id:number): Observable<ApiResponse<AgentDetail>> { return this.http.get<ApiResponse<AgentDetail>>(`${this.baseUrl}/agents/${id}`); }
   createAgent(input:{fullName:string;email:string;phone:string;password:string;commissionRate:number}):Observable<ApiResponse<Agent>>{return this.http.post<ApiResponse<Agent>>(`${this.baseUrl}/agents`,input);}
   updateAgent(id:number,input:{fullName:string;email:string;phone:string;password?:string;commissionRate:number}):Observable<ApiResponse<Agent>>{return this.http.put<ApiResponse<Agent>>(`${this.baseUrl}/agents/${id}`,input);}
   activateAgent(id:number):Observable<ApiResponse<{id:number;active:boolean}>>{return this.http.post<ApiResponse<{id:number;active:boolean}>>(`${this.baseUrl}/agents/${id}/activate`,{});}
   deleteAgent(id:number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/agents/${id}`); }
-  getCommissions(): Observable<ApiResponse<Commission[]>> { return this.http.get<ApiResponse<Commission[]>>(`${this.baseUrl}/commissions`); }
+  getCommissions(options: { search?: string; from?: string; to?: string } = {}): Observable<ApiResponse<Commission[]>> {
+    let params = new HttpParams();
+    if (options.search) params = params.set('search', options.search);
+    if (options.from) params = params.set('from', options.from);
+    if (options.to) params = params.set('to', options.to);
+    return this.http.get<ApiResponse<Commission[]>>(`${this.baseUrl}/commissions`, { params });
+  }
 
   uploadSalesReport(file: File): Observable<ApiResponse<{ batchId: number; totalRows: number; readyRows: number; attentionRows: number; skippedSheets: string[] }>> {
     const formData = new FormData();

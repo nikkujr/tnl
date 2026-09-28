@@ -1,0 +1,56 @@
+<div class="products-page">
+  <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Products' }]" />
+  <div class="page-heading">
+    <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Product management.</h2><p>Manage catalog details while inventory remains transaction-controlled.</p></div>
+    <button class="primary icon-button" (click)="openForm()"><app-icon name="plus" />New product</button>
+  </div>
+  <div class="tools">
+    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search product, SKU, or category"></label>
+    <select [(ngModel)]="categoryFilter" (ngModelChange)="onCategoryFilterChange()" aria-label="Filter products by category">
+      <option [ngValue]="null">All categories</option>
+      @for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
+    </select>
+  </div>
+  <article class="panel management-table products-table">
+    <div class="management-row header"><span>Product</span><span>Category</span><span>Price</span><span>Available</span><span>Actions</span></div>
+    @for (product of products(); track product.id) {
+      <div class="management-row">
+        <span><strong>{{ product.name }}</strong><small>{{ product.sku }}</small></span>
+        <span>{{ product.category }}</span>
+        <strong>{{ product.price | currency:'PHP':'symbol-narrow' }}</strong>
+        <span>{{ product.stockOnHand - product.stockReserved }}</span>
+        <span class="table-actions"><button class="row-action" (click)="openForm(product)">Edit</button><button class="row-action reject" (click)="remove(product)">Delete</button></span>
+      </div>
+    } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No products found.' }}</div> }
+  </article>
+  @if (total > limit) {
+    <div class="pagination">
+      <button class="ghost-button" [disabled]="page === 1" (click)="goToPage(-1)">← Previous</button>
+      <span>Page {{ page }} of {{ totalPages() }} · {{ total }} products</span>
+      <button class="ghost-button" [disabled]="page * limit >= total" (click)="goToPage(1)">Next →</button>
+    </div>
+  }
+</div>
+
+@if (showForm()) {
+  <div class="modal-backdrop" (click)="showForm.set(false)">
+    <section class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-title"><div><span class="eyebrow">Catalog</span><h2>{{ editingId ? 'Edit product' : 'New product' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
+      <form (ngSubmit)="save()">
+        <div class="form-grid">
+          <label>Product name<input name="productName" [(ngModel)]="form.name" required></label>
+          <label>SKU<input name="sku" [(ngModel)]="form.sku" required></label>
+          <label>Category<select name="categoryId" [(ngModel)]="form.categoryId">@for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }</select></label>
+          <label>Price<input name="price" type="number" min="0.01" step="0.01" [(ngModel)]="form.price" required></label>
+          <label class="wide">Description<textarea name="productDescription" [(ngModel)]="form.description" rows="4"></textarea></label>
+        </div>
+        <p class="form-note">Stock quantities are managed only through Inventory Management.</p>
+        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save product</button></footer>
+      </form>
+    </section>
+  </div>
+}
+
+@if (confirmDialog.config(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+}

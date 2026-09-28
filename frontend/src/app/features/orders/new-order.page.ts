@@ -13,7 +13,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
   imports: [CurrencyPipe, FormsModule, AppIconComponent, ActionDialogComponent, BreadcrumbComponent],
   templateUrl: './new-order.page.html',
   styleUrls: ['./new-order.page.scss', './new-order-accessibility.scss', './new-order-controls.scss', './new-order-pastel.scss', './new-order-lookups.scss'],
-  styles: ['.line-quantity{width:72px;padding:8px 10px;border:1px solid #d0d5dd;border-radius:8px;color:#101828;background:#fff;font:inherit}.icon-button{display:inline-flex;align-items:center;gap:7px}.icon-button app-icon{width:14px;height:14px}.empty-items>app-icon{width:30px;height:30px;margin:auto;color:#98a2b3}.picker header button app-icon{width:20px;height:20px}.search-box app-icon{width:16px;height:16px;color:#667085}']
+  styles: ['.line-quantity{width:72px;padding:8px 10px;border:1px solid var(--line, #d0d5dd);border-radius:8px;color:var(--ink, #101828);background:var(--color-surface, #fff);font:inherit}.icon-button{display:inline-flex;align-items:center;gap:7px}.icon-button app-icon{width:14px;height:14px}.empty-items>app-icon{width:30px;height:30px;margin:auto;color:var(--color-text-faint, #98a2b3)}.picker header button app-icon{width:20px;height:20px}.search-box app-icon{width:16px;height:16px;color:var(--muted, #667085)}']
 })
 export class NewOrderPage implements OnInit {
   private readonly api = inject(ApiService);
@@ -50,10 +50,10 @@ export class NewOrderPage implements OnInit {
 
   ngOnInit(): void {
     const requests: { customers: ReturnType<ApiService['getCustomers']>; products: ReturnType<ApiService['getProducts']>; agents?: ReturnType<ApiService['getAgents']> } = {
-      customers: this.api.getCustomers(),
-      products: this.api.getProducts()
+      customers: this.api.getCustomers({ limit: 100 }),
+      products: this.api.getProducts({ limit: 100 })
     };
-    if (this.session().role === 'ADMIN') requests.agents = this.api.getAgents(true);
+    if (this.session().role === 'ADMIN') requests.agents = this.api.getAgents({ activeOnly: true });
     forkJoin(requests).subscribe({
       next: (result) => {
         this.customers.set(result.customers.data);

@@ -1,0 +1,55 @@
+<div class="campaigns-page">
+  <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Campaigns' }]" />
+  <div class="page-heading">
+    <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Campaign management.</h2><p>Manage campaign content, schedules, and lifecycle status.</p></div>
+    <button class="primary icon-button" (click)="openForm()"><app-icon name="plus" />New campaign</button>
+  </div>
+  <div class="tools">
+    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search name or audience"></label>
+    <select [(ngModel)]="status" aria-label="Filter campaigns by status">
+      <option value="ALL">All statuses</option>
+      <option value="DRAFT">Draft</option>
+      <option value="SCHEDULED">Scheduled</option>
+      <option value="ACTIVE">Active</option>
+      <option value="COMPLETED">Completed</option>
+    </select>
+  </div>
+  <article class="panel management-table">
+    <div class="management-row header"><span>Campaign</span><span>Audience</span><span>Schedule</span><span>Actions</span></div>
+    @for (item of filtered(); track item.id) {
+      <div class="management-row">
+        <span><strong>{{ item.name }}</strong><small>{{ titleCase(item.status) }}</small></span>
+        <span>{{ item.targetAudience }}</span>
+        <span>{{ item.startDate | date:'mediumDate' }} – {{ item.endDate | date:'mediumDate' }}</span>
+        <span class="table-actions">
+          <button class="row-action approve" (click)="send(item)">Send email</button>
+          <button class="row-action" (click)="openForm(item)">Edit</button>
+          <button class="row-action reject" (click)="remove(item)">Delete</button>
+        </span>
+      </div>
+    } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No campaigns found.' }}</div> }
+  </article>
+</div>
+
+@if (showForm()) {
+  <div class="modal-backdrop" (click)="showForm.set(false)">
+    <section class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-title"><div><span class="eyebrow">Marketing</span><h2>{{ editingId ? 'Edit campaign' : 'New campaign' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
+      <form (ngSubmit)="save()">
+        <div class="form-grid">
+          <label>Campaign name<input name="campaignName" [(ngModel)]="form.name" required minlength="2"></label>
+          <label>Target audience<input name="campaignAudience" [(ngModel)]="form.targetAudience" required minlength="2"></label>
+          <label>Start date<input name="campaignStart" type="date" [(ngModel)]="form.startDate" required></label>
+          <label>End date<input name="campaignEnd" type="date" [(ngModel)]="form.endDate" required></label>
+          <label>Status<select name="campaignStatus" [(ngModel)]="form.status"><option value="DRAFT">Draft</option><option value="SCHEDULED">Scheduled</option><option value="ACTIVE">Active</option><option value="COMPLETED">Completed</option></select></label>
+          <label class="wide">Campaign content<app-rich-text-editor name="campaignContent" [(ngModel)]="form.content" placeholder="Write the campaign email content…" /></label>
+        </div>
+        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save campaign</button></footer>
+      </form>
+    </section>
+  </div>
+}
+
+@if (confirmDialog.config(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+}

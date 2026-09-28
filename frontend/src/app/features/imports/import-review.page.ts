@@ -62,8 +62,8 @@ export class ImportReviewPage implements OnInit {
     forkJoin({
       batch: this.api.getImportBatch(this.batchId),
       rows: this.api.getImportRows(this.batchId, { section: this.sectionFilter || undefined, status: this.statusFilter || undefined, page: this.page, limit: this.limit }),
-      customers: this.api.getCustomers('', 1, 100),
-      products: this.api.getProducts('', 100),
+      customers: this.api.getCustomers({ limit: 100 }),
+      products: this.api.getProducts({ limit: 100 }),
       agents: this.api.getImportAgentOptions()
     }).subscribe({
       next: (result) => {

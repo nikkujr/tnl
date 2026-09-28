@@ -21,10 +21,10 @@ export interface BreadcrumbItem { label: string; link?: string }
   `,
   styles: [`
     .app-breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
-    .app-breadcrumb a { color: #465fff; font-size: 12px; font-weight: 600; text-decoration: none; }
+    .app-breadcrumb a { color: var(--green, #7167c9); font-size: 12px; font-weight: 600; text-decoration: none; }
     .app-breadcrumb a:hover { text-decoration: underline; }
-    .app-breadcrumb .sep { color: #d0d5dd; font-size: 12px; }
-    .app-breadcrumb .current { color: #667085; font-size: 12px; font-weight: 600; }
+    .app-breadcrumb .sep { color: var(--line, #d0d5dd); font-size: 12px; }
+    .app-breadcrumb .current { color: var(--muted, #667085); font-size: 12px; font-weight: 600; }
   `]
 })
 export class BreadcrumbComponent {

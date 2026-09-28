@@ -1,0 +1,15 @@
+<div class="tracking-page">
+  <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Tracking' }]" />
+  <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Follow every handoff.</h2><p>Enter a tracking number to see the latest verified delivery events.</p></div>
+  <article class="tracking-card">
+    <label class="tracking-search"><input [(ngModel)]="trackingNumber" placeholder="Enter tracking number" (keyup.enter)="track()"><button (click)="track()" [disabled]="loading()">Track order</button></label>
+    @if (result(); as data) {
+      <div class="tracking-summary"><div><span class="eyebrow">Tracking number</span><h3>{{ data.trackingNumber }}</h3></div><span [class]="'status ' + statusClass(data.deliveryStatus || data.orderStatus)">{{ titleCase(data.deliveryStatus || data.orderStatus) }}</span><div><small>Delivery address</small><strong>{{ data.deliveryAddress }}</strong></div></div>
+      <div class="timeline">
+        @for (event of data.events; track event.occurredAt) {
+          <div class="timeline-step complete"><i></i><span><strong>{{ titleCase(event.status) }}</strong><small>{{ event.occurredAt | date:'medium' }} · {{ event.notes }}</small></span></div>
+        }
+      </div>
+    } @else { <div class="empty">Enter a tracking number to load live delivery events.</div> }
+  </article>
+</div>

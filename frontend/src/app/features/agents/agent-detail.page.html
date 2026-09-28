@@ -61,7 +61,7 @@
         <div class="agent-table">
           <div class="agent-row agent-row-header"><span>Customer</span><span>Contact</span><span>Address</span><span>Registered</span></div>
           @for (customer of data.customers; track customer.id) {
-            <button type="button" class="agent-row agent-row-link" (click)="viewCustomer(customer.id)">
+            <button type="button" class="agent-row agent-row-link" (click)="viewCustomer(customer.fullName)">
               <strong>{{ customer.fullName }}</strong>
               <span>{{ customer.email }}<small>{{ customer.phone }}</small></span>
               <span>{{ customer.address }}</span>

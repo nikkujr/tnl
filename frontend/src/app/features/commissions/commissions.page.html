@@ -1,0 +1,15 @@
+<div class="commissions-page">
+  <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Commissions' }]" />
+  <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Commission history.</h2><p>Delivered-order commissions calculated using the captured agent rate.</p></div>
+  <div class="tools">
+    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search order or customer"></label>
+    <label>From <input type="date" [(ngModel)]="from" (ngModelChange)="onDateRangeChange()"></label>
+    <label>To <input type="date" [(ngModel)]="to" (ngModelChange)="onDateRangeChange()"></label>
+  </div>
+  <article class="panel management-table">
+    <div class="management-row header"><span>Order</span><span>Customer</span><span>Agent / rate</span><span>Amount</span></div>
+    @for (item of commissions(); track item.id) {
+      <div class="management-row"><strong>{{ item.orderId }}</strong><span>{{ item.customerName }}</span><span>{{ item.agentName }} · {{ item.rate }}%</span><strong>{{ item.amount | currency:'PHP':'symbol-narrow' }}</strong></div>
+    } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No commissions have been posted.' }}</div> }
+  </article>
+</div>

@@ -1,0 +1,58 @@
+<div class="leads-page">
+  <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Leads' }]" />
+  <div class="page-heading">
+    <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Lead management.</h2><p>Qualify prospects, preserve attribution, and convert them into customers.</p></div>
+    <button class="primary icon-button" (click)="openForm()"><app-icon name="plus" />New lead</button>
+  </div>
+  <div class="tools">
+    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search name, email, or phone"></label>
+    <select [(ngModel)]="status" aria-label="Filter leads by status">
+      <option value="ALL">All statuses</option>
+      <option value="NEW">New</option>
+      <option value="CONTACTED">Contacted</option>
+      <option value="QUALIFIED">Qualified</option>
+      <option value="CONVERTED">Converted</option>
+      <option value="LOST">Lost</option>
+    </select>
+  </div>
+  <article class="panel management-table">
+    <div class="management-row header"><span>Lead</span><span>Source / agent</span><span>Status</span><span>Actions</span></div>
+    @for (item of filtered(); track item.id) {
+      <div class="management-row">
+        <span><strong>{{ item.fullName }}</strong><small>{{ item.email }} · {{ item.phone }}</small></span>
+        <span>{{ item.source }}<small>{{ item.assignedAgentName || 'Unassigned' }}</small></span>
+        <span>{{ titleCase(item.status) }}</span>
+        <span class="table-actions">
+          @if (item.status !== 'CONVERTED') {
+            <button class="row-action" (click)="openForm(item)">Edit</button>
+            <button class="row-action approve" (click)="convertLead(item)">Convert</button>
+            <button class="row-action reject" (click)="remove(item)">Delete</button>
+          }
+        </span>
+      </div>
+    } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No leads found.' }}</div> }
+  </article>
+</div>
+
+@if (showForm()) {
+  <div class="modal-backdrop" (click)="showForm.set(false)">
+    <section class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-title"><div><span class="eyebrow">CRM</span><h2>{{ editingId ? 'Edit lead' : 'New lead' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
+      <form (ngSubmit)="save()">
+        <div class="form-grid">
+          <label>Full name<input name="leadName" [(ngModel)]="form.fullName" required></label>
+          <label>Email<input name="leadEmail" type="email" [(ngModel)]="form.email" required></label>
+          <label>Phone<input name="leadPhone" [(ngModel)]="form.phone" required minlength="7" maxlength="16" placeholder="09XXXXXXXXX"></label>
+          <label>Source<input name="leadSource" [(ngModel)]="form.source" required></label>
+          <label>Assigned agent<select name="leadAgent" [(ngModel)]="form.assignedAgentId"><option [ngValue]="null">Unassigned</option>@for (agent of activeAgents(); track agent.id) { <option [ngValue]="agent.id">{{ agent.fullName }}</option> }</select></label>
+          <label>Status<select name="leadStatus" [(ngModel)]="form.status"><option value="NEW">New</option><option value="CONTACTED">Contacted</option><option value="QUALIFIED">Qualified</option><option value="LOST">Lost</option></select></label>
+        </div>
+        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save lead</button></footer>
+      </form>
+    </section>
+  </div>
+}
+
+@if (confirmDialog.config(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+}

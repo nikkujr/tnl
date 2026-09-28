@@ -17,18 +17,19 @@ router.get("/", async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 20)));
     const offset = (page - 1) * limit;
     const categoryFilter = categoryId > 0 ? " AND p.category_id=?" : "";
-    const args: unknown[] = [search, minPrice, maxPrice];
+    const args: unknown[] = [search, search, search, minPrice, maxPrice];
     if (categoryId > 0) args.push(categoryId);
     const [rows] = await db.query(
       `SELECT p.id,p.category_id categoryId,p.name,p.sku,p.price,p.description,p.stock_on_hand stockOnHand,
        p.stock_reserved stockReserved,p.low_stock_threshold lowStockThreshold,p.reorder_level reorderLevel,
        c.name category FROM products p JOIN categories c ON c.id=p.category_id
-       WHERE p.active=TRUE AND p.name LIKE ? AND p.price BETWEEN ? AND ?${categoryFilter}
+       WHERE p.active=TRUE AND (p.name LIKE ? OR p.sku LIKE ? OR c.name LIKE ?) AND p.price BETWEEN ? AND ?${categoryFilter}
        ORDER BY p.name LIMIT ? OFFSET ?`,
       [...args, limit, offset]
     );
     const [counts] = await db.query<any[]>(
-      `SELECT COUNT(*) total FROM products p WHERE p.active=TRUE AND p.name LIKE ? AND p.price BETWEEN ? AND ?${categoryFilter}`,
+      `SELECT COUNT(*) total FROM products p JOIN categories c ON c.id=p.category_id
+       WHERE p.active=TRUE AND (p.name LIKE ? OR p.sku LIKE ? OR c.name LIKE ?) AND p.price BETWEEN ? AND ?${categoryFilter}`,
       args
     );
     res.json({ data: rows, meta: { page, limit, total: counts[0].total } });

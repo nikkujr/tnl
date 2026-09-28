@@ -1,9 +1,9 @@
 import { Component, Input, inject } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
-  AlertTriangle, BadgeDollarSign, Bell, Boxes, Check, ChevronDown, ChevronRight, CircleUserRound, ClipboardList, Gauge,
-  LayoutDashboard, Mail, MapPinned, Megaphone, Menu, Package, PackageSearch,
-  Pencil, Plus, RotateCcw, Search, Tags, Trash2, UserCog, UserRoundSearch,
+  AlertCircle, AlertTriangle, BadgeDollarSign, Bell, Boxes, Check, CheckCircle2, ChevronDown, ChevronRight, CircleUserRound, ClipboardList, Gauge,
+  Info, LayoutDashboard, Mail, MapPinned, Megaphone, Menu, Monitor, Moon, Package, PackageSearch,
+  Pencil, Plus, RotateCcw, Search, Sun, Tags, Trash2, UserCog, UserRoundSearch,
   UsersRound, Warehouse, X, type IconNode
 } from 'lucide';
 
@@ -15,7 +15,8 @@ const ICONS = {
   check: Check, edit: Pencil, delete: Trash2, email: Mail, search: Search,
   restore: RotateCcw, account: CircleUserRound, catalog: Boxes,
   packageSearch: PackageSearch, gauge: Gauge, chevronDown: ChevronDown, chevronRight: ChevronRight,
-  alert: AlertTriangle
+  alert: AlertTriangle, sun: Sun, moon: Moon, monitor: Monitor,
+  checkCircle: CheckCircle2, alertCircle: AlertCircle, info: Info
 } satisfies Record<string, IconNode>;
 
 export type AppIconName = keyof typeof ICONS;

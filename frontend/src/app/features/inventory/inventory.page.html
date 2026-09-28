@@ -1,0 +1,30 @@
+<div class="inventory-page">
+  <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Inventory' }]" />
+  <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Know what's available.</h2><p>On-hand, reserved, and reorder signals—without spreadsheet guesswork.</p></div>
+  <div class="tools">
+    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search by product name"></label>
+    <select [(ngModel)]="health" (ngModelChange)="onHealthChange()" aria-label="Filter inventory by stock health"><option value="ALL">All inventory</option><option value="LOW">Low stock</option><option value="HEALTHY">Healthy</option></select>
+  </div>
+  <div class="inventory-grid">
+    @for (item of filtered(); track item.id) {
+      <article class="inventory-card">
+        <div><span class="eyebrow">{{ item.sku }}</span><h3>{{ item.name }}</h3></div>
+        <span class="stock-pill" [class.low]="item.stockOnHand <= item.lowStockThreshold">{{ item.stockOnHand <= item.lowStockThreshold ? 'Low stock' : 'Healthy' }}</span>
+        <div class="stock-number"><strong>{{ item.stockOnHand }}</strong><small>on hand · {{ item.stockReserved }} reserved</small></div>
+        <div class="stock-track"><i [style.width.%]="stockWidth(item.stockOnHand)"></i></div>
+        <footer><span>Alert {{ item.lowStockThreshold }} · Reorder {{ item.reorderLevel }}</span><span class="table-actions"><button class="row-action" (click)="editSettings(item)">Settings</button><button class="row-action" (click)="adjust(item)">Adjust stock</button></span></footer>
+      </article>
+    } @empty { <div class="empty panel">{{ loading() ? 'Loading…' : 'No inventory items match this stock filter.' }}</div> }
+  </div>
+  @if (isPaginated() && total > limit) {
+    <div class="pagination">
+      <button class="ghost-button" [disabled]="page === 1" (click)="goToPage(-1)">← Previous</button>
+      <span>Page {{ page }} of {{ totalPages() }} · {{ total }} products</span>
+      <button class="ghost-button" [disabled]="page * limit >= total" (click)="goToPage(1)">Next →</button>
+    </div>
+  }
+</div>
+
+@if (confirmDialog.config(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+}
