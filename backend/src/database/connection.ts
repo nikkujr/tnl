@@ -8,5 +8,9 @@ export const db = mysql.createPool({
   user: config.DB_USER,
   password: config.DB_PASSWORD,
   connectionLimit: 10,
-  decimalNumbers: true
+  decimalNumbers: true,
+  timezone: "Z",
+});
+db.on("connection", (connection) => {
+  connection.query("SET time_zone = '+00:00'");
 });

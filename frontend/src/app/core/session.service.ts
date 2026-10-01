@@ -27,10 +27,15 @@ export class SessionService {
         sessionStorage.setItem('tnl_user', JSON.stringify(data.user));
         this.session.set(data.user);
       }),
-      map(({ data }) => data)
+      map(({ data }) => data),
     );
   }
 
+  setSession(data: { token: string; user: SessionUser }): void {
+    sessionStorage.setItem('tnl_access_token', data.token);
+    sessionStorage.setItem('tnl_user', JSON.stringify(data.user));
+    this.session.set(data.user);
+  }
   logout(): void {
     sessionStorage.removeItem('tnl_access_token');
     sessionStorage.removeItem('tnl_user');

@@ -1,15 +1,33 @@
 <div class="customers-page">
   <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Customers' }]" />
   <div class="page-heading">
-    <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Relationships that compound.</h2><p>Keep customer context, ownership, and order history close.</p></div>
-    <button class="primary icon-button" (click)="openForm()"><app-icon name="plus" />New customer</button>
+    <div class="page-intro">
+      <span class="eyebrow">TNL Track</span>
+      <h2>Relationships that compound.</h2>
+      <p>Keep customer context, ownership, and order history close.</p>
+    </div>
+    <button class="primary icon-button" (click)="openForm()">
+      <app-icon name="plus" />New customer
+    </button>
   </div>
   <div class="tools">
-    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search name, email, phone, address, or agent"></label>
+    <label
+      ><span>⌕</span
+      ><input
+        [(ngModel)]="search"
+        (ngModelChange)="onSearchChange()"
+        placeholder="Search name, email, phone, address, or agent"
+    /></label>
     @if (session()!.role === 'ADMIN') {
-      <select [(ngModel)]="agentFilter" (ngModelChange)="onAgentFilterChange()" aria-label="Filter customers by agent">
+      <select
+        [(ngModel)]="agentFilter"
+        (ngModelChange)="onAgentFilterChange()"
+        aria-label="Filter customers by agent"
+      >
         <option [ngValue]="null">All agents</option>
-        @for (agent of activeAgents(); track agent.id) { <option [ngValue]="agent.id">{{ agent.fullName }}</option> }
+        @for (agent of activeAgents(); track agent.id) {
+          <option [ngValue]="agent.id">{{ agent.fullName }}</option>
+        }
       </select>
     }
   </div>
@@ -17,22 +35,41 @@
     @for (customer of customers(); track customer.id) {
       <div class="customer-row">
         <span class="customer-avatar">{{ customer.fullName.slice(0, 2).toUpperCase() }}</span>
-        <span class="customer-name"><strong>{{ customer.fullName }}</strong><small>{{ customer.email }}</small></span>
-        <span><small>Phone</small><strong>{{ customer.phone }}</strong></span>
-        <span><small>Address</small><strong>{{ customer.address }}</strong></span>
-        <span><small>Agent</small><strong>{{ customer.assignedAgentName || 'Unassigned' }}</strong></span>
+        <span class="customer-name"
+          ><strong>{{ customer.fullName }}</strong
+          ><small>{{ customer.email }}</small></span
+        >
+        <span
+          ><small>Phone</small><strong>{{ customer.phone }}</strong></span
+        >
+        <span
+          ><small>Address</small><strong>{{ customer.address }}</strong></span
+        >
+        <span
+          ><small>Agent</small
+          ><strong>{{ customer.assignedAgentName || 'Unassigned' }}</strong></span
+        >
         <span class="table-actions">
-          <button class="row-action" (click)="openForm(customer)">Edit</button>
-          @if (session()!.role === 'ADMIN') { <button class="row-action reject" (click)="remove(customer)">Delete</button> }
+          <button class="row-action" (click)="openForm(customer)">Edit</button
+          ><button class="row-action" (click)="invite(customer)">Invite to portal</button>
+          @if (session()!.role === 'ADMIN') {
+            <button class="row-action reject" (click)="remove(customer)">Delete</button>
+          }
         </span>
       </div>
-    } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No customers match your search.' }}</div> }
+    } @empty {
+      <div class="empty">{{ loading() ? 'Loading…' : 'No customers match your search.' }}</div>
+    }
   </article>
   @if (total > limit) {
     <div class="pagination">
-      <button class="ghost-button" [disabled]="page === 1" (click)="goToPage(-1)">← Previous</button>
+      <button class="ghost-button" [disabled]="page === 1" (click)="goToPage(-1)">
+        ← Previous
+      </button>
       <span>Page {{ page }} of {{ totalPages() }} · {{ total }} customers</span>
-      <button class="ghost-button" [disabled]="page * limit >= total" (click)="goToPage(1)">Next →</button>
+      <button class="ghost-button" [disabled]="page * limit >= total" (click)="goToPage(1)">
+        Next →
+      </button>
     </div>
   }
 </div>
@@ -40,24 +77,73 @@
 @if (showForm()) {
   <div class="modal-backdrop" (click)="showForm.set(false)">
     <section class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-title"><div><span class="eyebrow">CRM</span><h2>{{ editingId ? 'Edit customer' : 'New customer' }}</h2></div><button type="button" (click)="showForm.set(false)">×</button></div>
+      <div class="modal-title">
+        <div>
+          <span class="eyebrow">CRM</span>
+          <h2>{{ editingId ? 'Edit customer' : 'New customer' }}</h2>
+        </div>
+        <button type="button" (click)="showForm.set(false)">×</button>
+      </div>
       <form (ngSubmit)="save()">
         <div class="form-grid">
-          <label>Full name<input name="customerName" [(ngModel)]="form.fullName" required minlength="2"></label>
-          <label>Email<input name="customerEmail" type="email" [(ngModel)]="form.email" required></label>
-          <label>Phone<input name="customerPhone" [(ngModel)]="form.phone" required minlength="7" maxlength="16" placeholder="09XXXXXXXXX"></label>
+          <label
+            >Full name<input name="customerName" [(ngModel)]="form.fullName" required minlength="2"
+          /></label>
+          <label
+            >Email<input name="customerEmail" type="email" [(ngModel)]="form.email" required
+          /></label>
+          <label
+            >Phone<input
+              name="customerPhone"
+              [(ngModel)]="form.phone"
+              required
+              minlength="7"
+              maxlength="16"
+              placeholder="09XXXXXXXXX"
+          /></label>
           @if (session()!.role === 'ADMIN') {
-            <label>Assigned agent<select name="customerAgent" [(ngModel)]="form.assignedAgentId"><option [ngValue]="null">Unassigned</option>@for (agent of activeAgents(); track agent.id) { <option [ngValue]="agent.id">{{ agent.fullName }}</option> }</select></label>
+            <label
+              >Assigned agent<select name="customerAgent" [(ngModel)]="form.assignedAgentId">
+                <option [ngValue]="null">Unassigned</option>
+                @for (agent of activeAgents(); track agent.id) {
+                  <option [ngValue]="agent.id">{{ agent.fullName }}</option>
+                }
+              </select></label
+            >
           }
-          <label class="wide">Address<textarea name="customerAddress" [(ngModel)]="form.address" rows="4" required minlength="5"></textarea></label>
+          <label class="wide"
+            ><span
+              ><input name="marketingOptIn" type="checkbox" [(ngModel)]="form.marketingOptIn" />
+              Customer explicitly agreed to marketing emails</span
+            ></label
+          >
+          <label class="wide"
+            >Address<textarea
+              name="customerAddress"
+              [(ngModel)]="form.address"
+              rows="4"
+              required
+              minlength="5"
+            ></textarea>
+          </label>
         </div>
-        @if (session()!.role === 'AGENT') { <p class="form-note">This customer will remain assigned to your agent account.</p> }
-        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save customer</button></footer>
+        @if (session()!.role === 'AGENT') {
+          <p class="form-note">This customer will remain assigned to your agent account.</p>
+        }
+        <footer>
+          <button type="button" class="secondary-button" (click)="showForm.set(false)">
+            Cancel</button
+          ><button class="primary">Save customer</button>
+        </footer>
       </form>
     </section>
   </div>
 }
 
 @if (confirmDialog.config(); as dialog) {
-  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+  <app-action-dialog
+    [config]="dialog"
+    (cancelled)="confirmDialog.cancel()"
+    (confirmed)="confirmDialog.confirm($event)"
+  />
 }

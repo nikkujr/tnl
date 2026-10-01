@@ -1,0 +1,100 @@
+<section class="rewards-panel" aria-labelledby="agent-rewards-heading">
+  <header>
+    <div>
+      <span class="eyebrow">Monthly rewards</span>
+      <h3 id="agent-rewards-heading">Incentives &amp; bonuses</h3>
+      <p>Approved rewards are separate from commission.</p>
+    </div>
+    <label
+      >Reward month<input
+        type="month"
+        min="2000-01"
+        max="2100-12"
+        [ngModel]="month()"
+        (ngModelChange)="selectMonth($event)"
+    /></label>
+  </header>
+  @if (loading()) {
+    <p class="message" role="status">Loading incentives and bonuses…</p>
+  } @else if (error()) {
+    <div class="message error" role="alert">
+      {{ error() }} <button type="button" (click)="retry()">Retry</button>
+    </div>
+  } @else if (report(); as data) {
+    <div class="reward-totals">
+      <div>
+        <span>Approved incentives</span
+        ><strong>{{ data.totals.incentives | currency: 'PHP' : 'symbol-narrow' }}</strong>
+      </div>
+      <div>
+        <span>Approved bonuses</span
+        ><strong>{{ data.totals.bonuses | currency: 'PHP' : 'symbol-narrow' }}</strong>
+      </div>
+    </div>
+    @if (data.target; as target) {
+      <div class="target">
+        <div class="target-heading">
+          <h4>Monthly sales incentive</h4>
+          <span class="badge" [class.approved]="target.status === 'APPROVED'">{{
+            targetStatus(target.status)
+          }}</span>
+        </div>
+        @if (target.incentiveAmount > 0) {
+          <p>
+            Reach {{ target.salesTarget | currency: 'PHP' : 'symbol-narrow' }} in completed sales
+            for a {{ target.incentiveAmount | currency: 'PHP' : 'symbol-narrow' }} incentive.
+          </p>
+        } @else {
+          <p>Monthly sales target: {{ target.salesTarget | currency: 'PHP' : 'symbol-narrow' }}.</p>
+        }
+        <div
+          class="progress"
+          role="progressbar"
+          aria-label="Monthly sales target"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuenow]="progressWidth()"
+        >
+          <span [style.width.%]="progressWidth()"></span>
+        </div>
+        <div class="progress-caption">
+          <span>{{ data.sales | currency: 'PHP' : 'symbol-narrow' }} completed sales</span
+          ><strong>{{ target.progress | number: '1.0-1' }}% reached</strong>
+        </div>
+        <small
+          >Sales count after delivery and full payment. Incentives require admin approval.</small
+        >
+      </div>
+    } @else {
+      <p class="message">No sales incentive target has been set for this month.</p>
+    }
+    <div class="reward-history">
+      <h4>
+        Approved rewards · {{ data.period + '-01T00:00:00+08:00' | date: 'MMMM yyyy' : '+0800' }}
+      </h4>
+      @for (reward of data.rewards; track reward.id) {
+        <article class="reward-row">
+          <div>
+            <span class="reward-kind">{{
+              reward.kind === 'BONUS' ? 'Bonus' : 'Target incentive'
+            }}</span>
+            <p>{{ reward.reason }}</p>
+            <small
+              >Approved by {{ reward.approvedBy }} ·
+              {{ reward.createdAt | date: 'mediumDate' : '+0800' }}</small
+            >
+          </div>
+          <strong>{{ reward.amount | currency: 'PHP' : 'symbol-narrow' }}</strong>
+        </article>
+      } @empty {
+        <p class="message">No approved incentives or bonuses for this month.</p>
+      }
+    </div>
+    <footer>
+      <small>Contact your admin for payout details.</small>
+      @if (showManagementLink()) {
+        <a routerLink="/performance">Manage rewards →</a>
+      }
+    </footer>
+  }
+</section>

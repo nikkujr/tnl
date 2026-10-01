@@ -1,124 +1,501 @@
 <app-toast-container />
-@if (!session()) {
+@if (routedPath() === 'portal' || session()?.role === 'CUSTOMER') {
+  <router-outlet />
+} @else if (!session()) {
   <main class="landing-page">
-    <nav class="landing-nav"><a class="landing-brand" href="#"><span class="brand-mark">T</span><span><strong>TNL TRACK</strong><small>Sales & delivery</small></span></a><div><a href="#tracking">Track order</a><a href="#staff-login">Staff sign in</a></div></nav>
+    <nav class="landing-nav">
+      <a class="landing-brand" href="#"
+        ><span class="brand-mark">T</span
+        ><span><strong>TNL TRACK</strong><small>Sales & delivery</small></span></a
+      >
+      <div>
+        <a href="/portal">Customer portal</a><a href="#tracking">Track order</a
+        ><a href="#staff-login">Staff sign in</a>
+      </div>
+    </nav>
     <section class="hero">
       <app-landing-backdrop />
-      <div class="hero-copy"><span class="hero-kicker">Reliable delivery, clearly tracked</span><h1>Your order,<br><em>always in sight.</em></h1><p>Follow every milestone from preparation to delivery with one simple tracking number.</p><a class="hero-action" href="#tracking">Track my order <span>→</span></a><div class="hero-proof"><span><strong>Live</strong> delivery updates</span><span><strong>Secure</strong> order lookup</span><span><strong>Simple</strong> status history</span></div></div>
-      <div class="hero-visual"><div class="route-card"><span class="route-label">Delivery journey</span><div class="route-line"><i></i><i></i><i></i><i></i></div><div class="route-stops"><span>Preparing</span><span>Dispatched</span><span>In transit</span><strong>Delivered</strong></div></div><div class="floating-package"><span>◆</span><div><small>Shipment protected</small><strong>Handled with care</strong></div></div></div>
+      <div class="hero-copy">
+        <span class="hero-kicker">Reliable delivery, clearly tracked</span>
+        <h1>Your order,<br /><em>always in sight.</em></h1>
+        <p>Follow every milestone from preparation to delivery with one simple tracking number.</p>
+        <a class="hero-action" href="#tracking">Track my order <span>→</span></a>
+        <div class="hero-proof">
+          <span><strong>Live</strong> delivery updates</span
+          ><span><strong>Secure</strong> order lookup</span
+          ><span><strong>Simple</strong> status history</span>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="route-card">
+          <span class="route-label">Delivery journey</span>
+          <div class="route-line"><i></i><i></i><i></i><i></i></div>
+          <div class="route-stops">
+            <span>Preparing</span><span>Dispatched</span><span>In transit</span
+            ><strong>Delivered</strong>
+          </div>
+        </div>
+        <div class="floating-package">
+          <span>◆</span>
+          <div><small>Shipment protected</small><strong>Handled with care</strong></div>
+        </div>
+      </div>
     </section>
     <section class="public-tracking" id="tracking">
-      <div><span class="hero-kicker">Track my order</span><h2>Where is your delivery?</h2><p>Enter the tracking number included in your order confirmation.</p></div>
+      <div>
+        <span class="hero-kicker">Track my order</span>
+        <h2>Where is your delivery?</h2>
+        <p>Enter the tracking number included in your order confirmation.</p>
+      </div>
       <div class="tracking-card">
-        <form (ngSubmit)="track()"><label>Tracking number<div><input name="publicTracking" [(ngModel)]="trackingNumber" placeholder="e.g. TNL-ABC123-4F2A" required><button [disabled]="loading()">Track order →</button></div></label></form>
-        @if(trackingError()){<div class="public-error">{{trackingError()}}</div>}
+        <form (ngSubmit)="track()">
+          <label
+            >Tracking number
+            <div>
+              <input
+                name="publicTracking"
+                [(ngModel)]="trackingNumber"
+                placeholder="e.g. TNL-ABC123-4F2A"
+                required
+              /><button [disabled]="loading()">Track order →</button>
+            </div></label
+          >
+        </form>
+        @if (trackingError()) {
+          <div class="public-error">{{ trackingError() }}</div>
+        }
 
-        @if(trackingResult();as result){<div class="public-result"><header><span><small>Tracking number</small><strong>{{result.trackingNumber}}</strong></span><i>{{titleCase(result.deliveryStatus||result.orderStatus)}}</i></header><p>{{result.deliveryAddress}}</p><div class="public-timeline">@for(event of result.events;track event.occurredAt){<div><i></i><span><strong>{{titleCase(event.status)}}</strong><small>{{event.occurredAt|date:'medium'}}@if(event.notes){ · {{event.notes}}}</small></span></div>}@empty{<p>Your order has been received. Delivery events will appear here.</p>}</div></div>}
+        @if (trackingResult(); as result) {
+          <div class="public-result">
+            <header>
+              <span
+                ><small>Tracking number</small><strong>{{ result.trackingNumber }}</strong></span
+              ><i>{{ titleCase(result.deliveryStatus || result.orderStatus) }}</i>
+            </header>
+            <div class="public-timeline">
+              @for (event of result.events; track $index) {
+                <div>
+                  <i></i
+                  ><span
+                    ><strong>{{ titleCase(event.status) }}</strong
+                    ><small>{{ event.occurredAt | date: 'medium' }}</small></span
+                  >
+                </div>
+              } @empty {
+                <p>Your order has been received. Delivery events will appear here.</p>
+              }
+            </div>
+          </div>
+        }
       </div>
     </section>
-    <section class="staff-section" id="staff-login"><div><span class="hero-kicker">Team workspace</span><h2>Run operations in one place.</h2><p>Authorized administrators and agents can sign in to manage customers, orders, inventory, campaigns, and deliveries.</p></div><section class="login-card"><div><span class="eyebrow">Secure workspace</span><h2>Staff sign in</h2></div>@if(loginError()){<div class="error-banner">{{loginError()}}</div>}<form (ngSubmit)="login()"><label>Email<input type="email" name="email" [(ngModel)]="loginEmail" required></label><label>Password<input type="password" name="password" [(ngModel)]="loginPassword" required></label><button class="primary" [disabled]="loading()">{{loading()?'Signing in…':'Sign in'}}</button></form><div class="demo-accounts"><span>Demo accounts</span><button (click)="useAccount('ADMIN')">Admin</button><button (click)="useAccount('AGENT')">Agent</button></div></section></section>
-    <footer class="landing-footer"><strong>TNL TRACK</strong><span>Clear operations. Confident deliveries.</span></footer>
+    <section class="staff-section" id="staff-login">
+      <div>
+        <span class="hero-kicker">Team workspace</span>
+        <h2>Run operations in one place.</h2>
+        <p>
+          Authorized administrators and agents can sign in to manage customers, orders, inventory,
+          campaigns, and deliveries.
+        </p>
+      </div>
+      <section class="login-card">
+        <div>
+          <span class="eyebrow">Secure workspace</span>
+          <h2>Staff sign in</h2>
+        </div>
+        @if (loginError()) {
+          <div class="error-banner">{{ loginError() }}</div>
+        }
+        <form (ngSubmit)="login()">
+          <label>Email<input type="email" name="email" [(ngModel)]="loginEmail" required /></label
+          ><label
+            >Password<input
+              type="password"
+              name="password"
+              [(ngModel)]="loginPassword"
+              required /></label
+          ><button class="primary" [disabled]="loading()">
+            {{ loading() ? 'Signing in…' : 'Sign in' }}
+          </button>
+        </form>
+        <div class="demo-accounts">
+          <span>Demo accounts</span><button (click)="useAccount('ADMIN')">Admin</button
+          ><button (click)="useAccount('AGENT')">Agent</button>
+        </div>
+      </section>
+    </section>
+    <app-guided-chat />
+    <footer class="landing-footer">
+      <strong>TNL TRACK</strong><span>Clear operations. Confident deliveries.</span>
+    </footer>
   </main>
 } @else {
-<div class="app-shell">
-  @if(mobileNavOpen()){<button class="nav-backdrop" type="button" aria-label="Close navigation" (click)="mobileNavOpen.set(false)"></button>}
-  <aside class="sidebar" [class.mobile-open]="mobileNavOpen()" [class.admin-sidebar]="session()!.role === 'ADMIN'">
-    <button class="brand" (click)="selectView('Overview')">
-      <span class="brand-mark">T</span>
-      <span><strong>TNL</strong><small>TRACK</small></span>
-    </button>
+  <div class="app-shell">
+    @if (mobileNavOpen()) {
+      <button
+        class="nav-backdrop"
+        type="button"
+        aria-label="Close navigation"
+        (click)="mobileNavOpen.set(false)"
+      ></button>
+    }
+    <aside
+      class="sidebar"
+      [class.mobile-open]="mobileNavOpen()"
+      [class.admin-sidebar]="session()!.role === 'ADMIN'"
+    >
+      <button class="brand" (click)="selectView('Overview')">
+        <span class="brand-mark">T</span>
+        <span><strong>TNL</strong><small>TRACK</small></span>
+      </button>
 
-    <nav aria-label="Primary navigation">
-      <span class="nav-label">Workspace</span>
-      @for (item of visibleNavigation(); track item) {
-        <button [class.active]="isNavActive(item)" (click)="selectView(item)">
-          <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
-        </button>
-      }
-      @if (session()!.role === 'ADMIN') {
-        <span class="nav-label secondary">Manage</span>
-        @for (item of ['Leads', 'Campaigns', 'Agents']; track item) {
+      <nav aria-label="Primary navigation">
+        <span class="nav-label">Workspace</span>
+        @for (item of visibleNavigation(); track item) {
           <button [class.active]="isNavActive(item)" (click)="selectView(item)">
-            <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
+            <app-icon class="icon" [name]="iconFor(item)" />{{
+              item === 'Requests' ? 'Customer requests' : item
+            }}
           </button>
         }
-      }
-    </nav>
-
-    <div class="identity">
-      <span class="avatar">{{ initials() }}</span>
-      <span><strong>{{ session()!.fullName }}</strong><small>{{ session()!.role }}</small></span>
-      <button title="Sign out" (click)="logout()">↪</button>
-    </div>
-  </aside>
-
-  <main>
-    <header class="topbar">
-      <button class="hamburger" type="button" aria-label="Open navigation" [attr.aria-expanded]="mobileNavOpen()" (click)="mobileNavOpen.set(!mobileNavOpen())"><app-icon name="menu" /></button>
-      <div><span class="eyebrow">{{ session()!.role }} workspace</span><h1>{{ isNewOrderPage() ? 'New Order' : isOrderDetailPage() ? 'Order details' : isAgentDetailPage() ? 'Agent details' : isImportsPage() ? 'Import sales data' : isOrdersListPage() ? 'Orders' : isTrackingPage() ? 'Tracking' : isCategoriesPage() ? 'Categories' : isLeadsPage() ? 'Leads' : isCampaignsPage() ? 'Campaigns' : isAgentsPage() ? 'Agents' : isCommissionsPage() ? 'Commissions' : isProductsPage() ? 'Products' : isInventoryPage() ? 'Inventory' : isCustomersPage() ? 'Customers' : 'Overview' }}</h1></div>
-      <div class="header-actions">
-        <div class="theme-center" #themeCenter>
-          <button class="bell" type="button" aria-label="Theme settings" [attr.aria-expanded]="themeMenuOpen()" (click)="toggleThemeMenu()">
-            <app-icon [name]="themeService.mode() === 'system' ? 'monitor' : themeService.mode() === 'dark' ? 'moon' : 'sun'" />
-          </button>
-          @if (themeMenuOpen()) {
-            <section class="theme-menu">
-              <button type="button" [class.active]="themeService.mode() === 'system'" (click)="themeService.setMode('system'); themeMenuOpen.set(false)"><app-icon name="monitor" />System</button>
-              <button type="button" [class.active]="themeService.mode() === 'light'" (click)="themeService.setMode('light'); themeMenuOpen.set(false)"><app-icon name="sun" />Light</button>
-              <button type="button" [class.active]="themeService.mode() === 'dark'" (click)="themeService.setMode('dark'); themeMenuOpen.set(false)"><app-icon name="moon" />Dark</button>
-            </section>
+        @if (session()!.role === 'ADMIN') {
+          <span class="nav-label secondary">Manage</span>
+          @for (item of ['Leads', 'Campaigns', 'Agents', 'Performance']; track item) {
+            <button [class.active]="isNavActive(item)" (click)="selectView(item)">
+              <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
+            </button>
           }
+        }
+      </nav>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button
+          class="hamburger"
+          type="button"
+          aria-label="Open navigation"
+          [attr.aria-expanded]="mobileNavOpen()"
+          (click)="mobileNavOpen.set(!mobileNavOpen())"
+        >
+          <app-icon name="menu" />
+        </button>
+        <div class="workspace-heading">
+          <span class="eyebrow">{{ session()!.role }} workspace</span>
+          <h1>
+            {{
+              isNewOrderPage()
+                ? 'New Order'
+                : isOrderDetailPage()
+                  ? 'Order details'
+                  : isAgentDetailPage()
+                    ? 'Agent details'
+                    : isImportsPage()
+                      ? 'Import sales data'
+                      : isOrdersListPage()
+                        ? 'Orders'
+                        : isTrackingPage()
+                          ? 'Tracking'
+                          : isCategoriesPage()
+                            ? 'Categories'
+                            : isLeadsPage()
+                              ? 'Leads'
+                              : isCampaignsPage()
+                                ? 'Campaigns'
+                                : isAgentsPage()
+                                  ? 'Agents'
+                                  : isCommissionsPage()
+                                    ? 'Commissions'
+                                    : isProductsPage()
+                                      ? 'Products'
+                                      : isInventoryPage()
+                                        ? 'Inventory'
+                                        : isCustomersPage()
+                                          ? 'Customers'
+                                          : routedPath() === 'packages'
+                                            ? 'Packages'
+                                            : routedPath() === 'requests'
+                                              ? 'Customer requests'
+                                              : routedPath() === 'performance'
+                                                ? 'Agent performance'
+                                                : routedPath() === 'automations'
+                                                  ? 'Automations'
+                                                  : 'Overview'
+            }}
+          </h1>
         </div>
-        <div class="notification-center" #notificationCenter>
-          <button class="bell" type="button" aria-label="Notifications" [attr.aria-expanded]="notificationPanelOpen()" (click)="toggleNotifications()">
-            <app-icon name="bell" />
-            @if (unreadNotifications().length) { <b class="notification-badge">{{ unreadNotifications().length > 9 ? '9+' : unreadNotifications().length }}</b> }
-          </button>
-          @if (notificationPanelOpen()) {
-            <section class="notification-menu">
-              <header><div><span class="eyebrow">Activity</span><h2>Notifications</h2></div>@if(unreadNotifications().length){<button type="button" (click)="markNotificationsRead()">Mark all read</button>}</header>
-              <div class="notification-list">
-                @for (item of summary().notifications; track item.id) {
-                  <button type="button" class="notification-item" [class.unread]="isNotificationUnread(item.createdAt)" (click)="openNotification(item)">
-                    <span class="notification-icon"><app-icon [name]="item.type === 'ORDER' ? 'orders' : 'customers'" /></span>
-                    <span><strong>{{ item.title }}</strong><small>{{ item.message }} · {{ item.createdAt | date:'short' }}</small></span>
-                    @if(isNotificationUnread(item.createdAt)){<i></i>}
-                  </button>
-                } @empty { <div class="notification-empty">No order or customer activity yet.</div> }
-              </div>
-            </section>
+        <div class="header-actions">
+          <div class="theme-center" #themeCenter>
+            <button
+              class="bell"
+              type="button"
+              aria-label="Theme settings"
+              [attr.aria-expanded]="themeMenuOpen()"
+              (click)="toggleThemeMenu()"
+            >
+              <app-icon
+                [name]="
+                  themeService.mode() === 'system'
+                    ? 'monitor'
+                    : themeService.mode() === 'dark'
+                      ? 'moon'
+                      : 'sun'
+                "
+              />
+            </button>
+            @if (themeMenuOpen()) {
+              <section class="theme-menu">
+                <button
+                  type="button"
+                  [class.active]="themeService.mode() === 'system'"
+                  (click)="themeService.setMode('system'); themeMenuOpen.set(false)"
+                >
+                  <app-icon name="monitor" />System
+                </button>
+                <button
+                  type="button"
+                  [class.active]="themeService.mode() === 'light'"
+                  (click)="themeService.setMode('light'); themeMenuOpen.set(false)"
+                >
+                  <app-icon name="sun" />Light
+                </button>
+                <button
+                  type="button"
+                  [class.active]="themeService.mode() === 'dark'"
+                  (click)="themeService.setMode('dark'); themeMenuOpen.set(false)"
+                >
+                  <app-icon name="moon" />Dark
+                </button>
+              </section>
+            }
+          </div>
+          <div class="notification-center" #notificationCenter>
+            <button
+              class="bell"
+              type="button"
+              aria-label="Notifications"
+              [attr.aria-expanded]="notificationPanelOpen()"
+              (click)="toggleNotifications()"
+            >
+              <app-icon name="bell" />
+              @if (unreadNotifications().length) {
+                <b class="notification-badge">{{
+                  unreadNotifications().length > 9 ? '9+' : unreadNotifications().length
+                }}</b>
+              }
+            </button>
+            @if (notificationPanelOpen()) {
+              <section class="notification-menu">
+                <header>
+                  <div>
+                    <span class="eyebrow">Activity</span>
+                    <h2>Notifications</h2>
+                  </div>
+                  @if (unreadNotifications().length) {
+                    <button type="button" (click)="markNotificationsRead()">Mark all read</button>
+                  }
+                </header>
+                <div class="notification-list">
+                  @for (item of summary().notifications; track item.id) {
+                    <button
+                      type="button"
+                      class="notification-item"
+                      [class.unread]="isNotificationUnread(item.createdAt)"
+                      (click)="openNotification(item)"
+                    >
+                      <span class="notification-icon"
+                        ><app-icon [name]="item.type === 'ORDER' ? 'orders' : 'customers'"
+                      /></span>
+                      <span
+                        ><strong>{{ item.title }}</strong
+                        ><small
+                          >{{ item.message }} · {{ item.createdAt | date: 'short' }}</small
+                        ></span
+                      >
+                      @if (!item.readAt) {
+                        <i></i>
+                      }
+                    </button>
+                  } @empty {
+                    <div class="notification-empty">No order or customer activity yet.</div>
+                  }
+                </div>
+              </section>
+            }
+          </div>
+          @if (
+            !isNewOrderPage() && !isOrderDetailPage() && !isAgentDetailPage() && !isImportsPage()
+          ) {
+            <button class="primary icon-button" aria-label="New order" (click)="openNewOrder()">
+              <app-icon name="plus" /><span>New order</span>
+            </button>
           }
+          <div class="account-center" #accountCenter>
+            <button
+              class="account-trigger"
+              type="button"
+              [attr.aria-label]="'Account menu for ' + session()!.fullName"
+              [attr.aria-expanded]="accountMenuOpen()"
+              aria-controls="account-menu"
+              (click)="toggleAccountMenu()"
+            >
+              <span class="avatar">{{ initials() }}</span>
+              <span class="account-copy"
+                ><strong>{{ session()!.fullName }}</strong
+                ><small>{{ session()!.role }}</small></span
+              >
+              <app-icon class="account-chevron" name="chevronDown" />
+            </button>
+            @if (accountMenuOpen()) {
+              <section class="account-menu" id="account-menu" aria-label="Account">
+                <div class="account-details">
+                  <strong>{{ session()!.fullName }}</strong>
+                  <small>{{ session()!.role }} · {{ session()!.email }}</small>
+                </div>
+                <button type="button" (click)="logout()"><app-icon name="logout" />Sign out</button>
+              </section>
+            }
+          </div>
         </div>
-        @if(!isNewOrderPage()&&!isOrderDetailPage()&&!isAgentDetailPage()&&!isImportsPage()){<button class="primary icon-button" (click)="openNewOrder()"><app-icon name="plus" />New order</button>}
-      </div>
-    </header>
+      </header>
 
-    <section class="content">
-      @if (loading()) { <div class="loading-bar"><i></i></div> }
-      <router-outlet />
-    </section>
-  </main>
-</div>
-
-@if (showOrderForm()) {
-  <div class="modal-backdrop" (click)="closeNewOrder()">
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="new-order-title" (click)="$event.stopPropagation()">
-      <div class="modal-title"><div><span class="eyebrow">Order intake</span><h2 id="new-order-title">{{editingOrderId?'Edit pending order':'Create a new order'}}</h2></div><button (click)="closeNewOrder()">×</button></div>
-      <form (ngSubmit)="submitOrder()">
-        <div class="form-grid">
-          <label>Customer<select name="customer" [(ngModel)]="newOrder.customerId">@for (customer of customers(); track customer.id) { <option [ngValue]="customer.id">{{ customer.fullName }}</option> }</select></label>
-          @if(session()!.role==='ADMIN'){<label>Assigned agent<select name="agent" [(ngModel)]="newOrder.agentId" required>@for(agent of activeAgents();track agent.id){<option [ngValue]="agent.id">{{agent.fullName}}</option>}</select></label>}
-          <label>Payment method<select name="payment" [(ngModel)]="newOrder.paymentMethod"><option>Cash</option><option>Cash on delivery</option><option>Bank transfer</option><option>Card</option></select></label>
-          <div class="wide line-items"><div class="line-items-heading"><span>Order items</span><button type="button" class="row-action approve" (click)="addOrderItem()">＋ Add item</button></div>@for(item of newOrder.items;track $index;let index=$index){<div class="line-item-row"><select [name]="'product'+index" [(ngModel)]="item.productId">@for(product of products();track product.id){<option [ngValue]="product.id">{{product.name}} · {{product.stockOnHand-product.stockReserved}} available</option>}</select><input [name]="'quantity'+index" type="number" min="1" [(ngModel)]="item.quantity"><button type="button" class="row-action reject" [disabled]="newOrder.items.length===1" (click)="removeOrderItem(index)">Remove</button></div>}</div>
-          <label class="wide">Delivery address<input name="address" [(ngModel)]="newOrder.deliveryAddress"></label>
-        </div>
-        <p class="form-note">Stock availability is checked before submission. A tracking number is generated automatically.</p>
-        <footer><button type="button" class="secondary-button" (click)="closeNewOrder()">Cancel</button><button class="primary" type="submit">Create order</button></footer>
-      </form>
-    </section>
+      <section class="content">
+        @if (loading()) {
+          <div class="loading-bar"><i></i></div>
+        }
+        <router-outlet />
+      </section>
+    </main>
   </div>
-}
-@if(confirmDialog.config();as dialog){
-  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
-}
+
+  @if (showOrderForm()) {
+    <div class="modal-backdrop" (click)="closeNewOrder()">
+      <section
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-order-title"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="modal-title">
+          <div>
+            <span class="eyebrow">Order intake</span>
+            <h2 id="new-order-title">
+              {{ editingOrderId ? 'Edit pending order' : 'Create a new order' }}
+            </h2>
+          </div>
+          <button (click)="closeNewOrder()">×</button>
+        </div>
+        <form (ngSubmit)="submitOrder()">
+          <div class="form-grid">
+            <label
+              >Customer<select name="customer" [(ngModel)]="newOrder.customerId">
+                @for (customer of customers(); track customer.id) {
+                  <option [ngValue]="customer.id">{{ customer.fullName }}</option>
+                }
+              </select></label
+            >
+            @if (session()!.role === 'ADMIN') {
+              <label
+                >Assigned agent<select name="agent" [(ngModel)]="newOrder.agentId" required>
+                  @for (agent of activeAgents(); track agent.id) {
+                    <option [ngValue]="agent.id">{{ agent.fullName }}</option>
+                  }
+                </select></label
+              >
+            }
+            <label
+              >Payment method<select name="payment" [(ngModel)]="newOrder.paymentMethod">
+                <option>Cash</option>
+                <option>Cash on delivery</option>
+                <option>Bank transfer</option>
+                <option>Card</option>
+              </select></label
+            >
+            @if (newOrder.paymentMethod === 'Cash') {
+              <label
+                >Cash received<input
+                  name="cashReceived"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [(ngModel)]="newOrder.cashReceived"
+                  required
+              /></label>
+            }
+            @for (p of newOrder.packages; track p.packageId) {
+              <label
+                >Package: {{ editingPackageNames[p.packageId]
+                }}<input
+                  [name]="'pack' + p.packageId"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  [(ngModel)]="p.quantity"
+                  required
+              /></label>
+            }
+            @if (session()?.role === 'ADMIN' || newOrder.items.length) {
+              <div class="wide line-items">
+                <div class="line-items-heading">
+                  <span>Order items</span>
+                  @if (session()?.role === 'ADMIN') {
+                    <button type="button" class="row-action approve" (click)="addOrderItem()">
+                      ＋ Add item
+                    </button>
+                  }
+                </div>
+                @for (item of newOrder.items; track $index; let index = $index) {
+                  <div class="line-item-row">
+                    <select
+                      [name]="'product' + index"
+                      [(ngModel)]="item.productId"
+                      [disabled]="session()?.role !== 'ADMIN'"
+                    >
+                      @for (product of products(); track product.id) {
+                        <option [ngValue]="product.id">
+                          {{ product.name }} ·
+                          {{ product.stockOnHand - product.stockReserved }} available
+                        </option>
+                      }</select
+                    ><input
+                      [name]="'quantity' + index"
+                      type="number"
+                      min="1"
+                      [(ngModel)]="item.quantity"
+                    /><button
+                      type="button"
+                      class="row-action reject"
+                      [disabled]="newOrder.items.length === 1"
+                      (click)="removeOrderItem(index)"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+            <label class="wide"
+              >Delivery address<input name="address" [(ngModel)]="newOrder.deliveryAddress"
+            /></label>
+          </div>
+          <p class="form-note">
+            Stock availability is checked before submission. A tracking number is generated
+            automatically.
+          </p>
+          <footer>
+            <button type="button" class="secondary-button" (click)="closeNewOrder()">Cancel</button
+            ><button class="primary" type="submit">Create order</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+  }
+  @if (confirmDialog.config(); as dialog) {
+    <app-action-dialog
+      [config]="dialog"
+      (cancelled)="confirmDialog.cancel()"
+      (confirmed)="confirmDialog.confirm($event)"
+    />
+  }
 }

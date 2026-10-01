@@ -2,7 +2,9 @@ import "dotenv/config";
 import { z } from "zod";
 
 const schema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   CORS_ORIGINS: z.string().default("http://localhost:4200"),
   DB_HOST: z.string().min(1),
@@ -14,19 +16,29 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default("8h"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
-  SMTP_SECURE: z.string().default("false").transform((value) => value === "true"),
+  SMTP_SECURE: z
+    .string()
+    .default("false")
+    .transform((value) => value === "true"),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  SMTP_FROM: z.string().optional()
+  SMTP_FROM: z.string().optional(),
+  PUBLIC_APP_URL: z.url().default("http://localhost:4200"),
+  WORKER_POLL_MS: z.coerce.number().int().min(1000).default(5000),
 });
 
 const result = schema.safeParse(process.env);
 if (!result.success) {
-  console.error("Invalid environment configuration", result.error.flatten().fieldErrors);
+  console.error(
+    "Invalid environment configuration",
+    result.error.flatten().fieldErrors,
+  );
   throw new Error("Invalid environment configuration");
 }
 
 export const config = {
   ...result.data,
-  corsOrigins: result.data.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
+  corsOrigins: result.data.CORS_ORIGINS.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 };

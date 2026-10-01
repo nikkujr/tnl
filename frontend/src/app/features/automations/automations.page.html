@@ -1,0 +1,538 @@
+<div class="business automations-page">
+  <header class="page-heading">
+    <div>
+      <h2>Business automations</h2>
+      <p>Send timely updates, remind your team, and follow up with customers.</p>
+    </div>
+    <button class="refresh-button" (click)="load()" [disabled]="loading() || !!saving()">
+      <app-icon name="restore" />{{ loading() ? 'Refreshing…' : 'Refresh' }}
+    </button>
+  </header>
+  @if (error()) {
+    <div class="error" role="alert">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="notice" role="status">
+      {{ notice()
+      }}<button aria-label="Dismiss message" (click)="notice.set('')">
+        <app-icon name="close" />
+      </button>
+    </div>
+  }
+  @if (loading() && !settings().length) {
+    <div class="empty" role="status">Loading your automations…</div>
+  } @else if (settings().length) {
+    <section
+      class="service-banner"
+      [class.offline]="!serviceOnline()"
+      aria-label="Automation service status"
+    >
+      <span class="service-icon"
+        ><app-icon [name]="serviceOnline() ? 'checkCircle' : 'alert'"
+      /></span>
+      <div>
+        <strong>{{
+          serviceOnline() ? 'Automation service is running' : 'Automation service needs attention'
+        }}</strong>
+        <p>
+          {{
+            serviceOnline()
+              ? 'Enabled workflows are ready to process eligible updates and reminders.'
+              : 'Emails and reminders may be delayed. Ask your system administrator to start or check the automation service.'
+          }}
+        </p>
+      </div>
+      <span class="status-badge" [class.enabled]="serviceOnline()">{{
+        serviceOnline() ? 'Online' : 'Unavailable'
+      }}</span>
+    </section>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-icon"><app-icon name="checkCircle" /></span>
+        <div>
+          <strong
+            >{{ activeCount() }}<span> / {{ settings().length }}</span></strong
+          >
+          <p>Workflows on</p>
+        </div>
+      </div>
+      <div class="summary-card">
+        <span class="summary-icon"><app-icon name="orders" /></span>
+        <div>
+          <strong>{{ queuedCount() }}</strong>
+          <p>Actions waiting or processing</p>
+        </div>
+      </div>
+      <button class="summary-card review-summary" (click)="showActivity(true)">
+        <span class="summary-icon" [class.warning]="reviewCount() > 0"
+          ><app-icon name="alertCircle"
+        /></span>
+        <div>
+          <strong>{{ reviewCount() }}</strong>
+          <p>Actions needing review</p>
+        </div>
+        <app-icon name="chevronRight" />
+      </button>
+    </div>
+    <nav class="page-tabs" aria-label="Automation sections">
+      <button
+        [class.active]="tab === 'workflows'"
+        [attr.aria-current]="tab === 'workflows' ? 'page' : null"
+        (click)="tab = 'workflows'"
+      >
+        Workflows
+      </button>
+      <button
+        [class.active]="tab === 'activity'"
+        [attr.aria-current]="tab === 'activity' ? 'page' : null"
+        (click)="showActivity()"
+      >
+        Activity
+        @if (reviewCount()) {
+          <span class="tab-count">{{ reviewCount() }}</span>
+        }
+      </button>
+      <button
+        [class.active]="tab === 'previous'"
+        [attr.aria-current]="tab === 'previous' ? 'page' : null"
+        (click)="tab = 'previous'"
+      >
+        Previous orders
+        @if (legacy().length) {
+          <span class="tab-count">{{ legacy().length }}</span>
+        }
+      </button>
+    </nav>
+    @if (tab === 'workflows') {
+      <div class="section-intro">
+        <p>Turn a workflow on when you’re ready. Open Settings to adjust its timing or message.</p>
+        <span class="timezone"><app-icon name="tracking" />Schedules use Manila time</span>
+      </div>
+      @for (group of groups; track group) {
+        @if (groupSettings(group).length) {
+          <section class="workflow-group" [attr.aria-label]="group">
+            <h3>{{ group }}</h3>
+            <div class="workflow-list">
+              @for (s of groupSettings(group); track s.workflow) {
+                <article class="workflow-card" [class.editing]="draft?.workflow === s.workflow">
+                  <div class="workflow-overview">
+                    <span class="workflow-icon"><app-icon [name]="info(s.workflow).icon" /></span>
+                    <div class="workflow-copy">
+                      <h4>{{ info(s.workflow).title }}</h4>
+                      <p>{{ info(s.workflow).description }}</p>
+                      <div class="workflow-meta">
+                        <span><app-icon name="account" />{{ info(s.workflow).recipient }}</span
+                        ><span><app-icon name="chevronRight" />{{ timing(s) }}</span>
+                      </div>
+                    </div>
+                    <div class="workflow-controls">
+                      <button
+                        class="workflow-switch"
+                        type="button"
+                        role="switch"
+                        [attr.aria-checked]="s.enabled"
+                        [attr.aria-label]="info(s.workflow).title"
+                        [class.on]="s.enabled"
+                        [disabled]="!!saving()"
+                        (click)="toggle(s)"
+                      >
+                        <span class="switch-track"><span></span></span
+                        ><span>{{ s.enabled ? 'On' : 'Off' }}</span>
+                      </button>
+                      <button
+                        class="settings-button"
+                        [attr.aria-label]="'Settings for ' + info(s.workflow).title"
+                        [attr.aria-expanded]="draft?.workflow === s.workflow"
+                        [disabled]="!!saving()"
+                        (click)="edit(s)"
+                      >
+                        Settings<app-icon
+                          [name]="draft?.workflow === s.workflow ? 'chevronDown' : 'chevronRight'"
+                        />
+                      </button>
+                    </div>
+                  </div>
+                  @if (draft; as d) {
+                    @if (d.workflow === s.workflow) {
+                      <form
+                        class="workflow-editor"
+                        #settingsForm="ngForm"
+                        (ngSubmit)="save()"
+                        [attr.aria-label]="info(s.workflow).title + ' settings'"
+                      >
+                        <h5>Workflow settings</h5>
+                        @if (editorError) {
+                          <div class="error" role="alert">{{ editorError }}</div>
+                        }
+                        <div
+                          class="editor-grid"
+                          [class.with-preview]="d.config.subject !== undefined"
+                        >
+                          <div class="editor-fields">
+                            @if (d.config.hours !== undefined) {
+                              <label class="delay-field"
+                                >Remind after
+                                <div class="number-unit">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="8760"
+                                    step="1"
+                                    name="hours"
+                                    [(ngModel)]="d.config.hours"
+                                    required
+                                  /><span>hours</span>
+                                </div>
+                                <small>{{ info(s.workflow).delayHelp }}</small></label
+                              >
+                            }
+                            @if (d.config.delayDays !== undefined) {
+                              <label class="delay-field"
+                                >Send after
+                                <div class="number-unit">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="365"
+                                    step="0.5"
+                                    name="delay"
+                                    [(ngModel)]="d.config.delayDays"
+                                    required
+                                  /><span>days</span>
+                                </div>
+                                <small>{{ info(s.workflow).delayHelp }}</small></label
+                              >
+                            }
+                            @if (d.config.subject !== undefined) {
+                              <label
+                                >Email subject<input
+                                  name="subject"
+                                  [(ngModel)]="d.config.subject"
+                                  maxlength="180"
+                                  required
+                              /></label>
+                              <label
+                                >Email message<textarea
+                                  name="template"
+                                  [(ngModel)]="d.config.template"
+                                  rows="5"
+                                  maxlength="10000"
+                                  required
+                                ></textarea>
+                              </label>
+                              <div class="personalization">
+                                <span>Personalize your message</span>
+                                <div>
+                                  @for (token of tokens(s.workflow); track token.key) {
+                                    <button type="button" (click)="insertToken(token.key)">
+                                      <app-icon name="plus" />{{ token.label }}
+                                    </button>
+                                  }
+                                </div>
+                                <small
+                                  >These fields are filled in for each customer when the email is
+                                  sent.</small
+                                >
+                              </div>
+                            }
+                            @if (info(s.workflow).help) {
+                              <p class="workflow-help">{{ info(s.workflow).help }}</p>
+                            }
+                            @if (info(s.workflow).link) {
+                              <a class="related-link" [routerLink]="info(s.workflow).link"
+                                >{{ info(s.workflow).linkLabel }}<app-icon name="chevronRight"
+                              /></a>
+                            }
+                          </div>
+                          @if (d.config.subject !== undefined) {
+                            <aside class="email-preview" aria-label="Email preview">
+                              <div class="preview-heading">
+                                <app-icon name="email" />Email preview<span>Example</span>
+                              </div>
+                              <small>To: Maria Santos</small
+                              ><strong>{{
+                                preview(d.config.subject) || 'Your email subject'
+                              }}</strong>
+                              <p>
+                                {{
+                                  preview(d.config.template) ||
+                                    'Your email message will appear here.'
+                                }}
+                              </p>
+                              <div class="preview-note">
+                                Preview uses sample details. No email is sent.
+                              </div>
+                            </aside>
+                          }
+                        </div>
+                        <footer class="editor-footer">
+                          <span
+                            >{{
+                              s.enabled
+                                ? 'This workflow is on.'
+                                : 'This workflow stays off until you turn it on.'
+                            }}
+                            Changes apply to future actions.</span
+                          >
+                          <div>
+                            <button type="button" (click)="cancelEdit()" [disabled]="!!saving()">
+                              Cancel</button
+                            ><button
+                              class="primary"
+                              [disabled]="settingsForm.invalid || !!saving()"
+                            >
+                              {{ saving() === s.workflow ? 'Saving…' : 'Save changes' }}
+                            </button>
+                          </div>
+                        </footer>
+                      </form>
+                    }
+                  }
+                </article>
+              }
+            </div>
+          </section>
+        }
+      } @empty {
+        <div class="empty">No supported workflows are available yet.</div>
+      }
+    }
+    @if (tab === 'activity') {
+      <section class="activity-section">
+        <div class="activity-heading">
+          <div>
+            <h3>Automation activity</h3>
+            <p>See what happened and review actions that need your attention.</p>
+          </div>
+          <label
+            >Show<select
+              aria-label="Filter activity by outcome"
+              name="outcomes"
+              [(ngModel)]="state"
+              (ngModelChange)="loadRuns()"
+            >
+              <option value="">All outcomes</option>
+              <option value="REVIEW">Needs review</option>
+              <option value="PENDING">Waiting</option>
+              <option value="PROCESSING">Processing</option>
+              <option value="ACCEPTED">Email accepted</option>
+              <option value="SUCCEEDED">Completed</option>
+              <option value="FAILED">Failed</option>
+              <option value="UNKNOWN">Delivery uncertain</option>
+              <option value="SKIPPED">Skipped</option>
+            </select></label
+          >
+        </div>
+        <div class="activity-note">
+          <app-icon name="info" />
+          <p>
+            “Email accepted” means the mail service accepted the message; inbox delivery is not
+            confirmed. Uncertain sends need review before retrying.
+          </p>
+        </div>
+        @if (runsLoading()) {
+          <div class="empty" role="status">Loading activity…</div>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Workflow</th>
+                  <th>Outcome</th>
+                  <th>Created</th>
+                  <th>What happened</th>
+                  <th><span class="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of runs(); track r.id) {
+                  <tr>
+                    <td>
+                      <strong>{{ runTitle(r.workflow) }}</strong
+                      ><small
+                        >{{ r.attempts }} {{ r.attempts === 1 ? 'attempt' : 'attempts' }}</small
+                      >
+                    </td>
+                    <td>
+                      <span
+                        class="outcome-badge"
+                        [class]="'outcome-badge ' + r.state.toLowerCase()"
+                        >{{ stateLabel(r.state) }}</span
+                      >
+                    </td>
+                    <td class="date-cell">
+                      {{ r.createdAt | date: 'MMM d, y'
+                      }}<small>{{ r.createdAt | date: 'shortTime' }}</small>
+                    </td>
+                    <td class="outcome-details">
+                      <p>{{ outcome(r) }}</p>
+                      <details>
+                        <summary>Technical details</summary>
+                        <small
+                          >Action #{{ r.id }} · {{ r.state }}
+                          @if (r.lastError) {
+                            <br />{{ r.lastError }}
+                          }
+                          @if (r.result?.reason) {
+                            <br />{{ r.result.reason }}
+                          }
+                          @if (r.availableAt) {
+                            <br />Next available: {{ r.availableAt | date: 'medium' }}
+                          }
+                        </small>
+                      </details>
+                    </td>
+                    <td>
+                      @if (r.state === 'FAILED') {
+                        <button (click)="retry(r)" [disabled]="retrying() !== null">
+                          {{ retrying() === r.id ? 'Queuing…' : 'Retry' }}
+                        </button>
+                      }
+                      @if (r.state === 'UNKNOWN') {
+                        <button
+                          (click)="review(r)"
+                          [disabled]="retrying() !== null"
+                          [attr.aria-expanded]="reviewRun === r.id"
+                        >
+                          Review
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                  @if (reviewRun === r.id) {
+                    <tr>
+                      <td colspan="5" class="review-cell">
+                        <div class="retry-review">
+                          <app-icon name="alert" />
+                          <div>
+                            <strong>Check whether this email was already sent</strong>
+                            <p>
+                              The service could not confirm the outcome. Check the mail-service logs
+                              before retrying; sending again may create a duplicate.
+                            </p>
+                            <label class="acknowledgment"
+                              ><input
+                                type="checkbox"
+                                [(ngModel)]="acknowledgeUnknown"
+                                [name]="'acknowledge-' + r.id"
+                              />I understand that retrying an unknown send may duplicate an
+                              email.</label
+                            >
+                            <div class="review-actions">
+                              <button (click)="review(r)" [disabled]="retrying() !== null">
+                                Cancel</button
+                              ><button
+                                class="primary"
+                                (click)="retry(r)"
+                                [disabled]="!acknowledgeUnknown || retrying() !== null"
+                              >
+                                {{ retrying() === r.id ? 'Queuing…' : 'Retry' }}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                } @empty {
+                  <tr>
+                    <td colspan="5">
+                      <div class="activity-empty">
+                        <app-icon
+                          [name]="state === 'REVIEW' ? 'checkCircle' : 'orders'"
+                        /><strong>{{
+                          state === 'REVIEW' ? 'No actions need review' : 'No activity to show'
+                        }}</strong>
+                        <p>
+                          {{
+                            state
+                              ? 'No actions match this filter.'
+                              : 'Actions will appear here after an enabled workflow runs.'
+                          }}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="history-limit">Shows the latest 200 actions per selected outcome.</p>
+        }
+      </section>
+    }
+    @if (tab === 'previous') {
+      <section class="previous-section">
+        <h3>Previous orders to review</h3>
+        <p>
+          Older orders keep their original terms and posted commissions. Review discrepancies with
+          your team; this release does not recalculate historical commissions or send historical
+          messages.
+        </p>
+        @for (o of legacy(); track o.id) {
+          <div class="previous-order">
+            <div>
+              <a [routerLink]="['/orders', o.id]">{{ o.trackingNumber }}</a>
+              <p>
+                {{
+                  o.reason === 'POSTED_WITHOUT_FULL_PAYMENT'
+                    ? 'A commission was posted before full payment.'
+                    : 'This order has no saved package terms.'
+                }}
+              </p>
+              <small
+                >Payment:
+                {{
+                  o.paymentStatus === 'PAID'
+                    ? 'Fully paid'
+                    : o.paymentStatus === 'PARTIAL'
+                      ? 'Partially paid'
+                      : 'Unpaid'
+                }}</small
+              >
+            </div>
+            <a class="button" [routerLink]="['/orders', o.id]"
+              >View order<app-icon name="chevronRight"
+            /></a>
+          </div>
+        } @empty {
+          <div class="activity-empty">
+            <app-icon name="checkCircle" /><strong>No previous orders need review</strong>
+            <p>No discrepancies were found in the latest records.</p>
+          </div>
+        }
+      </section>
+    }
+    <details class="service-details">
+      <summary>Service details <span>For system administrators</span></summary>
+      <div>
+        <p>
+          Recent worker heartbeats show whether the background service is available. A heartbeat
+          older than three minutes is considered stale.
+        </p>
+        @for (w of workers(); track w.id) {
+          <p>
+            <strong>{{ healthy(w) ? 'Active worker' : 'Worker not responding' }}</strong> ·
+            {{ w.lastSeenAt | date: 'medium'
+            }}<small
+              >{{ w.id }}
+              @if (w.lastError) {
+                · {{ w.lastError }}
+              }
+            </small>
+          </p>
+        } @empty {
+          <p>
+            No worker heartbeat has been recorded. Start the API’s separate automation worker and
+            refresh this page.
+          </p>
+        }
+        <div class="backlog-tags">
+          @for (b of backlog(); track b.state) {
+            <span>{{ stateLabel(b.state) }}: {{ b.count }}</span>
+          }
+        </div>
+      </div>
+    </details>
+  }
+</div>

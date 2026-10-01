@@ -9,10 +9,11 @@ import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
 import { ActionDialogComponent } from '../../shared/action-dialog.component';
 import { AppIconComponent, AppIconName } from '../../shared/app-icon.component';
 import { formatMoney } from '../../shared/money';
+import { AgentRewardsComponent } from '../../shared/agent-rewards.component';
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [CurrencyPipe, DatePipe, ActionDialogComponent, AppIconComponent],
+  imports: [CurrencyPipe, DatePipe, ActionDialogComponent, AppIconComponent, AgentRewardsComponent],
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.scss'
 })

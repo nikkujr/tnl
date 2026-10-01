@@ -23,24 +23,21 @@ button { cursor: pointer; }
 @keyframes loading { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 236px 1fr; }
 .sidebar { position: sticky; top: 0; height: 100vh; padding: 27px 18px 18px; display: flex; flex-direction: column; color: white; background: var(--sidebar-bg, #101828); box-shadow: 5px 0 20px rgba(16,24,40,.08); }
-.brand { display: flex; gap: 11px; align-items: center; padding: 0 9px; border: 0; color: white; background: transparent; text-align: left; }
+.brand { display: flex; flex-shrink: 0; gap: 11px; align-items: center; padding: 0 9px; border: 0; color: white; background: transparent; text-align: left; }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: white; background: var(--green); font: 800 19px/1 Georgia, serif; box-shadow: 0 0 0 4px rgba(70,95,255,.16); }
 .brand strong, .brand small { display: block; }
 .brand strong { font: 700 18px/1 Georgia, serif; }
 .brand small { margin-top: 3px; color: #a9c1b7; font-size: 8px; letter-spacing: .34em; }
 nav { margin-top: 26px; }
+// Keep long navigation lists within the viewport.
+.sidebar nav { flex: 1; min-height: 0; overflow-y: auto; }
 .nav-label { display: block; margin: 0 10px 8px; color: #87a69a; font-size: 9px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
 .nav-label.secondary { margin-top: 24px; }
 nav button { width: 100%; display: flex; gap: 12px; align-items: center; padding: 11px 12px; margin: 2px 0; border: 0; border-radius: 9px; color: #b8cbc3; background: transparent; text-align: left; font-size: 13px; }
 nav button:hover, nav button.active { color: white; background: rgba(255,255,255,.08); }
 nav button.active { box-shadow: inset 3px 0 #8098ff; }
 .icon { width: 18px; font-size: 18px; text-align: center; }
-.identity { margin-top: auto; display: grid; grid-template-columns: 34px 1fr auto; gap: 9px; align-items: center; padding: 14px 5px 0; border-top: 1px solid rgba(255,255,255,.1); }
 .avatar { display: grid; place-items: center; border-radius: 50%; font-weight: 700; width: 34px; height: 34px; color: var(--green); background: #e7cdb7; font-size: 10px; }
-.identity strong, .identity small { display: block; }
-.identity strong { font-size: 11px; }
-.identity small { margin-top: 3px; color: #8da99d; font-size: 9px; }
-.identity button { border: 0; color: #9eb7ac; background: transparent; }
 main { min-width: 0; }
 .topbar { position: sticky; z-index: 8; top: 0; height: 84px; display: flex; align-items: center; justify-content: space-between; padding: 0 42px; border-bottom: 1px solid var(--line); background: var(--color-surface, #fff); backdrop-filter: blur(12px); }
 .topbar h1 { margin: 3px 0 0; font: 700 23px/1.1 Georgia, serif; }
@@ -82,15 +79,14 @@ main { min-width: 0; }
   .app-shell { grid-template-columns: 76px 1fr; }
   .sidebar { padding-inline: 12px; }
   .brand { justify-content: center; }
-  .brand > span:last-child, .nav-label, nav button:not(.active) > :not(.icon), nav button.active > :not(.icon), .identity > :not(.avatar) { display: none; }
+  .brand > span:last-child, .nav-label, nav button:not(.active) > :not(.icon), nav button.active > :not(.icon) { display: none; }
   .nav-label.secondary { display: none; }
   nav button { justify-content: center; }
-  .identity { display: flex; justify-content: center; }
 }
 @media (max-width: 680px) {
   .app-shell { display: block; padding-bottom: 68px; }
   .sidebar { position: fixed; z-index: 10; inset: auto 0 0; width: 100%; height: 68px; padding: 8px; flex-direction: row; }
-  .brand, .identity, .nav-label { display: none; }
+  .brand, .nav-label { display: none; }
   .sidebar nav { width: 100%; margin: 0; display: flex; justify-content: space-around; }
   .sidebar nav button { width: auto; margin: 0; padding: 10px; }
   .sidebar nav button:nth-of-type(n+6) { display: none; }

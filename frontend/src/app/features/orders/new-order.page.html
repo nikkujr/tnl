@@ -1,81 +1,557 @@
 <div class="order-page">
   <div class="page-head">
-    <div><app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: 'New order' }]" /><h2>Create a customer order</h2><p>Build a multi-item order, confirm ownership and delivery, then submit it for approval.</p></div>
+    <div>
+      <app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: 'New order' }]" />
+      <h2>Create a customer order</h2>
+      <p>
+        {{
+          session().role === 'AGENT'
+            ? 'Choose packages for your customer, confirm delivery, then submit the order for approval.'
+            : 'Build a multi-item order, confirm ownership and delivery, then submit it for approval.'
+        }}
+      </p>
+    </div>
     <button class="ghost-button" (click)="cancel()">← Back to orders</button>
   </div>
 
-  @if (error() && !itemModalOpen()) { <div class="alert">{{ error() }}</div> }
-  @if (loading()) { <div class="page-loading">Loading order workspace…</div> } @else {
+  @if (error() && !itemModalOpen() && !packageModalOpen()) {
+    <div class="alert">{{ error() }}</div>
+  }
+  @if (loading()) {
+    <div class="page-loading">Loading order workspace…</div>
+  } @else {
     <form (ngSubmit)="submit()" class="order-layout">
       <div class="main-column">
         <section class="surface">
-          <div class="section-head"><span class="section-number">1</span><div><h3>Customer and ownership</h3><p>Choose who placed the order and who will manage it.</p></div></div>
+          <div class="section-head">
+            <span class="section-number">1</span>
+            <div>
+              <h3>Customer and ownership</h3>
+              <p>Choose who placed the order and who will manage it.</p>
+            </div>
+          </div>
           <div class="fields">
-            <label>Customer<button type="button" class="lookup-field" (click)="openCustomerModal()">@if(selectedCustomer();as customer){<span class="lookup-avatar">{{customer.fullName.slice(0,2).toUpperCase()}}</span><span><strong>{{customer.fullName}}</strong><small>{{customer.phone}} · {{customer.email}}</small></span>}@else{<span></span><span><strong>Select customer</strong><small>Search customer records</small></span>}<app-icon name="search" /></button></label>
-            @if(session().role==='ADMIN'){<label>Assigned agent<button type="button" class="lookup-field" (click)="openAgentModal()">@if(selectedAgent();as agent){<span class="lookup-avatar agent">{{agent.fullName.slice(0,2).toUpperCase()}}</span><span><strong>{{agent.fullName}}</strong><small>{{agent.email}}</small></span>}@else{<span></span><span><strong>Select agent</strong><small>Search active agents</small></span>}<app-icon name="search" /></button></label>}
+            <label
+              >Customer<button type="button" class="lookup-field" (click)="openCustomerModal()">
+                @if (selectedCustomer(); as customer) {
+                  <span class="lookup-avatar">{{
+                    customer.fullName.slice(0, 2).toUpperCase()
+                  }}</span
+                  ><span
+                    ><strong>{{ customer.fullName }}</strong
+                    ><small>{{ customer.phone }} · {{ customer.email }}</small></span
+                  >
+                } @else {
+                  <span></span
+                  ><span
+                    ><strong>Select customer</strong><small>Search customer records</small></span
+                  >
+                }
+                <app-icon name="search" /></button
+            ></label>
+            @if (session().role === 'ADMIN') {
+              <label
+                >Assigned agent<button
+                  type="button"
+                  class="lookup-field"
+                  (click)="openAgentModal()"
+                >
+                  @if (selectedAgent(); as agent) {
+                    <span class="lookup-avatar agent">{{
+                      agent.fullName.slice(0, 2).toUpperCase()
+                    }}</span
+                    ><span
+                      ><strong>{{ agent.fullName }}</strong
+                      ><small>{{ agent.email }}</small></span
+                    >
+                  } @else {
+                    <span></span
+                    ><span><strong>Select agent</strong><small>Search active agents</small></span>
+                  }
+                  <app-icon name="search" /></button
+              ></label>
+            }
           </div>
         </section>
 
-        <section class="surface">
-          <div class="section-head items-head"><div class="heading-group"><span class="section-number">2</span><div><h3>Order items</h3><p>Add each product through the catalog selector.</p></div></div><button type="button" class="brand-button icon-button" (click)="openItemModal()"><app-icon name="plus" />Add item</button></div>
-          <div class="items-table">
-            <div class="item-row item-header"><span>Product</span><span>Price</span><span>Quantity</span><span>Subtotal</span><span></span></div>
-            @for(item of items();track item.product.id){
-              <div class="item-row"><span><strong>{{item.product.name}}</strong><small>{{item.product.sku}} · {{item.product.category}}</small></span><span>{{item.product.price|currency:'PHP':'symbol-narrow'}}</span><span><input class="line-quantity" type="number" min="1" [max]="item.product.stockOnHand-item.product.stockReserved" [name]="'quantity-'+item.product.id" [ngModel]="item.quantity" (ngModelChange)="changeItemQuantity(item.product.id,$event)"></span><strong>{{item.product.price*item.quantity|currency:'PHP':'symbol-narrow'}}</strong><button type="button" (click)="removeItem(item.product.id)">Remove</button></div>
-            } @empty { <div class="empty-items"><app-icon name="packageSearch" /><strong>No items yet</strong><p>Use “Add item” to choose a product and quantity.</p></div> }
-          </div>
-        </section>
+        @if (session().role === 'ADMIN') {
+          <section class="surface">
+            <div class="section-head items-head">
+              <div class="heading-group">
+                <span class="section-number">2</span>
+                <div>
+                  <h3>Order items</h3>
+                  <p>Add each product through the catalog selector.</p>
+                </div>
+              </div>
+              <button type="button" class="brand-button icon-button" (click)="openItemModal()">
+                <app-icon name="plus" />Add item
+              </button>
+            </div>
+            <div class="items-table">
+              <div class="item-row item-header">
+                <span>Product</span><span>Price</span><span>Quantity</span><span>Subtotal</span
+                ><span></span>
+              </div>
+              @for (item of items(); track item.product.id) {
+                <div class="item-row">
+                  <span
+                    ><strong>{{ item.product.name }}</strong
+                    ><small>{{ item.product.sku }} · {{ item.product.category }}</small></span
+                  ><span>{{ item.product.price | currency: 'PHP' : 'symbol-narrow' }}</span
+                  ><span
+                    ><input
+                      class="line-quantity"
+                      type="number"
+                      min="1"
+                      [max]="item.product.stockOnHand - item.product.stockReserved"
+                      [name]="'quantity-' + item.product.id"
+                      [ngModel]="item.quantity"
+                      (ngModelChange)="changeItemQuantity(item.product.id, $event)" /></span
+                  ><strong>{{
+                    item.product.price * item.quantity | currency: 'PHP' : 'symbol-narrow'
+                  }}</strong
+                  ><button type="button" (click)="removeItem(item.product.id)">Remove</button>
+                </div>
+              } @empty {
+                <div class="empty-items">
+                  <app-icon name="packageSearch" /><strong>No items yet</strong>
+                  <p>Use “Add item” to choose a product and quantity.</p>
+                </div>
+              }
+            </div>
+          </section>
+        } @else {
+          <section class="surface">
+            <div class="section-head items-head">
+              <div class="heading-group">
+                <span class="section-number">2</span>
+                <div>
+                  <h3>Order packages</h3>
+                  <p>Choose the packages your customer would like to order.</p>
+                </div>
+              </div>
+              <button type="button" class="brand-button icon-button" (click)="openPackageModal()">
+                <app-icon name="plus" />Add package
+              </button>
+            </div>
+            <div class="items-table">
+              <div class="item-row item-header">
+                <span>Package</span><span>Price</span><span>Quantity</span><span>Subtotal</span
+                ><span></span>
+              </div>
+              @for (line of packageLines(); track line.package.id) {
+                <div class="item-row">
+                  <span
+                    ><strong>{{ line.package.name }}</strong
+                    ><small>{{ line.package.components.length }} component products</small></span
+                  ><span>{{ line.package.sellingPrice | currency: 'PHP' : 'symbol-narrow' }}</span
+                  ><input
+                    class="line-quantity"
+                    type="number"
+                    min="1"
+                    [max]="line.package.available"
+                    [name]="'package-line-' + line.package.id"
+                    [attr.aria-label]="'Quantity for ' + line.package.name"
+                    [ngModel]="line.quantity"
+                    (ngModelChange)="changePackageQuantity(line.package.id, $event)"
+                  /><strong>{{
+                    line.package.sellingPrice * line.quantity | currency: 'PHP' : 'symbol-narrow'
+                  }}</strong
+                  ><button type="button" (click)="removePackage(line.package.id)">Remove</button>
+                </div>
+              } @empty {
+                <div class="empty-items">
+                  <app-icon name="catalog" /><strong>No packages yet</strong>
+                  <p>Use “Add package” to choose a package and quantity.</p>
+                </div>
+              }
+            </div>
+          </section>
+        }
 
         <section class="surface">
-          <div class="section-head"><span class="section-number">3</span><div><h3>Delivery and payment</h3><p>Confirm where the order is going and how it will be paid.</p></div></div>
+          <div class="section-head">
+            <span class="section-number">3</span>
+            <div>
+              <h3>Delivery and payment</h3>
+              <p>Confirm where the order is going and how it will be paid.</p>
+            </div>
+          </div>
           <div class="fields">
-            <label>Payment method<select name="payment" [(ngModel)]="paymentMethod"><option>Cash</option><option>Cash on delivery</option><option>Bank transfer</option><option>Card</option></select></label>
-            @if(paymentMethod==='Cash'){<label>Cash received<input name="cashReceived" type="number" min="0" step="0.01" [(ngModel)]="cashReceived" required></label><div class="cash-change wide"><span>Order total <strong>{{total()|currency:'PHP':'symbol-narrow'}}</strong></span><span>Change <strong>{{cashChange()|currency:'PHP':'symbol-narrow'}}</strong></span></div>}
-            <label class="wide">Delivery address<textarea name="address" [(ngModel)]="deliveryAddress" rows="3" required></textarea></label>
+            <label
+              >Payment method<select name="payment" [(ngModel)]="paymentMethod">
+                <option>Cash</option>
+                <option>Cash on delivery</option>
+                <option>Bank transfer</option>
+                <option>Card</option>
+              </select></label
+            >
+            @if (paymentMethod === 'Cash') {
+              <label
+                >Cash received<input
+                  name="cashReceived"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [(ngModel)]="cashReceived"
+                  required
+              /></label>
+              <div class="cash-change wide">
+                <span
+                  >Order total
+                  <strong>{{ total() | currency: 'PHP' : 'symbol-narrow' }}</strong></span
+                ><span
+                  >Change
+                  <strong>{{ cashChange() | currency: 'PHP' : 'symbol-narrow' }}</strong></span
+                >
+              </div>
+            }
+            <label class="wide"
+              >Delivery address<textarea
+                name="address"
+                [(ngModel)]="deliveryAddress"
+                rows="3"
+                required
+              ></textarea>
+            </label>
           </div>
         </section>
+        @if (session().role === 'ADMIN') {
+          <section class="surface">
+            <div class="section-head">
+              <h3>Packages</h3>
+              <p>Catalog contents, price, and commission are saved with this order.</p>
+            </div>
+            <div class="fields">
+              <label
+                >Package<select name="package" [(ngModel)]="selectedPackageId">
+                  @for (p of packages(); track p.id) {
+                    <option [ngValue]="p.id">
+                      {{ p.name }} · {{ p.sellingPrice | currency: 'PHP' : 'symbol-narrow' }} ·
+                      {{ p.available }} available
+                    </option>
+                  }
+                </select></label
+              ><label
+                >Package quantity<input
+                  name="packageQuantity"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  [(ngModel)]="packageQuantity" /></label
+              ><button type="button" class="brand-button" (click)="addPackage()">
+                Add package
+              </button>
+            </div>
+            @for (l of packageLines(); track l.package.id) {
+              <div class="item-row">
+                <strong>{{ l.package.name }}</strong
+                ><span>{{ l.package.sellingPrice | currency: 'PHP' : 'symbol-narrow' }}</span
+                ><span>× {{ l.quantity }}</span
+                ><strong>{{
+                  l.package.sellingPrice * l.quantity | currency: 'PHP' : 'symbol-narrow'
+                }}</strong
+                ><button type="button" (click)="removePackage(l.package.id)">Remove</button>
+              </div>
+            }
+          </section>
+        }
       </div>
 
       <aside class="summary surface">
-        <span class="summary-label">Order summary</span><h3>{{items().length}} {{items().length===1?'item':'items'}}</h3>
-        <div class="summary-lines">@for(item of items();track item.product.id){<div><span>{{item.product.name}} × {{item.quantity}}</span><strong>{{item.product.price*item.quantity|currency:'PHP':'symbol-narrow'}}</strong></div>}</div>
-        <div class="grand-total"><span>Total</span><strong>{{total()|currency:'PHP':'symbol-narrow'}}</strong></div>
+        <span class="summary-label">Order summary</span>
+        <h3>{{ items().length + packageLines().length }} selected lines</h3>
+        <div class="summary-lines">
+          @for (item of items(); track item.product.id) {
+            <div>
+              <span>{{ item.product.name }} × {{ item.quantity }}</span
+              ><strong>{{
+                item.product.price * item.quantity | currency: 'PHP' : 'symbol-narrow'
+              }}</strong>
+            </div>
+          }
+        </div>
+        <div class="summary-lines">
+          @for (l of packageLines(); track l.package.id) {
+            <div>
+              <span>{{ l.package.name }} × {{ l.quantity }}</span
+              ><strong>{{
+                l.package.sellingPrice * l.quantity | currency: 'PHP' : 'symbol-narrow'
+              }}</strong>
+            </div>
+          }
+        </div>
+        <div class="grand-total">
+          <span>Total</span><strong>{{ total() | currency: 'PHP' : 'symbol-narrow' }}</strong>
+        </div>
+        @if (session().role === 'AGENT') {
+          <section class="commission-estimate" aria-labelledby="commission-estimate-label">
+            <div>
+              <span id="commission-estimate-label">Your estimated commission</span>
+              <strong class="commission-amount" aria-live="polite" aria-atomic="true">{{
+                estimatedCommission() | currency: 'PHP' : 'symbol-narrow'
+              }}</strong>
+            </div>
+            <p>Earned when this order is delivered and fully paid.</p>
+          </section>
+        }
         <p>Inventory is verified again by the API. A tracking number is generated automatically.</p>
-        <button class="submit-button" [disabled]="!items().length">Create order</button>
+        <button class="submit-button" [disabled]="!items().length && !packageLines().length">
+          Create order
+        </button>
         <button type="button" class="cancel-button" (click)="cancel()">Cancel</button>
       </aside>
     </form>
   }
 </div>
 
-@if(customerModalOpen()){
-  <div class="picker-backdrop" (click)="customerModalOpen.set(false)"><section class="picker entity-picker" role="dialog" aria-modal="true" aria-labelledby="customer-picker-title" (click)="$event.stopPropagation()">
-    <header><div><span>Customer directory</span><h2 id="customer-picker-title">Select a customer</h2></div><button type="button" (click)="customerModalOpen.set(false)"><app-icon name="close" /></button></header>
-    <label class="search-box"><app-icon name="search" /><input [(ngModel)]="customerSearch" placeholder="Search name, email, phone, or address"></label>
-    <div class="entity-list">@for(customer of filteredCustomers();track customer.id){<button type="button" [class.selected]="pendingCustomerId===customer.id" (click)="pendingCustomerId=customer.id"><span class="lookup-avatar">{{customer.fullName.slice(0,2).toUpperCase()}}</span><span><strong>{{customer.fullName}}</strong><small>{{customer.email}} · {{customer.phone}}</small><small>{{customer.address}}</small></span><app-icon name="check" /></button>}@empty{<div class="no-products">No customers match your search.</div>}</div>
-    <footer><span></span><span></span><button type="button" class="ghost-button" (click)="customerModalOpen.set(false)">Cancel</button><button type="button" class="brand-button" [disabled]="!pendingCustomerId" (click)="confirmCustomer()">Select customer</button></footer>
-  </section></div>
+@if (customerModalOpen()) {
+  <div class="picker-backdrop" (click)="customerModalOpen.set(false)">
+    <section
+      class="picker entity-picker"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="customer-picker-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header>
+        <div>
+          <span>Customer directory</span>
+          <h2 id="customer-picker-title">Select a customer</h2>
+        </div>
+        <button type="button" (click)="customerModalOpen.set(false)">
+          <app-icon name="close" />
+        </button>
+      </header>
+      <label class="search-box"
+        ><app-icon name="search" /><input
+          [(ngModel)]="customerSearch"
+          placeholder="Search name, email, phone, or address"
+      /></label>
+      <div class="entity-list">
+        @for (customer of filteredCustomers(); track customer.id) {
+          <button
+            type="button"
+            [class.selected]="pendingCustomerId === customer.id"
+            (click)="pendingCustomerId = customer.id"
+          >
+            <span class="lookup-avatar">{{ customer.fullName.slice(0, 2).toUpperCase() }}</span
+            ><span
+              ><strong>{{ customer.fullName }}</strong
+              ><small>{{ customer.email }} · {{ customer.phone }}</small
+              ><small>{{ customer.address }}</small></span
+            ><app-icon name="check" />
+          </button>
+        } @empty {
+          <div class="no-products">No customers match your search.</div>
+        }
+      </div>
+      <footer>
+        <span></span><span></span
+        ><button type="button" class="ghost-button" (click)="customerModalOpen.set(false)">
+          Cancel</button
+        ><button
+          type="button"
+          class="brand-button"
+          [disabled]="!pendingCustomerId"
+          (click)="confirmCustomer()"
+        >
+          Select customer
+        </button>
+      </footer>
+    </section>
+  </div>
 }
 
-@if(agentModalOpen()){
-  <div class="picker-backdrop" (click)="agentModalOpen.set(false)"><section class="picker entity-picker" role="dialog" aria-modal="true" aria-labelledby="agent-picker-title" (click)="$event.stopPropagation()">
-    <header><div><span>Team directory</span><h2 id="agent-picker-title">Assign an agent</h2></div><button type="button" (click)="agentModalOpen.set(false)"><app-icon name="close" /></button></header>
-    <label class="search-box"><app-icon name="search" /><input [(ngModel)]="agentSearch" placeholder="Search agent name, email, or phone"></label>
-    <div class="entity-list">@for(agent of filteredAgents();track agent.id){<button type="button" [class.selected]="pendingAgentId===agent.id" (click)="pendingAgentId=agent.id"><span class="lookup-avatar agent">{{agent.fullName.slice(0,2).toUpperCase()}}</span><span><strong>{{agent.fullName}}</strong><small>{{agent.email}} · {{agent.phone}}</small></span><app-icon name="check" /></button>}@empty{<div class="no-products">No active agents match your search.</div>}</div>
-    <footer><span></span><span></span><button type="button" class="ghost-button" (click)="agentModalOpen.set(false)">Cancel</button><button type="button" class="brand-button" [disabled]="!pendingAgentId" (click)="confirmAgent()">Assign agent</button></footer>
-  </section></div>
+@if (agentModalOpen()) {
+  <div class="picker-backdrop" (click)="agentModalOpen.set(false)">
+    <section
+      class="picker entity-picker"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="agent-picker-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header>
+        <div>
+          <span>Team directory</span>
+          <h2 id="agent-picker-title">Assign an agent</h2>
+        </div>
+        <button type="button" (click)="agentModalOpen.set(false)"><app-icon name="close" /></button>
+      </header>
+      <label class="search-box"
+        ><app-icon name="search" /><input
+          [(ngModel)]="agentSearch"
+          placeholder="Search agent name, email, or phone"
+      /></label>
+      <div class="entity-list">
+        @for (agent of filteredAgents(); track agent.id) {
+          <button
+            type="button"
+            [class.selected]="pendingAgentId === agent.id"
+            (click)="pendingAgentId = agent.id"
+          >
+            <span class="lookup-avatar agent">{{ agent.fullName.slice(0, 2).toUpperCase() }}</span
+            ><span
+              ><strong>{{ agent.fullName }}</strong
+              ><small>{{ agent.email }} · {{ agent.phone }}</small></span
+            ><app-icon name="check" />
+          </button>
+        } @empty {
+          <div class="no-products">No active agents match your search.</div>
+        }
+      </div>
+      <footer>
+        <span></span><span></span
+        ><button type="button" class="ghost-button" (click)="agentModalOpen.set(false)">
+          Cancel</button
+        ><button
+          type="button"
+          class="brand-button"
+          [disabled]="!pendingAgentId"
+          (click)="confirmAgent()"
+        >
+          Assign agent
+        </button>
+      </footer>
+    </section>
+  </div>
 }
 
-@if(itemModalOpen()){
-  <div class="picker-backdrop" (click)="itemModalOpen.set(false)"><section class="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" (click)="$event.stopPropagation()">
-    <header><div><span>Product catalog</span><h2 id="picker-title">Add an order item</h2></div><button (click)="itemModalOpen.set(false)"><app-icon name="close" /></button></header>
-    <label class="search-box"><app-icon name="search" /><input [(ngModel)]="productSearch" placeholder="Search product, SKU, or category"></label>
-    <div class="product-list">@for(product of availableProducts();track product.id){<button type="button" [class.selected]="selectedProductId===product.id" (click)="selectedProductId=product.id"><span class="product-icon">{{product.name.slice(0,1)}}</span><span><strong>{{product.name}}</strong><small>{{product.sku}} · {{product.category}}</small></span><span><strong>{{product.price|currency:'PHP':'symbol-narrow'}}</strong><small>{{product.stockOnHand-product.stockReserved}} available</small></span></button>}@empty{<div class="no-products">No additional products match your search.</div>}</div>
-    @if(error()){<div class="alert picker-alert">{{error()}}</div>}
-    <footer><label>Quantity<input type="number" min="1" [(ngModel)]="selectedQuantity"></label><span></span><button class="ghost-button" (click)="itemModalOpen.set(false)">Cancel</button><button class="brand-button" [disabled]="!selectedProductId" (click)="addSelectedItem()">Add to order</button></footer>
-  </section></div>
+@if (packageModalOpen()) {
+  <div class="picker-backdrop" (click)="packageModalOpen.set(false)">
+    <section
+      class="picker"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="package-picker-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header>
+        <div>
+          <span>Package catalog</span>
+          <h2 id="package-picker-title">Add a package</h2>
+        </div>
+        <button
+          type="button"
+          aria-label="Close package picker"
+          (click)="packageModalOpen.set(false)"
+        >
+          <app-icon name="close" />
+        </button>
+      </header>
+      <label class="search-box"
+        ><app-icon name="search" /><input
+          [(ngModel)]="packageSearch"
+          placeholder="Search packages or their contents"
+          aria-label="Search packages"
+      /></label>
+      <div class="product-list">
+        @for (pack of filteredPackages(); track pack.id) {
+          <button
+            type="button"
+            [class.selected]="selectedPackageId === pack.id"
+            [disabled]="pack.available < 1"
+            (click)="selectedPackageId = pack.id"
+          >
+            <span class="product-icon"><app-icon name="catalog" /></span
+            ><span
+              ><strong>{{ pack.name }}</strong
+              ><small>{{ pack.description }}</small>
+              @for (component of pack.components; track component.productId) {
+                <small>{{ component.productName }} × {{ component.quantity }}</small>
+              }</span
+            ><span
+              ><strong>{{ pack.sellingPrice | currency: 'PHP' : 'symbol-narrow' }}</strong
+              ><small>{{ pack.available }} available</small></span
+            >
+          </button>
+        } @empty {
+          <div class="no-products">No packages match your search.</div>
+        }
+      </div>
+      @if (error()) {
+        <div class="alert picker-alert" role="alert">{{ error() }}</div>
+      }
+      <footer>
+        <label
+          >Quantity<input type="number" min="1" max="10000" [(ngModel)]="packageQuantity" /></label
+        ><span></span
+        ><button type="button" class="ghost-button" (click)="packageModalOpen.set(false)">
+          Cancel</button
+        ><button
+          type="button"
+          class="brand-button"
+          [disabled]="!selectedPackageId || packageQuantity < 1 || packageQuantity > 10000"
+          (click)="addPackage()"
+        >
+          Add to order
+        </button>
+      </footer>
+    </section>
+  </div>
 }
 
-@if(actionDialog();as dialog){
-  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog($event)" />
+@if (itemModalOpen() && session().role === 'ADMIN') {
+  <div class="picker-backdrop" (click)="itemModalOpen.set(false)">
+    <section
+      class="picker"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="picker-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header>
+        <div>
+          <span>Product catalog</span>
+          <h2 id="picker-title">Add an order item</h2>
+        </div>
+        <button (click)="itemModalOpen.set(false)"><app-icon name="close" /></button>
+      </header>
+      <label class="search-box"
+        ><app-icon name="search" /><input
+          [(ngModel)]="productSearch"
+          placeholder="Search product, SKU, or category"
+      /></label>
+      <div class="product-list">
+        @for (product of availableProducts(); track product.id) {
+          <button
+            type="button"
+            [class.selected]="selectedProductId === product.id"
+            (click)="selectedProductId = product.id"
+          >
+            <span class="product-icon">{{ product.name.slice(0, 1) }}</span
+            ><span
+              ><strong>{{ product.name }}</strong
+              ><small>{{ product.sku }} · {{ product.category }}</small></span
+            ><span
+              ><strong>{{ product.price | currency: 'PHP' : 'symbol-narrow' }}</strong
+              ><small>{{ product.stockOnHand - product.stockReserved }} available</small></span
+            >
+          </button>
+        } @empty {
+          <div class="no-products">No additional products match your search.</div>
+        }
+      </div>
+      @if (error()) {
+        <div class="alert picker-alert">{{ error() }}</div>
+      }
+      <footer>
+        <label>Quantity<input type="number" min="1" [(ngModel)]="selectedQuantity" /></label
+        ><span></span><button class="ghost-button" (click)="itemModalOpen.set(false)">Cancel</button
+        ><button class="brand-button" [disabled]="!selectedProductId" (click)="addSelectedItem()">
+          Add to order
+        </button>
+      </footer>
+    </section>
+  </div>
+}
+
+@if (actionDialog(); as dialog) {
+  <app-action-dialog
+    [config]="dialog"
+    (cancelled)="closeActionDialog()"
+    (confirmed)="confirmActionDialog($event)"
+  />
 }

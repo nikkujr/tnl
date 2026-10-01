@@ -18,26 +18,36 @@ const htmlToText = (value: string) =>
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-export const sendCampaignEmail = async (campaign: { name: string; content: string }, recipients: string[]) => {
-  if (!config.SMTP_HOST || !config.SMTP_FROM) {
-    throw new HttpError(503, "Campaign email is not configured. Set SMTP_HOST and SMTP_FROM.");
-  }
+export async function sendEmail(
+  to: string,
+  subject: string,
+  text: string,
+  html?: string,
+) {
+  if (!config.SMTP_HOST || !config.SMTP_FROM)
+    throw new HttpError(
+      503,
+      "Email is not configured. Set SMTP_HOST and SMTP_FROM.",
+    );
   const transporter = nodemailer.createTransport({
     host: config.SMTP_HOST,
     port: config.SMTP_PORT,
     secure: config.SMTP_SECURE,
-    auth: config.SMTP_USER ? { user: config.SMTP_USER, pass: config.SMTP_PASSWORD ?? "" } : undefined
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 30000,
+    disableFileAccess: true,
+    disableUrlAccess: true,
+    ...(config.SMTP_USER
+      ? { auth: { user: config.SMTP_USER, pass: config.SMTP_PASSWORD ?? "" } }
+      : {}),
   });
-  const isHtml = containsHtml(campaign.content);
-  const message = {
+  return transporter.sendMail({
     from: config.SMTP_FROM,
-    to: config.SMTP_FROM,
-    bcc: recipients,
-    subject: campaign.name,
-    ...(isHtml
-      ? { html: campaign.content, text: htmlToText(campaign.content) }
-      : { text: campaign.content })
-  };
-  const result = await transporter.sendMail(message);
-  return { messageId: result.messageId, recipientCount: recipients.length, contentType: isHtml ? "text/html" : "text/plain" };
-};
+    to,
+    subject,
+    text,
+    ...(html ? { html } : {}),
+  });
+}
+export { htmlToText, containsHtml };

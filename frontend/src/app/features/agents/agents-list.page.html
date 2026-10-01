@@ -1,11 +1,26 @@
 <div class="agents-list-page">
   <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Agents' }]" />
   <div class="page-heading">
-    <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Agent management.</h2><p>Manage agent access, contact details, and commission rates.</p></div>
-    <button class="primary icon-button" (click)="openForm()"><app-icon name="plus" />New agent</button>
+    <div class="page-intro">
+      <span class="eyebrow">TNL Track</span>
+      <h2>Agent management.</h2>
+      <p>Manage field agent access and contact details. New commissions use package terms.</p>
+    </div>
+    <div class="page-actions">
+      <a class="row-action" routerLink="/performance">View team performance</a>
+      <button class="primary icon-button" (click)="openForm()">
+        <app-icon name="plus" />New agent
+      </button>
+    </div>
   </div>
   <div class="tools">
-    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search name, email, or phone"></label>
+    <label
+      ><span>⌕</span
+      ><input
+        [(ngModel)]="search"
+        (ngModelChange)="onSearchChange()"
+        placeholder="Search name, email, or phone"
+    /></label>
     <select [(ngModel)]="status" aria-label="Filter agents by status">
       <option value="ALL">All agents</option>
       <option value="ACTIVE">Active</option>
@@ -13,41 +28,96 @@
     </select>
   </div>
   <article class="panel management-table agents-table">
-    <div class="management-row header"><span>Agent / status</span><span>Contact</span><span>Commission</span><span>Closed deals</span><span>Actions</span></div>
+    <div class="management-row header">
+      <span>Agent / status</span><span>Contact</span><span>Earned commission</span
+      ><span>Closed deals</span><span>Actions</span>
+    </div>
     @for (item of filtered(); track item.id) {
       <div class="management-row">
-        <span><strong>{{ item.fullName }}</strong><small>{{ item.active ? 'Active' : 'Inactive' }}</small></span>
-        <span>{{ item.email }}<small>{{ item.phone }}</small></span>
-        <span>{{ item.commissionRate }}%</span>
+        <span
+          ><strong>{{ item.fullName }}</strong
+          ><small>{{ item.active ? 'Active' : 'Inactive' }}</small></span
+        >
+        <span
+          >{{ item.email }}<small>{{ item.phone }}</small></span
+        >
+        <span>{{ item.totalCommission ?? 0 | currency: 'PHP' : 'symbol-narrow' }}</span>
         <span>{{ item.closedDeals }}</span>
         <span class="table-actions">
           <button class="row-action" (click)="viewAgent(item)">View</button>
           <button class="row-action" (click)="openForm(item)">Edit</button>
-          @if (item.active) { <button class="row-action reject" (click)="deactivate(item)">Deactivate</button> } @else { <button class="row-action approve" (click)="activate(item)">Activate</button> }
+          @if (item.active) {
+            <button class="row-action reject" (click)="deactivate(item)">Deactivate</button>
+          } @else {
+            <button class="row-action approve" (click)="activate(item)">Activate</button>
+          }
         </span>
       </div>
-    } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No agents found.' }}</div> }
+    } @empty {
+      <div class="empty">{{ loading() ? 'Loading…' : 'No agents found.' }}</div>
+    }
   </article>
 </div>
 
 @if (showForm()) {
   <div class="modal-backdrop" (click)="showForm.set(false)">
     <section class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-title"><div><span class="eyebrow">Access</span><h2>{{ editingId ? 'Edit agent' : 'New agent' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
+      <div class="modal-title">
+        <div>
+          <span class="eyebrow">Access</span>
+          <h2>{{ editingId ? 'Edit agent' : 'New agent' }}</h2>
+        </div>
+        <button (click)="showForm.set(false)">×</button>
+      </div>
       <form (ngSubmit)="save()">
         <div class="form-grid">
-          <label>Full name<input name="agentName" [(ngModel)]="form.fullName" required></label>
-          <label>Email<input name="agentEmail" type="email" [(ngModel)]="form.email" required></label>
-          <label>Phone<input name="agentPhone" [(ngModel)]="form.phone" required minlength="7" maxlength="16" placeholder="09XXXXXXXXX"></label>
-          <label>Commission rate (%)<input name="commissionRate" type="number" min="0" max="100" step="0.01" [(ngModel)]="form.commissionRate" required></label>
-          <label class="wide">Password {{ editingId ? '(leave blank to keep current password)' : '' }}<input name="agentPassword" type="password" minlength="8" [(ngModel)]="form.password" [required]="!editingId"></label>
+          <label>Full name<input name="agentName" [(ngModel)]="form.fullName" required /></label>
+          <label
+            >Email<input name="agentEmail" type="email" [(ngModel)]="form.email" required
+          /></label>
+          <label
+            >Phone<input
+              name="agentPhone"
+              [(ngModel)]="form.phone"
+              required
+              minlength="7"
+              maxlength="16"
+              placeholder="09XXXXXXXXX"
+          /></label>
+          <label
+            >Legacy rate (%)<input
+              name="commissionRate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              [(ngModel)]="form.commissionRate"
+              readonly
+          /></label>
+          <label class="wide"
+            >Password {{ editingId ? '(leave blank to keep current password)' : ''
+            }}<input
+              name="agentPassword"
+              type="password"
+              minlength="8"
+              [(ngModel)]="form.password"
+              [required]="!editingId"
+          /></label>
         </div>
-        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save agent</button></footer>
+        <footer>
+          <button type="button" class="secondary-button" (click)="showForm.set(false)">
+            Cancel</button
+          ><button class="primary">Save agent</button>
+        </footer>
       </form>
     </section>
   </div>
 }
 
 @if (confirmDialog.config(); as dialog) {
-  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+  <app-action-dialog
+    [config]="dialog"
+    (cancelled)="confirmDialog.cancel()"
+    (confirmed)="confirmDialog.confirm($event)"
+  />
 }

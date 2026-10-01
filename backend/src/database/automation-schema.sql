@@ -1,0 +1,159 @@
+CREATE TABLE IF NOT EXISTS packages (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(180) NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  selling_price DECIMAL(12,2) NOT NULL,
+  commission_type ENUM('FIXED','PERCENTAGE') NOT NULL,
+  commission_value DECIMAL(12,2) NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CHECK (selling_price > 0),
+  CHECK (commission_value >= 0 AND (commission_type <> 'PERCENTAGE' OR commission_value <= 100))
+);
+CREATE TABLE IF NOT EXISTS package_items (
+  package_id BIGINT UNSIGNED NOT NULL,
+  product_id BIGINT UNSIGNED NOT NULL,
+  quantity INT UNSIGNED NOT NULL,
+  PRIMARY KEY(package_id,product_id),
+  FOREIGN KEY(package_id) REFERENCES packages(id),
+  FOREIGN KEY(product_id) REFERENCES products(id),
+  CHECK(quantity > 0)
+);
+CREATE TABLE IF NOT EXISTS order_packages (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  order_id BIGINT UNSIGNED NOT NULL,
+  package_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(180) NOT NULL,
+  quantity INT UNSIGNED NOT NULL,
+  selling_price DECIMAL(12,2) NOT NULL,
+  commission_type ENUM('FIXED','PERCENTAGE') NOT NULL,
+  commission_value DECIMAL(12,2) NOT NULL,
+  components JSON NOT NULL,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY(package_id) REFERENCES packages(id),
+  UNIQUE(order_id,package_id),
+  CHECK(quantity > 0)
+);
+CREATE TABLE IF NOT EXISTS customer_accounts (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  customer_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  token_version INT UNSIGNED NOT NULL DEFAULT 0,
+  verified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(customer_id) REFERENCES customers(id)
+);
+CREATE TABLE IF NOT EXISTS customer_auth_tokens (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  purpose ENUM('REGISTER','INVITE','RESET') NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  payload JSON NOT NULL,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX(expires_at)
+);
+CREATE TABLE IF NOT EXISTS customer_order_requests (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  customer_id BIGINT UNSIGNED NOT NULL,
+  agent_id BIGINT UNSIGNED NULL,
+  status ENUM('SUBMITTED','CONVERTED','DECLINED') NOT NULL DEFAULT 'SUBMITTED',
+  snapshot JSON NOT NULL,
+  delivery_address VARCHAR(500) NOT NULL,
+  payment_method VARCHAR(80) NOT NULL,
+  order_id BIGINT UNSIGNED NULL UNIQUE,
+  decline_reason VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY(customer_id) REFERENCES customers(id),
+  FOREIGN KEY(agent_id) REFERENCES users(id),
+  FOREIGN KEY(order_id) REFERENCES orders(id),
+  INDEX(status,agent_id),
+  INDEX(customer_id,created_at)
+);
+CREATE TABLE IF NOT EXISTS order_followups (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  order_id BIGINT UNSIGNED NOT NULL,
+  customer_id BIGINT UNSIGNED NOT NULL,
+  message VARCHAR(1000) NOT NULL,
+  reply VARCHAR(2000) NULL,
+  replied_by BIGINT UNSIGNED NULL,
+  replied_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(order_id) REFERENCES orders(id),
+  FOREIGN KEY(customer_id) REFERENCES customers(id),
+  FOREIGN KEY(replied_by) REFERENCES users(id),
+  INDEX(order_id,replied_at)
+);
+CREATE TABLE IF NOT EXISTS domain_events (
+  id CHAR(36) PRIMARY KEY,
+  type VARCHAR(80) NOT NULL,
+  aggregate_type VARCHAR(40) NOT NULL,
+  aggregate_id BIGINT UNSIGNED NOT NULL,
+  actor_id BIGINT UNSIGNED NULL,
+  payload JSON NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  INDEX(aggregate_type,aggregate_id,created_at)
+);
+CREATE TABLE IF NOT EXISTS automation_settings (
+  workflow VARCHAR(80) PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  config JSON NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS automation_runs (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  event_id CHAR(36) NULL,
+  workflow VARCHAR(80) NOT NULL,
+  dedupe_key VARCHAR(255) NOT NULL UNIQUE,
+  state ENUM('PENDING','PROCESSING','ACCEPTED','SUCCEEDED','FAILED','UNKNOWN','SKIPPED') NOT NULL DEFAULT 'PENDING',
+  payload JSON NOT NULL,
+  available_at DATETIME(6) NOT NULL,
+  lease_until DATETIME(6) NULL,
+  lease_owner CHAR(36) NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  send_started_at DATETIME(6) NULL,
+  result JSON NULL,
+  last_error VARCHAR(1000) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX(state,available_at),
+  INDEX(lease_until),
+  FOREIGN KEY(event_id) REFERENCES domain_events(id)
+);
+CREATE TABLE IF NOT EXISTS staff_notifications (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  dedupe_key VARCHAR(255) NOT NULL,
+  type VARCHAR(80) NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  message VARCHAR(1000) NOT NULL,
+  link VARCHAR(255) NOT NULL,
+  read_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id,dedupe_key),
+  FOREIGN KEY(user_id) REFERENCES users(id),
+  INDEX(user_id,read_at,created_at)
+);
+CREATE TABLE IF NOT EXISTS automation_episodes (
+  workflow VARCHAR(80) NOT NULL,
+  entity_id BIGINT UNSIGNED NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT FALSE,
+  generation INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY(workflow,entity_id)
+);
+CREATE TABLE IF NOT EXISTS worker_heartbeats (
+  id VARCHAR(80) PRIMARY KEY,
+  last_seen_at DATETIME NOT NULL,
+  last_error VARCHAR(1000) NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_runs (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  campaign_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  recipient_count INT UNSIGNED NOT NULL,
+  content_snapshot JSON NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);

@@ -1,7 +1,6 @@
 # TNL Track
 
-TNL Track is a CRM, sales, inventory, delivery-tracking, and agent-management
-system implemented as independently deployable Angular and Express projects.
+TNL Track is a CRM, package sales, inventory, delivery, customer portal, and field-agent management system. Angular, the Express API, and a durable MySQL-backed automation worker deploy independently.
 
 ## Projects
 
@@ -24,6 +23,9 @@ system implemented as independently deployable Angular and Express projects.
 4. Run `npm run db:migrate`.
 5. Run `npm run db:seed`.
 6. Run `npm run dev`.
+7. In a separate backend process, run `npm run worker`.
+
+Use `npm run build`, `npm start`, and `npm run worker:start` for compiled production processes. Both API and worker require the same database and mail configuration. Set `PUBLIC_APP_URL` to the customer-facing HTTPS origin for activation, reset, and unsubscribe links. Run migrations before either process starts. Do not run the demo seed against production data.
 
 The seed creates:
 
@@ -51,5 +53,8 @@ The frontend and backend share no runtime code and communicate only through the
 HTTP contract in `docs/API.md`. Permitted frontend origins are configured with
 `CORS_ORIGINS`.
 
-Automated tests are intentionally omitted for the initial release. Follow and
-record the scenarios in `docs/MANUAL_ACCEPTANCE.md`.
+Run `npm test` in backend for focused calculations and recovery checks. To include disposable MySQL integration checks, set `TNL_INTEGRATION=1` before running `npm test`. The configured database user must be able to create/drop an isolated `tnl_test_<random>` schema; tests never migrate the configured live schema. Integration tests use a local SMTP sink, not the configured email provider.
+
+See [the implementation specification](issues/README.md), [API contract](docs/API.md), [deployment and rollout](docs/DEPLOYMENT.md), and [acceptance record](docs/MANUAL_ACCEPTANCE.md). Workflows start disabled. Review legacy discrepancies, configure SMTP/templates, and enable each deliberately in the admin Automations screen.
+
+Admins can use **Manage → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, and admin-approved bonuses. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets or rewards are created automatically.

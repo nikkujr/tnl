@@ -1,100 +1,206 @@
-import { DatePipe } from '@angular/common';
-import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { DatePipe, JsonPipe } from '@angular/common';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ApiService, Campaign } from '../../core/api.service';
-import { ToastService } from '../../shared/toast.service';
-import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
-import { ActionDialogComponent } from '../../shared/action-dialog.component';
-import { AppIconComponent } from '../../shared/app-icon.component';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { Subscription } from 'rxjs';
+import { BusinessApi } from '../../core/business-api.service';
+import { Campaign, Customer } from '../../core/api.service';
 import { RichTextEditorComponent } from '../../shared/rich-text-editor.component';
-
+import { AppIconComponent } from '../../shared/app-icon.component';
 @Component({
   selector: 'app-campaigns-page',
-  imports: [DatePipe, FormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent, RichTextEditorComponent],
+  imports: [DatePipe, JsonPipe, FormsModule, RichTextEditorComponent, AppIconComponent],
   templateUrl: './campaigns.page.html',
-  styleUrl: './campaigns.page.scss'
+  styleUrls: ['../../shared/business.scss', './campaigns.page.scss'],
 })
-export class CampaignsPage implements OnInit, OnDestroy {
-  private readonly api = inject(ApiService);
-  readonly toast = inject(ToastService);
-  readonly confirmDialog = inject(ConfirmDialogService);
-
+export class CampaignsPage {
+  readonly api = inject(BusinessApi);
   readonly campaigns = signal<Campaign[]>([]);
-  readonly loading = signal(true);
+  readonly customers = signal<Customer[]>([]);
+  readonly customerDialog = viewChild.required<ElementRef<HTMLDialogElement>>('customerDialog');
+  readonly customerLoading = signal(false);
+  readonly customerError = signal('');
+  readonly customerTotal = signal(0);
+  readonly pendingCustomerIds = signal<number[]>([]);
+  readonly customerPageSize = 25;
+  private readonly destroyRef = inject(DestroyRef);
+  private customerRequest?: Subscription;
+  customerSearch = '';
+  customerPage = 1;
+  readonly recipients = signal<any[]>([]);
+  readonly outcomes = signal<any[]>([]);
+  readonly error = signal('');
+  readonly notice = signal('');
   readonly showForm = signal(false);
-
-  search = '';
-  status = 'ALL';
-  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
-
+  private readonly injector = inject(Injector);
+  private readonly formHeading = viewChild<ElementRef<HTMLElement>>('formHeading');
+  private readonly previewHeading = viewChild<ElementRef<HTMLElement>>('previewHeading');
+  readonly previewName = signal('');
   editingId: number | null = null;
-  form = { name: '', targetAudience: '', content: '', startDate: '', endDate: '', status: 'DRAFT' };
-
-  filtered(): Campaign[] {
-    return this.status === 'ALL' ? this.campaigns() : this.campaigns().filter((item) => item.status === this.status);
-  }
-
-  ngOnInit(): void {
+  previewId = 0;
+  search = '';
+  form = {
+    name: '',
+    content: '',
+    startDate: '',
+    endDate: '',
+    status: 'DRAFT',
+    audienceType: 'ALL',
+    customerIds: [] as number[],
+    scheduledAt: '',
+  };
+  constructor() {
     this.load();
   }
-
-  ngOnDestroy(): void {
-    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+  load() {
+    this.api
+      .get<Campaign[]>('campaigns', { search: this.search })
+      .subscribe({ next: (r) => this.campaigns.set(r.data), error: (e) => this.fail(e) });
   }
-
-  private load(): void {
-    this.loading.set(true);
-    this.api.getCampaigns(this.search).subscribe({
-      next: ({ data }) => { this.campaigns.set(data); this.loading.set(false); },
-      error: (error) => { this.loading.set(false); this.toast.fail(error.error?.error?.message ?? 'Unable to load campaigns.'); }
-    });
+  dateOnly(value: string) {
+    return value ? value.slice(0, 10) + 'T00:00:00Z' : null;
   }
-
-  onSearchChange(): void {
-    if (this.searchDebounce) clearTimeout(this.searchDebounce);
-    this.searchDebounce = setTimeout(() => this.load(), 350);
-  }
-
-  titleCase(value: string): string { return value.toLowerCase().split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' '); }
-
-  openForm(item?: Campaign): void {
-    this.editingId = item?.id ?? null;
+  openForm(c?: Campaign) {
+    this.editingId = c?.id ?? null;
+    const date = c?.scheduledAt
+      ? new Date(new Date(c.scheduledAt).getTime() + 8 * 3600000).toISOString().slice(0, 16)
+      : '';
     this.form = {
-      name: item?.name ?? '', targetAudience: item?.targetAudience ?? '', content: item?.content ?? '',
-      startDate: item?.startDate?.slice(0, 10) ?? '', endDate: item?.endDate?.slice(0, 10) ?? '', status: item?.status ?? 'DRAFT'
+      name: c?.name ?? '',
+      content: c?.content ?? '',
+      startDate: c?.startDate?.slice(0, 10) ?? '',
+      endDate: c?.endDate?.slice(0, 10) ?? '',
+      status: c?.status === 'SCHEDULED' ? 'SCHEDULED' : 'DRAFT',
+      audienceType: c?.audienceType ?? 'ALL',
+      customerIds: [...(c?.customerIds ?? [])],
+      scheduledAt: date,
     };
     this.showForm.set(true);
+    afterNextRender(
+      () => {
+        this.formHeading()?.nativeElement.focus({ preventScroll: true });
+        this.formHeading()?.nativeElement.scrollIntoView({ block: 'start' });
+      },
+      { injector: this.injector },
+    );
   }
-
-  save(): void {
-    if (this.form.endDate <= this.form.startDate) { this.toast.fail('Campaign end date must be later than its start date.'); return; }
-    const input = { ...this.form } as Omit<Campaign, 'id'>;
-    const request = this.editingId ? this.api.updateCampaign(this.editingId, input) : this.api.createCampaign(input);
-    this.loading.set(true);
+  select(id: number, checked: boolean) {
+    this.pendingCustomerIds.update((ids) =>
+      checked ? [...new Set([...ids, id])] : ids.filter((i) => i !== id),
+    );
+  }
+  openCustomerPicker() {
+    this.pendingCustomerIds.set([...this.form.customerIds]);
+    this.customerSearch = '';
+    this.findCustomers();
+    this.customerDialog().nativeElement.showModal();
+  }
+  closeCustomerPicker(apply = false) {
+    if (apply) this.form.customerIds = [...this.pendingCustomerIds()];
+    this.customerDialog().nativeElement.close();
+  }
+  allCustomersOnPageSelected() {
+    return (
+      this.customers().length > 0 &&
+      this.customers().every((c) => this.pendingCustomerIds().includes(c.id))
+    );
+  }
+  someCustomersOnPageSelected() {
+    return (
+      this.customers().some((c) => this.pendingCustomerIds().includes(c.id)) &&
+      !this.allCustomersOnPageSelected()
+    );
+  }
+  selectCustomerPage(checked: boolean) {
+    const pageIds = new Set(this.customers().map((c) => c.id));
+    this.pendingCustomerIds.update((ids) =>
+      checked ? [...new Set([...ids, ...pageIds])] : ids.filter((id) => !pageIds.has(id)),
+    );
+  }
+  findCustomers(page = 1) {
+    this.customerRequest?.unsubscribe();
+    this.customerPage = page;
+    this.customerLoading.set(true);
+    this.customerError.set('');
+    this.customers.set([]);
+    this.customerRequest = this.api
+      .get<Customer[]>('customers', {
+        search: this.customerSearch,
+        page,
+        limit: this.customerPageSize,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => {
+          this.customers.set(r.data);
+          this.customerTotal.set(r.meta?.total ?? r.data.length);
+          this.customerLoading.set(false);
+        },
+        error: (e) => {
+          this.customerError.set(e.error?.error?.message ?? 'Unable to load customers. Try again.');
+          this.customerLoading.set(false);
+        },
+      });
+  }
+  save() {
+    const input = {
+      ...this.form,
+      scheduledAt: this.form.scheduledAt ? this.form.scheduledAt + ':00+08:00' : null,
+    };
+    const request = this.editingId
+      ? this.api.put('campaigns/' + this.editingId, input)
+      : this.api.post('campaigns', input);
     request.subscribe({
-      next: () => { this.showForm.set(false); this.toast.success(this.editingId ? 'Campaign updated.' : 'Campaign created.'); this.load(); },
-      error: (error) => { this.loading.set(false); this.toast.fail(error.error?.error?.message ?? 'Unable to save campaign.'); }
+      next: () => {
+        this.showForm.set(false);
+        this.notice.set('Campaign saved.');
+        this.load();
+      },
+      error: (e) => this.fail(e),
     });
   }
-
-  async remove(item: Campaign): Promise<void> {
-    const confirmed = await this.confirmDialog.open({ title: 'Delete campaign?', message: `"${item.name}" will be permanently removed.`, confirmLabel: 'Delete campaign', tone: 'danger' });
-    if (!confirmed) return;
-    this.loading.set(true);
-    this.api.deleteCampaign(item.id).subscribe({
-      next: () => { this.toast.success('Campaign deleted.'); this.load(); },
-      error: (error) => { this.loading.set(false); this.toast.fail(error.error?.error?.message ?? 'Unable to delete campaign.'); }
+  preview(c: Campaign) {
+    this.previewId = c.id;
+    this.previewName.set(c.name);
+    afterNextRender(
+      () => {
+        this.previewHeading()?.nativeElement.focus({ preventScroll: true });
+        this.previewHeading()?.nativeElement.scrollIntoView({ block: 'start' });
+      },
+      { injector: this.injector },
+    );
+    this.api
+      .get<any[]>(`campaigns/${c.id}/recipients`)
+      .subscribe({ next: (r) => this.recipients.set(r.data), error: (e) => this.fail(e) });
+    this.results(c.id);
+  }
+  results(id: number) {
+    this.api
+      .get<any[]>(`campaigns/${id}/results`)
+      .subscribe({ next: (r) => this.outcomes.set(r.data), error: (e) => this.fail(e) });
+  }
+  send() {
+    this.api.post(`campaigns/${this.previewId}/send`).subscribe({
+      next: (r) => {
+        this.notice.set(
+          `${r.data.recipientCount} recipient actions queued. Repeated sends reuse this run.`,
+        );
+        this.results(this.previewId);
+        this.load();
+      },
+      error: (e) => this.fail(e),
     });
   }
-
-  async send(item: Campaign): Promise<void> {
-    const confirmed = await this.confirmDialog.open({ title: 'Send campaign email?', message: `"${item.name}" will be sent to all customer email addresses using BCC.`, confirmLabel: 'Send campaign' });
-    if (!confirmed) return;
-    this.loading.set(true);
-    this.api.sendCampaign(item.id).subscribe({
-      next: ({ data }) => { this.toast.success(`Campaign sent to ${data.recipientCount} customer${data.recipientCount === 1 ? '' : 's'}.`); this.load(); },
-      error: (error) => { this.loading.set(false); this.toast.fail(error.error?.error?.message ?? 'Unable to send campaign email.'); }
-    });
+  private fail(e: any) {
+    this.error.set(e.error?.error?.message ?? 'Unable to complete this action.');
   }
 }

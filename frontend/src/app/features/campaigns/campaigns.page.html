@@ -1,55 +1,399 @@
-<div class="campaigns-page">
-  <app-breadcrumb [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Campaigns' }]" />
-  <div class="page-heading">
-    <div class="page-intro"><span class="eyebrow">TNL Track</span><h2>Campaign management.</h2><p>Manage campaign content, schedules, and lifecycle status.</p></div>
-    <button class="primary icon-button" (click)="openForm()"><app-icon name="plus" />New campaign</button>
-  </div>
-  <div class="tools">
-    <label><span>⌕</span><input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="Search name or audience"></label>
-    <select [(ngModel)]="status" aria-label="Filter campaigns by status">
-      <option value="ALL">All statuses</option>
-      <option value="DRAFT">Draft</option>
-      <option value="SCHEDULED">Scheduled</option>
-      <option value="ACTIVE">Active</option>
-      <option value="COMPLETED">Completed</option>
-    </select>
-  </div>
-  <article class="panel management-table">
-    <div class="management-row header"><span>Campaign</span><span>Audience</span><span>Schedule</span><span>Actions</span></div>
-    @for (item of filtered(); track item.id) {
-      <div class="management-row">
-        <span><strong>{{ item.name }}</strong><small>{{ titleCase(item.status) }}</small></span>
-        <span>{{ item.targetAudience }}</span>
-        <span>{{ item.startDate | date:'mediumDate' }} – {{ item.endDate | date:'mediumDate' }}</span>
-        <span class="table-actions">
-          <button class="row-action approve" (click)="send(item)">Send email</button>
-          <button class="row-action" (click)="openForm(item)">Edit</button>
-          <button class="row-action reject" (click)="remove(item)">Delete</button>
-        </span>
+<div class="business-page campaigns-page">
+  <header class="page-heading">
+    <div>
+      <h2>Reach the right customers.</h2>
+      <p>Create a campaign, choose your audience, and follow its results.</p>
+    </div>
+    <button class="primary icon-button" (click)="openForm()">
+      <app-icon name="plus" />New campaign
+    </button>
+  </header>
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="notice" role="status">{{ notice() }}</p>
+  }
+  <section class="panel campaign-list" aria-label="Campaign list">
+    <div class="list-toolbar">
+      <div class="list-title">
+        <h3>Your campaigns</h3>
+        <span class="count-badge">{{ campaigns().length }}</span>
       </div>
-    } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No campaigns found.' }}</div> }
-  </article>
-</div>
-
-@if (showForm()) {
-  <div class="modal-backdrop" (click)="showForm.set(false)">
-    <section class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-title"><div><span class="eyebrow">Marketing</span><h2>{{ editingId ? 'Edit campaign' : 'New campaign' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
-      <form (ngSubmit)="save()">
-        <div class="form-grid">
-          <label>Campaign name<input name="campaignName" [(ngModel)]="form.name" required minlength="2"></label>
-          <label>Target audience<input name="campaignAudience" [(ngModel)]="form.targetAudience" required minlength="2"></label>
-          <label>Start date<input name="campaignStart" type="date" [(ngModel)]="form.startDate" required></label>
-          <label>End date<input name="campaignEnd" type="date" [(ngModel)]="form.endDate" required></label>
-          <label>Status<select name="campaignStatus" [(ngModel)]="form.status"><option value="DRAFT">Draft</option><option value="SCHEDULED">Scheduled</option><option value="ACTIVE">Active</option><option value="COMPLETED">Completed</option></select></label>
-          <label class="wide">Campaign content<app-rich-text-editor name="campaignContent" [(ngModel)]="form.content" placeholder="Write the campaign email content…" /></label>
+      <label class="campaign-search"
+        ><app-icon name="search" /><input
+          type="search"
+          aria-label="Search campaigns"
+          placeholder="Search campaigns…"
+          [(ngModel)]="search"
+          (ngModelChange)="load()"
+      /></label>
+    </div>
+    <div class="campaign-table-wrap">
+      <table class="campaign-table">
+        <thead>
+          <tr>
+            <th>Campaign</th>
+            <th>Audience</th>
+            <th>Schedule</th>
+            <th class="actions-heading">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of campaigns(); track c.id) {
+            <tr>
+              <td data-label="Campaign">
+                <div class="campaign-identity">
+                  <span class="campaign-icon"><app-icon name="campaigns" /></span>
+                  <div>
+                    <strong class="campaign-name">{{ c.name }}</strong>
+                    <span class="status-badge" [attr.data-status]="c.status">{{
+                      c.status.toLowerCase().replaceAll('_', ' ')
+                    }}</span>
+                  </div>
+                </div>
+              </td>
+              <td data-label="Audience" class="audience-cell">
+                <span class="audience-label"
+                  ><app-icon name="customers" />
+                  {{
+                    c.audienceType === 'SELECTED' ? 'Selected customers' : 'All eligible customers'
+                  }}
+                </span>
+              </td>
+              <td data-label="Schedule" class="schedule-cell">
+                <span
+                  >{{ dateOnly(c.startDate) | date: 'MMM d, y' : 'UTC' }} –
+                  {{ dateOnly(c.endDate) | date: 'MMM d, y' : 'UTC' }}</span
+                >
+                <small>
+                  @if (c.scheduledAt) {
+                    Sends {{ c.scheduledAt | date: 'MMM d, y, h:mm a' : '+0800' }} · Manila
+                  } @else {
+                    No send scheduled
+                  }
+                </small>
+              </td>
+              <td data-label="Actions">
+                <div class="row-actions">
+                  <button class="results-button" (click)="preview(c)">
+                    View results<app-icon name="chevronRight" />
+                  </button>
+                  @if (c.status === 'DRAFT' || c.status === 'SCHEDULED') {
+                    <button class="edit-button" (click)="openForm(c)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="campaign-empty">
+                <span class="empty-icon"><app-icon name="campaigns" /></span>
+                <strong>{{
+                  search ? 'No campaigns match your search' : 'Your next campaign starts here'
+                }}</strong>
+                <p>
+                  {{
+                    search
+                      ? 'Try a different campaign name.'
+                      : 'Create a campaign to share offers with your customers.'
+                  }}
+                </p>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="list-footnote">
+      <app-icon name="info" /><span
+        >Each campaign sends once to customers who opted in. Schedules use Manila time.</span
+      >
+    </div>
+  </section>
+  @if (showForm()) {
+    <section class="panel campaign-form">
+      <div class="section-header">
+        <div>
+          <h3 #formHeading tabindex="-1">{{ editingId ? 'Edit' : 'Create' }} campaign</h3>
+          <p>Choose who to reach and when to send your message.</p>
         </div>
-        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save campaign</button></footer>
+        <button
+          type="button"
+          class="close-button"
+          aria-label="Close campaign form"
+          (click)="showForm.set(false)"
+        >
+          <app-icon name="close" />
+        </button>
+      </div>
+      <form (ngSubmit)="save()">
+        <div class="grid">
+          <label>Name<input name="name" [(ngModel)]="form.name" required minlength="2" /></label
+          ><label
+            >Audience<select
+              name="audience"
+              [(ngModel)]="form.audienceType"
+              (ngModelChange)="$event === 'SELECTED' && openCustomerPicker()"
+            >
+              <option value="ALL">All eligible customers</option>
+              <option value="SELECTED">Selected customers</option>
+            </select></label
+          ><label
+            >Start date<input
+              type="date"
+              name="start"
+              [(ngModel)]="form.startDate"
+              required /></label
+          ><label
+            >End date<input type="date" name="end" [(ngModel)]="form.endDate" required /></label
+          ><label
+            >Status<select name="status" [(ngModel)]="form.status">
+              <option value="DRAFT">Draft</option>
+              <option value="SCHEDULED">Scheduled</option>
+            </select></label
+          ><label
+            >Send at (Manila)<input
+              type="datetime-local"
+              name="sendAt"
+              [(ngModel)]="form.scheduledAt"
+              [required]="form.status === 'SCHEDULED'"
+          /></label>
+        </div>
+        @if (form.audienceType === 'SELECTED') {
+          <div class="audience-summary">
+            <div>
+              <strong>{{ form.customerIds.length }} customers selected</strong>
+              <small>Unsubscribed contacts will be excluded.</small>
+            </div>
+            <button type="button" (click)="openCustomerPicker()">Choose customers</button>
+          </div>
+        }
+        <label class="content-field"
+          >Content<app-rich-text-editor name="content" [(ngModel)]="form.content"
+        /></label>
+        <div class="actions form-actions">
+          <button type="submit" class="primary">Save</button
+          ><button type="button" (click)="showForm.set(false)">Cancel</button>
+        </div>
       </form>
     </section>
-  </div>
-}
+  }
+  @if (previewId) {
+    <section class="panel campaign-preview">
+      <div class="section-header">
+        <div>
+          <h3 #previewHeading tabindex="-1">Recipient preview</h3>
+          <p>{{ previewName() }}</p>
+        </div>
+        <button
+          type="button"
+          class="close-button"
+          aria-label="Close campaign results"
+          (click)="previewId = 0"
+        >
+          <app-icon name="close" />
+        </button>
+      </div>
+      <div class="recipient-summary">
+        <span class="campaign-icon"><app-icon name="customers" /></span>
+        <div>
+          <strong>{{ recipients().length }} eligible recipients</strong
+          ><small>Consent is checked again before each send.</small>
+        </div>
+        <button class="primary" (click)="send()">Queue this campaign once</button>
+      </div>
+      <div class="recipient-list">
+        @for (c of recipients(); track c.id) {
+          <div>
+            <strong>{{ c.fullName || c.full_name }}</strong
+            ><span>{{ c.email }}</span>
+          </div>
+        } @empty {
+          <p>No eligible recipients at the moment.</p>
+        }
+      </div>
+      <div class="outcomes-heading">
+        <h3>Recipient outcomes</h3>
+        <button class="icon-button" (click)="results(previewId)">
+          <app-icon name="restore" />Refresh results
+        </button>
+      </div>
+      <p class="outcomes-description">
+        Accepted means SMTP accepted the email; inbox delivery remains unconfirmed. Unknown outcomes
+        require admin review in Automations.
+      </p>
+      <div class="outcomes-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Outcome</th>
+              <th>Attempts</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of outcomes(); track r.id) {
+              <tr>
+                <td>{{ r.customerId }}</td>
+                <td>
+                  <span class="status-badge">{{ r.state.toLowerCase().replaceAll('_', ' ') }}</span>
+                </td>
+                <td>{{ r.attempts }}</td>
+                <td>{{ r.lastError }} {{ r.result | json }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4" class="empty">No recipient outcomes yet.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>
 
-@if (confirmDialog.config(); as dialog) {
-  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
-}
+<dialog
+  #customerDialog
+  class="customer-dialog"
+  aria-labelledby="customer-dialog-title"
+  aria-describedby="customer-dialog-description"
+>
+  <div class="customer-picker">
+    <header class="picker-header">
+      <div>
+        <h2 id="customer-dialog-title">Select customers</h2>
+        <p id="customer-dialog-description">
+          Choose your audience. Unsubscribed contacts will be excluded from sends.
+        </p>
+      </div>
+      <button type="button" aria-label="Close customer selection" (click)="closeCustomerPicker()">
+        ×
+      </button>
+    </header>
+    <label class="field customer-search"
+      >Find customers
+      <input
+        type="search"
+        autofocus
+        [(ngModel)]="customerSearch"
+        (ngModelChange)="findCustomers()"
+        placeholder="Search by name, email or phone"
+      />
+    </label>
+    <div class="selection-toolbar">
+      <span role="status"
+        >{{ pendingCustomerIds().length }} selected across all pages and searches</span
+      >
+      <button
+        type="button"
+        [disabled]="!pendingCustomerIds().length"
+        (click)="pendingCustomerIds.set([])"
+      >
+        Clear selection
+      </button>
+    </div>
+    @if (customerError()) {
+      <div class="error" role="alert">
+        {{ customerError() }}
+        <button type="button" (click)="findCustomers(customerPage)">Retry</button>
+      </div>
+    }
+    <div
+      class="customer-table-wrap"
+      [attr.aria-busy]="customerLoading()"
+      tabindex="0"
+      role="region"
+      aria-label="Customer search results"
+    >
+      <table>
+        <thead>
+          <tr>
+            <th scope="col" class="selection-cell">
+              <input
+                type="checkbox"
+                aria-label="Select all customers on this page"
+                [checked]="allCustomersOnPageSelected()"
+                [indeterminate]="someCustomersOnPageSelected()"
+                [disabled]="customerLoading() || !customers().length"
+                (change)="selectCustomerPage($any($event.target).checked)"
+              />
+            </th>
+            <th scope="col">Customer</th>
+            <th scope="col">Email</th>
+            <th scope="col">Marketing consent</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (customerLoading()) {
+            <tr>
+              <td colspan="4" class="empty">Loading customers…</td>
+            </tr>
+          } @else {
+            @for (c of customers(); track c.id) {
+              <tr [class.selected]="pendingCustomerIds().includes(c.id)">
+                <td class="selection-cell">
+                  <input
+                    type="checkbox"
+                    [attr.aria-label]="'Select ' + c.fullName"
+                    [checked]="pendingCustomerIds().includes(c.id)"
+                    (change)="select(c.id, $any($event.target).checked)"
+                  />
+                </td>
+                <td>
+                  <strong>{{ c.fullName }}</strong
+                  ><small>{{ c.phone }}</small>
+                </td>
+                <td class="customer-email">{{ c.email }}</td>
+                <td>
+                  <span class="consent-tag" [class.opted-in]="c.marketingOptIn">
+                    {{ c.marketingOptIn ? 'Opted in' : 'Unsubscribed' }}
+                  </span>
+                </td>
+              </tr>
+            } @empty {
+              @if (!customerError()) {
+                <tr>
+                  <td colspan="4" class="empty">No customers found. Try another search.</td>
+                </tr>
+              }
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="customer-pagination">
+      <span>{{ customerTotal() }} customers found · Page {{ customerPage }}</span>
+      <div class="actions">
+        <button
+          type="button"
+          [disabled]="customerLoading() || !!customerError() || customerPage <= 1"
+          (click)="findCustomers(customerPage - 1)"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          [disabled]="
+            customerLoading() ||
+            !!customerError() ||
+            customerPage * customerPageSize >= customerTotal()
+          "
+          (click)="findCustomers(customerPage + 1)"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+    <footer class="picker-footer">
+      <button type="button" (click)="closeCustomerPicker()">Cancel</button>
+      <button type="button" class="primary" (click)="closeCustomerPicker(true)">
+        Apply selection ({{ pendingCustomerIds().length }})
+      </button>
+    </footer>
+  </div>
+</dialog>

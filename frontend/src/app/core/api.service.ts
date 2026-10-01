@@ -3,10 +3,23 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-export type Role = 'ADMIN' | 'AGENT';
-export interface SessionUser { id: number; email: string; fullName: string; role: Role }
-export interface ApiResponse<T> { data: T; meta?: { page: number; limit: number; total?: number } }
-export interface Category { id: number; name: string; description: string | null; productCount: number }
+export type Role = 'ADMIN' | 'AGENT' | 'CUSTOMER';
+export interface SessionUser {
+  id: number;
+  email: string;
+  fullName: string;
+  role: Role;
+}
+export interface ApiResponse<T> {
+  data: T;
+  meta?: { page: number; limit: number; total?: number };
+}
+export interface Category {
+  id: number;
+  name: string;
+  description: string | null;
+  productCount: number;
+}
 export interface DashboardSummary {
   totalOrders: number;
   pendingOrders: number;
@@ -22,7 +35,9 @@ export interface DashboardSummary {
 }
 export interface DashboardNotification {
   id: string;
-  type: 'ORDER' | 'CUSTOMER';
+  type: string;
+  link: string;
+  readAt: string | null;
   title: string;
   message: string;
   createdAt: string;
@@ -35,6 +50,7 @@ export interface Customer {
   address: string;
   assignedAgentId: number | null;
   assignedAgentName: string | null;
+  marketingOptIn?: boolean;
 }
 export interface Product {
   id: number;
@@ -57,6 +73,8 @@ export interface Order {
   customerName: string;
   agentName: string;
   items: OrderItem[];
+  packages: OrderPackage[];
+  total: number;
   orderStatus: string;
   deliveryStatus: string | null;
   paymentStatus: string;
@@ -66,10 +84,40 @@ export interface Order {
   deliveryAddress: string;
   createdAt: string;
 }
-export interface OrderItem { productId:number; productName:string; sku:string; quantity:number; unitPrice:number }
-export interface OrderHistoryEvent { id:number; type:string; message:string; createdAt:string; actorName:string|null }
-export interface DeliveryEvent { status:string; notes:string|null; occurredAt:string }
+export interface OrderItem {
+  productId: number;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+}
+export interface OrderPackage {
+  packageId: number;
+  name: string;
+  quantity: number;
+  sellingPrice: number;
+  commissionType: 'FIXED' | 'PERCENTAGE';
+  commissionValue: number;
+  components: Array<{ productId: number; productName: string; quantity: number }>;
+}
+export interface OrderHistoryEvent {
+  id: number;
+  type: string;
+  message: string;
+  createdAt: string;
+  actorName: string | null;
+}
+export interface DeliveryEvent {
+  status: string;
+  notes: string | null;
+  occurredAt: string;
+}
 export interface OrderDetail extends Order {
+  commission?: {
+    amount: number;
+    source: string;
+    breakdown: Array<{ name: string; quantity: number; amount: number }>;
+  } | null;
   customerEmail: string;
   customerPhone: string;
   agentEmail: string;
@@ -81,22 +129,95 @@ export interface TrackingResult {
   trackingNumber: string;
   orderStatus: string;
   deliveryStatus: string | null;
-  deliveryAddress: string;
   events: Array<{
     status: string;
-    notes: string | null;
-    latitude: number | null;
-    longitude: number | null;
     occurredAt: string;
   }>;
 }
-export interface Lead { id:number; fullName:string; email:string; phone:string; source:string; status:string; assignedAgentId:number|null; assignedAgentName:string|null }
-export interface Campaign { id:number; name:string; targetAudience:string; content:string; startDate:string; endDate:string; status:string }
-export interface Agent { id:number; fullName:string; email:string; phone:string; commissionRate:number; active:boolean; closedDeals:number }
-export interface Commission { id:number; amount:number; rate:number; createdAt:string; orderId:string; customerName:string; agentName:string }
-export interface AgentCustomer { id:number; fullName:string; email:string; phone:string; address:string; createdAt:string }
-export interface AgentOrder { id:number; trackingNumber:string; customerName:string; orderStatus:string; deliveryStatus:string|null; paymentStatus:string; createdAt:string; amount:number }
-export interface AgentCommission { id:number; amount:number; rate:number; createdAt:string; orderId:number; trackingNumber:string; customerName:string }
+export interface Lead {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  source: string;
+  status: string;
+  assignedAgentId: number | null;
+  assignedAgentName: string | null;
+}
+export interface Campaign {
+  id: number;
+  name: string;
+  targetAudience: string;
+  content: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  audienceType?: 'ALL' | 'SELECTED';
+  customerIds?: number[];
+  scheduledAt?: string | null;
+}
+export interface Agent {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  commissionRate: number;
+  totalCommission?: number;
+  active: boolean;
+  closedDeals: number;
+}
+export interface Commission {
+  id: number;
+  amount: number;
+  rate: number | null;
+  source: string;
+  breakdown: Array<{ name: string; quantity: number; amount: number }> | null;
+  createdAt: string;
+  orderId: string;
+  customerName: string;
+  agentName: string;
+}
+export interface AgentCustomer {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  createdAt: string;
+}
+export interface AgentOrder {
+  id: number;
+  trackingNumber: string;
+  customerName: string;
+  orderStatus: string;
+  deliveryStatus: string | null;
+  paymentStatus: string;
+  createdAt: string;
+  amount: number;
+  commissionAmount: number | null;
+  commissionStatus:
+    | 'EARNED'
+    | 'OTHER_AGENT'
+    | 'LEGACY_REVIEW'
+    | 'CANCELLED'
+    | 'STANDALONE'
+    | 'POSTING_REVIEW'
+    | 'AWAITING_APPROVAL'
+    | 'AWAITING_PAYMENT'
+    | 'AWAITING_DELIVERY'
+    | 'AWAITING_COMPLETION';
+}
+export interface AgentCommission {
+  id: number;
+  amount: number;
+  rate: number | null;
+  source: string;
+  breakdown: Array<{ name: string; quantity: number; amount: number }> | null;
+  createdAt: string;
+  orderId: number;
+  trackingNumber: string;
+  customerName: string;
+}
 export interface AgentDetail extends Agent {
   createdAt: string;
   customers: AgentCustomer[];
@@ -107,7 +228,8 @@ export interface AgentDetail extends Agent {
 export interface CreateOrderInput {
   customerId: number;
   agentId?: number;
-  items: Array<{ productId:number; quantity:number }>;
+  items: Array<{ productId: number; quantity: number }>;
+  packages?: Array<{ packageId: number; quantity: number }>;
   deliveryAddress: string;
   paymentMethod: string;
   cashReceived?: number | null;
@@ -151,7 +273,11 @@ export interface ImportRow {
   issue: string | null;
   createdOrderId: number | null;
 }
-export interface ImportAgentOption { id: number; fullName: string; email: string }
+export interface ImportAgentOption {
+  id: number;
+  fullName: string;
+  email: string;
+}
 export interface OrderStats {
   totalOrders: number;
   pendingOrders: number;
@@ -181,15 +307,23 @@ export class ApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiUrl;
 
-  login(email: string, password: string): Observable<ApiResponse<{ token: string; user: SessionUser }>> {
-    return this.http.post<ApiResponse<{ token: string; user: SessionUser }>>(`${this.baseUrl}/auth/login`, { email, password });
+  login(
+    email: string,
+    password: string,
+  ): Observable<ApiResponse<{ token: string; user: SessionUser }>> {
+    return this.http.post<ApiResponse<{ token: string; user: SessionUser }>>(
+      `${this.baseUrl}/auth/login`,
+      { email, password },
+    );
   }
 
   getDashboard(): Observable<ApiResponse<DashboardSummary>> {
     return this.http.get<ApiResponse<DashboardSummary>>(`${this.baseUrl}/dashboard`);
   }
 
-  getCustomers(options: { search?: string; page?: number; limit?: number; agentId?: number } = {}): Observable<ApiResponse<Customer[]>> {
+  getCustomers(
+    options: { search?: string; page?: number; limit?: number; agentId?: number } = {},
+  ): Observable<ApiResponse<Customer[]>> {
     let params = new HttpParams();
     if (options.search) params = params.set('search', options.search);
     if (options.page) params = params.set('page', options.page);
@@ -198,11 +332,16 @@ export class ApiService {
     return this.http.get<ApiResponse<Customer[]>>(`${this.baseUrl}/customers`, { params });
   }
 
-  createCustomer(input: Omit<Customer, 'id' | 'assignedAgentName'>): Observable<ApiResponse<Customer>> {
+  createCustomer(
+    input: Omit<Customer, 'id' | 'assignedAgentName'>,
+  ): Observable<ApiResponse<Customer>> {
     return this.http.post<ApiResponse<Customer>>(`${this.baseUrl}/customers`, input);
   }
 
-  updateCustomer(id: number, input: Omit<Customer, 'id' | 'assignedAgentName'>): Observable<ApiResponse<Customer>> {
+  updateCustomer(
+    id: number,
+    input: Omit<Customer, 'id' | 'assignedAgentName'>,
+  ): Observable<ApiResponse<Customer>> {
     return this.http.put<ApiResponse<Customer>>(`${this.baseUrl}/customers/${id}`, input);
   }
 
@@ -210,7 +349,9 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/customers/${id}`);
   }
 
-  getProducts(options: { search?: string; page?: number; limit?: number; categoryId?: number } = {}): Observable<ApiResponse<Product[]>> {
+  getProducts(
+    options: { search?: string; page?: number; limit?: number; categoryId?: number } = {},
+  ): Observable<ApiResponse<Product[]>> {
     let params = new HttpParams();
     if (options.search) params = params.set('search', options.search);
     if (options.page) params = params.set('page', options.page);
@@ -219,7 +360,9 @@ export class ApiService {
     return this.http.get<ApiResponse<Product[]>>(`${this.baseUrl}/products`, { params });
   }
 
-  getCategories(options: { search?: string; page?: number; limit?: number } = {}): Observable<ApiResponse<Category[]>> {
+  getCategories(
+    options: { search?: string; page?: number; limit?: number } = {},
+  ): Observable<ApiResponse<Category[]>> {
     let params = new HttpParams();
     if (options.search) params = params.set('search', options.search);
     if (options.page) params = params.set('page', options.page);
@@ -227,11 +370,17 @@ export class ApiService {
     return this.http.get<ApiResponse<Category[]>>(`${this.baseUrl}/categories`, { params });
   }
 
-  createCategory(input: { name: string; description: string | null }): Observable<ApiResponse<Category>> {
+  createCategory(input: {
+    name: string;
+    description: string | null;
+  }): Observable<ApiResponse<Category>> {
     return this.http.post<ApiResponse<Category>>(`${this.baseUrl}/categories`, input);
   }
 
-  updateCategory(id: number, input: { name: string; description: string | null }): Observable<ApiResponse<Category>> {
+  updateCategory(
+    id: number,
+    input: { name: string; description: string | null },
+  ): Observable<ApiResponse<Category>> {
     return this.http.put<ApiResponse<Category>>(`${this.baseUrl}/categories/${id}`, input);
   }
 
@@ -239,11 +388,26 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/categories/${id}`);
   }
 
-  createProduct(input: { categoryId: number; name: string; sku: string; price: number; description: string | null }): Observable<ApiResponse<Product>> {
+  createProduct(input: {
+    categoryId: number;
+    name: string;
+    sku: string;
+    price: number;
+    description: string | null;
+  }): Observable<ApiResponse<Product>> {
     return this.http.post<ApiResponse<Product>>(`${this.baseUrl}/products`, input);
   }
 
-  updateProduct(id: number, input: { categoryId: number; name: string; sku: string; price: number; description: string | null }): Observable<ApiResponse<Product>> {
+  updateProduct(
+    id: number,
+    input: {
+      categoryId: number;
+      name: string;
+      sku: string;
+      price: number;
+      description: string | null;
+    },
+  ): Observable<ApiResponse<Product>> {
     return this.http.put<ApiResponse<Product>>(`${this.baseUrl}/products/${id}`, input);
   }
 
@@ -251,18 +415,32 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/products/${id}`);
   }
 
-  adjustInventory(productId: number, type: 'ADD' | 'DEDUCT', quantity: number, note?: string): Observable<ApiResponse<{ productId: number; stockOnHand: number }>> {
+  adjustInventory(
+    productId: number,
+    type: 'ADD' | 'DEDUCT',
+    quantity: number,
+    note?: string,
+  ): Observable<ApiResponse<{ productId: number; stockOnHand: number }>> {
     return this.http.post<ApiResponse<{ productId: number; stockOnHand: number }>>(
       `${this.baseUrl}/products/${productId}/inventory-adjustments`,
-      { type, quantity, note }
+      { type, quantity, note },
     );
   }
 
-  updateInventorySettings(productId: number, lowStockThreshold: number, reorderLevel: number): Observable<ApiResponse<unknown>> {
-    return this.http.put<ApiResponse<unknown>>(`${this.baseUrl}/products/${productId}/inventory-settings`, { lowStockThreshold, reorderLevel });
+  updateInventorySettings(
+    productId: number,
+    lowStockThreshold: number,
+    reorderLevel: number,
+  ): Observable<ApiResponse<unknown>> {
+    return this.http.put<ApiResponse<unknown>>(
+      `${this.baseUrl}/products/${productId}/inventory-settings`,
+      { lowStockThreshold, reorderLevel },
+    );
   }
 
-  getOrders(options: { page?: number; limit?: number; search?: string; status?: string } = {}): Observable<ApiResponse<Order[]>> {
+  getOrders(
+    options: { page?: number; limit?: number; search?: string; status?: string } = {},
+  ): Observable<ApiResponse<Order[]>> {
     let params = new HttpParams();
     if (options.page) params = params.set('page', options.page);
     if (options.limit) params = params.set('limit', options.limit);
@@ -275,8 +453,13 @@ export class ApiService {
     return this.http.get<ApiResponse<OrderDetail>>(`${this.baseUrl}/orders/${id}`);
   }
 
-  createOrder(input: CreateOrderInput): Observable<ApiResponse<{ id: number; trackingNumber: string; orderStatus: string }>> {
-    return this.http.post<ApiResponse<{ id: number; trackingNumber: string; orderStatus: string }>>(`${this.baseUrl}/orders`, input);
+  createOrder(
+    input: CreateOrderInput,
+  ): Observable<ApiResponse<{ id: number; trackingNumber: string; orderStatus: string }>> {
+    return this.http.post<ApiResponse<{ id: number; trackingNumber: string; orderStatus: string }>>(
+      `${this.baseUrl}/orders`,
+      input,
+    );
   }
 
   updateOrder(id: number, input: CreateOrderInput): Observable<ApiResponse<unknown>> {
@@ -287,16 +470,37 @@ export class ApiService {
     return this.http.get<ApiResponse<OrderStats>>(`${this.baseUrl}/orders/stats`);
   }
 
-  decideOrder(orderId: number, decision: 'APPROVE' | 'REJECT'): Observable<ApiResponse<{ id: number; orderStatus: string }>> {
-    return this.http.post<ApiResponse<{ id: number; orderStatus: string }>>(`${this.baseUrl}/orders/${orderId}/decision`, { decision });
+  decideOrder(
+    orderId: number,
+    decision: 'APPROVE' | 'REJECT',
+  ): Observable<ApiResponse<{ id: number; orderStatus: string }>> {
+    return this.http.post<ApiResponse<{ id: number; orderStatus: string }>>(
+      `${this.baseUrl}/orders/${orderId}/decision`,
+      { decision },
+    );
   }
 
-  updatePaymentStatus(orderId: number, paymentStatus: 'UNPAID'|'PARTIALLY_PAID'|'PAID', paymentMethod: string, cashReceived: number | null): Observable<ApiResponse<unknown>> {
-    return this.http.patch<ApiResponse<unknown>>(`${this.baseUrl}/orders/${orderId}/payment-status`, { paymentStatus, paymentMethod, cashReceived });
+  updatePaymentStatus(
+    orderId: number,
+    paymentStatus: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID',
+    paymentMethod: string,
+    cashReceived: number | null,
+  ): Observable<ApiResponse<unknown>> {
+    return this.http.patch<ApiResponse<unknown>>(
+      `${this.baseUrl}/orders/${orderId}/payment-status`,
+      { paymentStatus, paymentMethod, cashReceived },
+    );
   }
 
-  updateDeliveryStatus(orderId: number, deliveryStatus: 'PREPARING'|'DISPATCHED'|'IN_TRANSIT'|'OUT_FOR_DELIVERY'|'DELIVERED', notes?: string): Observable<ApiResponse<unknown>> {
-    return this.http.patch<ApiResponse<unknown>>(`${this.baseUrl}/orders/${orderId}/delivery-status`, { deliveryStatus, notes });
+  updateDeliveryStatus(
+    orderId: number,
+    deliveryStatus: 'PREPARING' | 'DISPATCHED' | 'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED',
+    notes?: string,
+  ): Observable<ApiResponse<unknown>> {
+    return this.http.patch<ApiResponse<unknown>>(
+      `${this.baseUrl}/orders/${orderId}/delivery-status`,
+      { deliveryStatus, notes },
+    );
   }
 
   deleteOrder(orderId: number): Observable<void> {
@@ -304,7 +508,9 @@ export class ApiService {
   }
 
   track(trackingNumber: string): Observable<ApiResponse<TrackingResult>> {
-    return this.http.get<ApiResponse<TrackingResult>>(`${this.baseUrl}/tracking/${encodeURIComponent(trackingNumber)}`);
+    return this.http.get<ApiResponse<TrackingResult>>(
+      `${this.baseUrl}/tracking/${encodeURIComponent(trackingNumber)}`,
+    );
   }
   getLeads(options: { search?: string; source?: string } = {}): Observable<ApiResponse<Lead[]>> {
     let params = new HttpParams();
@@ -312,31 +518,85 @@ export class ApiService {
     if (options.source) params = params.set('source', options.source);
     return this.http.get<ApiResponse<Lead[]>>(`${this.baseUrl}/leads`, { params });
   }
-  createLead(input: Omit<Lead,'id'|'assignedAgentName'>): Observable<ApiResponse<Lead>> { return this.http.post<ApiResponse<Lead>>(`${this.baseUrl}/leads`,input); }
-  updateLead(id:number,input:Omit<Lead,'id'|'assignedAgentName'>): Observable<ApiResponse<Lead>> { return this.http.put<ApiResponse<Lead>>(`${this.baseUrl}/leads/${id}`,input); }
-  convertLead(id:number): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.baseUrl}/leads/${id}/convert`,{}); }
-  deleteLead(id:number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/leads/${id}`); }
+  createLead(input: Omit<Lead, 'id' | 'assignedAgentName'>): Observable<ApiResponse<Lead>> {
+    return this.http.post<ApiResponse<Lead>>(`${this.baseUrl}/leads`, input);
+  }
+  updateLead(
+    id: number,
+    input: Omit<Lead, 'id' | 'assignedAgentName'>,
+  ): Observable<ApiResponse<Lead>> {
+    return this.http.put<ApiResponse<Lead>>(`${this.baseUrl}/leads/${id}`, input);
+  }
+  convertLead(id: number): Observable<ApiResponse<unknown>> {
+    return this.http.post<ApiResponse<unknown>>(`${this.baseUrl}/leads/${id}/convert`, {});
+  }
+  deleteLead(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/leads/${id}`);
+  }
   getCampaigns(search = ''): Observable<ApiResponse<Campaign[]>> {
     let params = new HttpParams();
     if (search) params = params.set('search', search);
     return this.http.get<ApiResponse<Campaign[]>>(`${this.baseUrl}/campaigns`, { params });
   }
-  createCampaign(input:Omit<Campaign,'id'>): Observable<ApiResponse<Campaign>> { return this.http.post<ApiResponse<Campaign>>(`${this.baseUrl}/campaigns`,input); }
-  updateCampaign(id:number,input:Omit<Campaign,'id'>): Observable<ApiResponse<Campaign>> { return this.http.put<ApiResponse<Campaign>>(`${this.baseUrl}/campaigns/${id}`,input); }
-  sendCampaign(id:number): Observable<ApiResponse<{messageId:string;recipientCount:number}>> { return this.http.post<ApiResponse<{messageId:string;recipientCount:number}>>(`${this.baseUrl}/campaigns/${id}/send`,{}); }
-  deleteCampaign(id:number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/campaigns/${id}`); }
-  getAgents(options: { activeOnly?: boolean; search?: string } = {}): Observable<ApiResponse<Agent[]>> {
+  createCampaign(input: Omit<Campaign, 'id'>): Observable<ApiResponse<Campaign>> {
+    return this.http.post<ApiResponse<Campaign>>(`${this.baseUrl}/campaigns`, input);
+  }
+  updateCampaign(id: number, input: Omit<Campaign, 'id'>): Observable<ApiResponse<Campaign>> {
+    return this.http.put<ApiResponse<Campaign>>(`${this.baseUrl}/campaigns/${id}`, input);
+  }
+  sendCampaign(id: number): Observable<ApiResponse<{ messageId: string; recipientCount: number }>> {
+    return this.http.post<ApiResponse<{ messageId: string; recipientCount: number }>>(
+      `${this.baseUrl}/campaigns/${id}/send`,
+      {},
+    );
+  }
+  deleteCampaign(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/campaigns/${id}`);
+  }
+  getAgents(
+    options: { activeOnly?: boolean; search?: string } = {},
+  ): Observable<ApiResponse<Agent[]>> {
     let params = new HttpParams();
     if (options.activeOnly) params = params.set('activeOnly', 'true');
     if (options.search) params = params.set('search', options.search);
     return this.http.get<ApiResponse<Agent[]>>(`${this.baseUrl}/agents`, { params });
   }
-  getAgent(id:number): Observable<ApiResponse<AgentDetail>> { return this.http.get<ApiResponse<AgentDetail>>(`${this.baseUrl}/agents/${id}`); }
-  createAgent(input:{fullName:string;email:string;phone:string;password:string;commissionRate:number}):Observable<ApiResponse<Agent>>{return this.http.post<ApiResponse<Agent>>(`${this.baseUrl}/agents`,input);}
-  updateAgent(id:number,input:{fullName:string;email:string;phone:string;password?:string;commissionRate:number}):Observable<ApiResponse<Agent>>{return this.http.put<ApiResponse<Agent>>(`${this.baseUrl}/agents/${id}`,input);}
-  activateAgent(id:number):Observable<ApiResponse<{id:number;active:boolean}>>{return this.http.post<ApiResponse<{id:number;active:boolean}>>(`${this.baseUrl}/agents/${id}/activate`,{});}
-  deleteAgent(id:number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/agents/${id}`); }
-  getCommissions(options: { search?: string; from?: string; to?: string } = {}): Observable<ApiResponse<Commission[]>> {
+  getAgent(id: number): Observable<ApiResponse<AgentDetail>> {
+    return this.http.get<ApiResponse<AgentDetail>>(`${this.baseUrl}/agents/${id}`);
+  }
+  createAgent(input: {
+    fullName: string;
+    email: string;
+    phone: string;
+    password: string;
+    commissionRate: number;
+  }): Observable<ApiResponse<Agent>> {
+    return this.http.post<ApiResponse<Agent>>(`${this.baseUrl}/agents`, input);
+  }
+  updateAgent(
+    id: number,
+    input: {
+      fullName: string;
+      email: string;
+      phone: string;
+      password?: string;
+      commissionRate: number;
+    },
+  ): Observable<ApiResponse<Agent>> {
+    return this.http.put<ApiResponse<Agent>>(`${this.baseUrl}/agents/${id}`, input);
+  }
+  activateAgent(id: number): Observable<ApiResponse<{ id: number; active: boolean }>> {
+    return this.http.post<ApiResponse<{ id: number; active: boolean }>>(
+      `${this.baseUrl}/agents/${id}/activate`,
+      {},
+    );
+  }
+  deleteAgent(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/agents/${id}`);
+  }
+  getCommissions(
+    options: { search?: string; from?: string; to?: string } = {},
+  ): Observable<ApiResponse<Commission[]>> {
     let params = new HttpParams();
     if (options.search) params = params.set('search', options.search);
     if (options.from) params = params.set('from', options.from);
@@ -344,26 +604,76 @@ export class ApiService {
     return this.http.get<ApiResponse<Commission[]>>(`${this.baseUrl}/commissions`, { params });
   }
 
-  uploadSalesReport(file: File): Observable<ApiResponse<{ batchId: number; totalRows: number; readyRows: number; attentionRows: number; skippedSheets: string[] }>> {
+  uploadSalesReport(file: File): Observable<
+    ApiResponse<{
+      batchId: number;
+      totalRows: number;
+      readyRows: number;
+      attentionRows: number;
+      skippedSheets: string[];
+    }>
+  > {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post<ApiResponse<{ batchId: number; totalRows: number; readyRows: number; attentionRows: number; skippedSheets: string[] }>>(`${this.baseUrl}/imports/sales-report`, formData);
+    return this.http.post<
+      ApiResponse<{
+        batchId: number;
+        totalRows: number;
+        readyRows: number;
+        attentionRows: number;
+        skippedSheets: string[];
+      }>
+    >(`${this.baseUrl}/imports/sales-report`, formData);
   }
-  getImportBatches(): Observable<ApiResponse<ImportBatch[]>> { return this.http.get<ApiResponse<ImportBatch[]>>(`${this.baseUrl}/imports`); }
-  getImportBatch(id: number): Observable<ApiResponse<ImportBatch>> { return this.http.get<ApiResponse<ImportBatch>>(`${this.baseUrl}/imports/${id}`); }
-  getImportAgentOptions(): Observable<ApiResponse<ImportAgentOption[]>> { return this.http.get<ApiResponse<ImportAgentOption[]>>(`${this.baseUrl}/imports/meta/agents`); }
-  getImportRows(batchId: number, options: { section?: string; status?: string; page?: number; limit?: number } = {}): Observable<ApiResponse<ImportRow[]>> {
+  getImportBatches(): Observable<ApiResponse<ImportBatch[]>> {
+    return this.http.get<ApiResponse<ImportBatch[]>>(`${this.baseUrl}/imports`);
+  }
+  getImportBatch(id: number): Observable<ApiResponse<ImportBatch>> {
+    return this.http.get<ApiResponse<ImportBatch>>(`${this.baseUrl}/imports/${id}`);
+  }
+  getImportAgentOptions(): Observable<ApiResponse<ImportAgentOption[]>> {
+    return this.http.get<ApiResponse<ImportAgentOption[]>>(`${this.baseUrl}/imports/meta/agents`);
+  }
+  getImportRows(
+    batchId: number,
+    options: { section?: string; status?: string; page?: number; limit?: number } = {},
+  ): Observable<ApiResponse<ImportRow[]>> {
     let params = new HttpParams();
     if (options.section) params = params.set('section', options.section);
     if (options.status) params = params.set('status', options.status);
     params = params.set('page', options.page ?? 1).set('limit', options.limit ?? 50);
-    return this.http.get<ApiResponse<ImportRow[]>>(`${this.baseUrl}/imports/${batchId}/rows`, { params });
+    return this.http.get<ApiResponse<ImportRow[]>>(`${this.baseUrl}/imports/${batchId}/rows`, {
+      params,
+    });
   }
-  patchImportRow(batchId: number, rowId: number, patch: ImportRowPatch): Observable<ApiResponse<{ id: number; status: string; issue: string | null }>> {
-    return this.http.patch<ApiResponse<{ id: number; status: string; issue: string | null }>>(`${this.baseUrl}/imports/${batchId}/rows/${rowId}`, patch);
+  patchImportRow(
+    batchId: number,
+    rowId: number,
+    patch: ImportRowPatch,
+  ): Observable<ApiResponse<{ id: number; status: string; issue: string | null }>> {
+    return this.http.patch<ApiResponse<{ id: number; status: string; issue: string | null }>>(
+      `${this.baseUrl}/imports/${batchId}/rows/${rowId}`,
+      patch,
+    );
   }
-  cancelImportBatch(batchId: number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/imports/${batchId}`); }
-  confirmImportBatch(batchId: number): Observable<ApiResponse<{ batchId: number; ordersCreated: number; newCustomers: number; newProducts: number }>> {
-    return this.http.post<ApiResponse<{ batchId: number; ordersCreated: number; newCustomers: number; newProducts: number }>>(`${this.baseUrl}/imports/${batchId}/confirm`, {});
+  cancelImportBatch(batchId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/imports/${batchId}`);
+  }
+  confirmImportBatch(batchId: number): Observable<
+    ApiResponse<{
+      batchId: number;
+      ordersCreated: number;
+      newCustomers: number;
+      newProducts: number;
+    }>
+  > {
+    return this.http.post<
+      ApiResponse<{
+        batchId: number;
+        ordersCreated: number;
+        newCustomers: number;
+        newProducts: number;
+      }>
+    >(`${this.baseUrl}/imports/${batchId}/confirm`, {});
   }
 }

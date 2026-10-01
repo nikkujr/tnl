@@ -1,0 +1,294 @@
+<div class="business">
+  <div class="bar">
+    <div>
+      <h2>Package catalog</h2>
+      <p>Approved offers for field agents. Inventory remains on the component products.</p>
+    </div>
+    @if (session()?.role === 'ADMIN') {
+      <button (click)="edit()">New package</button>
+    }
+  </div>
+  @if (error()) {
+    <div class="error" role="alert">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="notice" role="status">{{ notice() }}</div>
+  }
+  <section class="panel">
+    @for (p of packages(); track p.id) {
+      <div class="row">
+        <div>
+          <h3>
+            {{ p.name }} <span class="tag">{{ p.active ? 'Active' : 'Inactive' }}</span>
+          </h3>
+          <p>{{ p.description }}</p>
+          <strong
+            >{{ p.sellingPrice | currency: 'PHP' : 'symbol-narrow' }} · {{ p.available }} packages
+            available</strong
+          ><small
+            >Commission:
+            {{
+              p.commissionType === 'FIXED'
+                ? (p.commissionValue | currency: 'PHP' : 'symbol-narrow')
+                : p.commissionValue + '%'
+            }}</small
+          >
+          @for (c of p.components; track c.productId) {
+            <small>{{ c.productName }} × {{ c.quantity }}</small>
+          }
+        </div>
+        @if (session()?.role === 'ADMIN') {
+          <div class="actions">
+            <button (click)="edit(p)">Edit</button
+            ><button (click)="deactivate(p)" [disabled]="!p.active">Deactivate</button>
+          </div>
+        }
+      </div>
+    } @empty {
+      <p>No packages defined yet.</p>
+    }
+  </section>
+  @if (session()?.role === 'ADMIN') {
+    <form
+      class="panel package-form"
+      #packageForm="ngForm"
+      (ngSubmit)="packageForm.valid && componentsValid() && save()"
+    >
+      <h3>{{ editing ? 'Edit package' : 'Create package' }}</h3>
+      <div class="fields">
+        <label>Name<input name="name" [(ngModel)]="form.name" required minlength="2" /></label
+        ><label
+          >Selling price<input
+            name="price"
+            type="number"
+            min="0.01"
+            step="0.01"
+            [(ngModel)]="form.sellingPrice"
+            required /></label
+        ><label
+          >Commission type<select name="type" [(ngModel)]="form.commissionType">
+            <option value="FIXED">Fixed peso amount</option>
+            <option value="PERCENTAGE">Percentage of package price</option>
+          </select></label
+        ><label
+          >Commission value<input
+            name="commission"
+            type="number"
+            min="0"
+            [max]="form.commissionType === 'PERCENTAGE' ? 100 : 9999999999"
+            step="0.01"
+            [(ngModel)]="form.commissionValue"
+            required /></label
+        ><label class="wide"
+          >Description<textarea name="description" [(ngModel)]="form.description"></textarea>
+        </label>
+      </div>
+      <label><input name="active" type="checkbox" [(ngModel)]="form.active" />Active offer</label>
+      <div class="components-heading">
+        <div>
+          <h3>Components</h3>
+          <p>Choose the products and units included in each package.</p>
+        </div>
+        <button
+          type="button"
+          class="add-component"
+          [disabled]="busy() || form.components.length >= 50"
+          (click)="openComponentPicker()"
+        >
+          <app-icon name="plus" />Add component
+        </button>
+      </div>
+      @for (c of form.components; track $index; let i = $index) {
+        <div class="component-row">
+          <span class="component-icon"><app-icon name="products" /></span>
+          <div class="component-name">
+            <strong>{{ productName(c.productId) }}</strong>
+            <button
+              type="button"
+              class="change-product"
+              [disabled]="busy()"
+              (click)="openComponentPicker(i)"
+            >
+              Change product
+            </button>
+          </div>
+          <label
+            >Units per package<input
+              [name]="'quantity' + i"
+              type="number"
+              min="1"
+              max="10000"
+              step="1"
+              [(ngModel)]="c.quantity"
+              required /></label
+          ><button type="button" (click)="form.components.splice(i, 1)" [disabled]="busy()">
+            Remove
+          </button>
+        </div>
+      } @empty {
+        <div class="components-empty">
+          <app-icon name="catalog" /><strong>No components added</strong>
+          <p>Use Add component to choose a product.</p>
+        </div>
+      }
+      <div class="actions package-form-actions">
+        <button class="primary" [disabled]="busy() || packageForm.invalid || !componentsValid()">
+          Save package
+        </button>
+      </div>
+    </form>
+  }
+</div>
+
+@if (session()?.role === 'ADMIN') {
+  <dialog
+    #componentDialog
+    class="component-dialog"
+    aria-labelledby="component-dialog-title"
+    aria-describedby="component-dialog-description"
+  >
+    <form
+      class="component-picker"
+      #componentForm="ngForm"
+      (ngSubmit)="componentForm.valid && applyComponent()"
+    >
+      <header class="picker-heading">
+        <div>
+          <h2 id="component-dialog-title">
+            {{ componentIndex === null ? 'Add component' : 'Change component' }}
+          </h2>
+          <p id="component-dialog-description">
+            Select a product and set its units per package. Products already included are hidden.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="close-picker"
+          aria-label="Close product selection"
+          (click)="componentDialog.close()"
+        >
+          <app-icon name="close" />
+        </button>
+      </header>
+      <label class="field"
+        >Find products
+        <input
+          type="search"
+          name="productSearch"
+          autofocus
+          [ngModel]="productSearch()"
+          (ngModelChange)="searchProducts($event)"
+          placeholder="Search by product name or category"
+      /></label>
+      @if (pickerError()) {
+        <p class="error" role="alert">{{ pickerError() }}</p>
+      }
+      <div
+        class="product-table-wrap"
+        tabindex="0"
+        role="region"
+        aria-label="Product search results"
+      >
+        <table>
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr-only">Selection</span></th>
+              <th scope="col">Product</th>
+              <th scope="col">Price</th>
+              <th scope="col">Availability</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (catalogLoading()) {
+              <tr>
+                <td colspan="4" class="empty">Loading products…</td>
+              </tr>
+            } @else {
+              @for (p of visibleProducts(); track p.id) {
+                <tr [class.selected]="selectedProductId() === p.id">
+                  <td>
+                    <input
+                      type="radio"
+                      [id]="'component-product-' + p.id"
+                      name="componentProduct"
+                      [attr.aria-label]="'Select ' + p.name"
+                      [checked]="selectedProductId() === p.id"
+                      (change)="selectedProductId.set(p.id)"
+                    />
+                  </td>
+                  <td>
+                    <label [for]="'component-product-' + p.id" class="product-name"
+                      ><strong>{{ p.name }}</strong
+                      ><small>{{ p.category }}</small></label
+                    >
+                  </td>
+                  <td>{{ p.price | currency: 'PHP' : 'symbol-narrow' }}</td>
+                  <td>
+                    <span class="availability" [class.available]="p.available">{{
+                      p.available ? 'In stock' : 'Out of stock'
+                    }}</span>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="4" class="empty">
+                    No products found. Try another search or remove an existing component.
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="product-pagination">
+        <span
+          >{{ filteredProducts().length }} products · Page {{ productPage() }} of
+          {{ productPageCount() }}</span
+        >
+        <div class="actions">
+          <button
+            type="button"
+            [disabled]="productPage() <= 1"
+            (click)="productPage.set(productPage() - 1)"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            [disabled]="productPage() >= productPageCount()"
+            (click)="productPage.set(productPage() + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+      <div class="component-choice">
+        <div>
+          <small>Selected product</small
+          ><strong>{{ selectedProduct()?.name || 'Choose a product above' }}</strong>
+        </div>
+        <label class="field"
+          >Units per package<input
+            type="number"
+            name="componentQuantity"
+            [(ngModel)]="componentQuantity"
+            min="1"
+            max="10000"
+            step="1"
+            required
+        /></label>
+      </div>
+      <footer class="picker-actions">
+        <button type="button" (click)="componentDialog.close()">Cancel</button>
+        <button
+          class="primary"
+          [disabled]="
+            !selectedProduct() || componentForm.invalid || !validQuantity(componentQuantity)
+          "
+        >
+          {{ componentIndex === null ? 'Add to package' : 'Apply changes' }}
+        </button>
+      </footer>
+    </form>
+  </dialog>
+}

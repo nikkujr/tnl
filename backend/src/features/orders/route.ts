@@ -1,77 +1,58 @@
-import { randomInt } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../database/connection.js";
 import { authenticate, authorize } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
+import { transaction, jsonValue } from "../../shared/transaction.js";
+import { pesos } from "../../shared/money.js";
+import {
+  cashPayment,
+  checkStock,
+  completeSale,
+  createSale,
+  quote,
+  readSale,
+  requirements,
+  saveSale,
+  totalCents,
+} from "./sales.js";
+import { orderBody } from "./validation.js";
+import { assertAgentPackageSelections, enforceAgentPackageCreation } from "./creation-policy.js";
+import { deliveryStages, deliveryTransition, saleTotalSql } from "./queries.js";
+import { paymentEpisode } from "../automations/payment-episode.js";
+import { stockEpisode } from "../automations/stock.js";
+import { event, orderChanged } from "../automations/events.js";
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, authorize("ADMIN", "AGENT"));
 
-const TRACKING_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-function randomTrackingSegment(length: number): string {
-  return Array.from({ length }, () => TRACKING_CHARS[randomInt(TRACKING_CHARS.length)]).join("");
-}
-function generateTrackingNumber(): string {
-  return `TNL-${randomTrackingSegment(6)}-${randomTrackingSegment(4)}`;
-}
-
-async function logOrderEvent(connection: any, orderId: number, actorId: number | null, type: string, message: string): Promise<void> {
-  await connection.execute("INSERT INTO order_events(order_id,actor_id,type,message) VALUES(?,?,?,?)", [orderId, actorId, type, message]);
-}
-
-const itemSchema = z.object({
-  productId: z.number().int().positive(),
-  quantity: z.number().int().positive()
-});
-const orderBody = z.object({
-  customerId: z.number().int().positive(),
-  agentId: z.number().int().positive().optional(),
-  items: z.array(itemSchema).min(1).max(50).refine(
-    (items) => new Set(items.map((item) => item.productId)).size === items.length,
-    "A product can appear only once per order"
-  ),
-  deliveryAddress: z.string().min(5).max(500),
-  paymentMethod: z.string().min(2).max(80),
-  cashReceived: z.number().min(0).nullable().optional()
-});
-const createSchema = z.object({ body: orderBody, query: z.any(), params: z.any() });
-
-interface ProductRow {
-  id: number;
-  name: string;
-  sku: string;
-  price: number;
-  stock_on_hand: number;
-  stock_reserved: number;
-}
-
-async function loadProducts(connection: any, items: Array<{ productId: number; quantity: number }>, lock = false) {
-  const ids = items.map((item) => item.productId);
-  const placeholders = ids.map(() => "?").join(",");
-  const [rawRows] = await connection.query(
-    `SELECT id,name,sku,price,stock_on_hand,stock_reserved FROM products
-     WHERE active=TRUE AND id IN (${placeholders})${lock ? " FOR UPDATE" : ""}`,
-    ids
+async function logOrderEvent(
+  connection: any,
+  orderId: number,
+  actorId: number | null,
+  type: string,
+  message: string,
+): Promise<void> {
+  await connection.execute(
+    "INSERT INTO order_events(order_id,actor_id,type,message) VALUES(?,?,?,?)",
+    [orderId, actorId, type, message],
   );
-  const rows = rawRows as ProductRow[];
-  if (rows.length !== items.length) throw new HttpError(400, "One or more selected products do not exist");
-  for (const item of items) {
-    const product = rows.find((row) => row.id === item.productId);
-    if (!product || product.stock_on_hand - product.stock_reserved < item.quantity) {
-      throw new HttpError(409, `Insufficient available inventory for product ${item.productId}`);
-    }
-  }
-  return rows;
 }
+
+const createSchema = z.object({
+  body: orderBody,
+  query: z.any(),
+  params: z.any(),
+});
 
 const STATUS_FILTERS: Record<string, string> = {
   Open: "o.order_status IN ('PENDING','APPROVED')",
   Pending: "o.order_status='PENDING'",
-  Approved: "o.order_status='APPROVED' AND (o.delivery_status IS NULL OR o.delivery_status NOT IN ('DELIVERED','IN_TRANSIT'))",
+  Approved:
+    "o.order_status='APPROVED' AND (o.delivery_status IS NULL OR o.delivery_status NOT IN ('DELIVERED','IN_TRANSIT'))",
   "In transit": "o.delivery_status='IN_TRANSIT'",
   Delivered: "o.delivery_status='DELIVERED'",
-  Cancelled: "o.order_status='CANCELLED'"
+  Cancelled: "o.order_status='CANCELLED'",
 };
 
 router.get("/", async (req, res, next) => {
@@ -84,9 +65,14 @@ router.get("/", async (req, res, next) => {
 
     const filters: string[] = [];
     const args: unknown[] = [];
-    if (req.user!.role === "AGENT") { filters.push("o.agent_id=?"); args.push(req.user!.id); }
+    if (req.user!.role === "AGENT") {
+      filters.push("o.agent_id=?");
+      args.push(req.user!.id);
+    }
     if (search) {
-      filters.push("(o.tracking_number LIKE ? OR c.full_name LIKE ? OR EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id=o.id AND oi.product_name LIKE ?))");
+      filters.push(
+        "(o.tracking_number LIKE ? OR c.full_name LIKE ? OR EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id=o.id AND oi.product_name LIKE ?))",
+      );
       args.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     if (STATUS_FILTERS[status]) filters.push(STATUS_FILTERS[status]);
@@ -94,7 +80,7 @@ router.get("/", async (req, res, next) => {
 
     const [countRows] = await db.query<any[]>(
       `SELECT COUNT(*) total FROM orders o JOIN customers c ON c.id=o.customer_id${where}`,
-      args
+      args,
     );
     const [orders] = await db.query<any[]>(
       `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,
@@ -104,27 +90,32 @@ router.get("/", async (req, res, next) => {
        o.created_at createdAt,u.full_name agentName
        FROM orders o JOIN customers c ON c.id=o.customer_id JOIN users u ON u.id=o.agent_id${where}
        ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
-      [...args, limit, offset]
+      [...args, limit, offset],
     );
-    if (!orders.length) return res.json({ data: [], meta: { page, limit, total: countRows[0].total } });
-    const ids = orders.map((order) => order.id);
-    const [items] = await db.query<any[]>(
-      `SELECT order_id orderId,product_id productId,product_name productName,sku,quantity,unit_price unitPrice
-       FROM order_items WHERE order_id IN (${ids.map(() => "?").join(",")}) ORDER BY id`,
-      ids
-    );
+    if (!orders.length)
+      return res.json({
+        data: [],
+        meta: { page, limit, total: countRows[0].total },
+      });
     res.json({
-      data: orders.map((order) => ({ ...order, items: items.filter((item) => item.orderId === order.id) })),
-      meta: { page, limit, total: countRows[0].total }
+      data: await Promise.all(
+        orders.map(async (order) => {
+          const sale = await readSale(db, order.id);
+          return { ...order, ...sale, total: pesos(totalCents(sale)) };
+        }),
+      ),
+      meta: { page, limit, total: countRows[0].total },
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get("/stats", async (req, res, next) => {
   try {
     const scope = req.user!.role === "AGENT" ? " WHERE o.agent_id=?" : "";
     const args = req.user!.role === "AGENT" ? [req.user!.id] : [];
-    const revenueExpr = `CASE WHEN o.payment_status='PAID' THEN (SELECT COALESCE(SUM(oi.quantity*oi.unit_price),0) FROM order_items oi WHERE oi.order_id=o.id) ELSE 0 END`;
+    const revenueExpr = `CASE WHEN o.payment_status='PAID' THEN ${saleTotalSql("o")} ELSE 0 END`;
     const [totalsRows] = await db.query<any[]>(
       `SELECT COUNT(*) totalOrders,
        SUM(o.order_status='PENDING') pendingOrders,
@@ -133,7 +124,7 @@ router.get("/stats", async (req, res, next) => {
        SUM(o.payment_status='PAID') paidOrders,
        COALESCE(SUM(${revenueExpr}),0) totalRevenue
        FROM orders o${scope}`,
-      args
+      args,
     );
     const [statusRows] = await db.query<any[]>(
       `SELECT
@@ -147,7 +138,7 @@ router.get("/stats", async (req, res, next) => {
           ELSE 'Rejected'
         END status, COUNT(*) count
        FROM orders o${scope} GROUP BY status`,
-      args
+      args,
     );
     const monthlyScope = req.user!.role === "AGENT" ? " AND o.agent_id=?" : "";
     const [monthlyRows] = await db.query<any[]>(
@@ -155,7 +146,7 @@ router.get("/stats", async (req, res, next) => {
        FROM orders o
        WHERE o.created_at>=DATE_FORMAT(DATE_SUB(CURRENT_DATE,INTERVAL 11 MONTH),'%Y-%m-01')${monthlyScope}
        GROUP BY month ORDER BY month`,
-      args
+      args,
     );
     const totals = totalsRows[0];
     const totalOrders = Number(totals.totalOrders ?? 0);
@@ -169,20 +160,38 @@ router.get("/stats", async (req, res, next) => {
         cancelledOrders: Number(totals.cancelledOrders ?? 0),
         totalRevenue,
         averageOrderValue: paidOrders > 0 ? totalRevenue / paidOrders : 0,
-        statusBreakdown: statusRows.map((row) => ({ status: row.status, count: Number(row.count) })),
-        monthlyTrend: monthlyRows.map((row) => ({ month: row.month, orders: Number(row.orders), revenue: Number(row.revenue) }))
-      }
+        statusBreakdown: statusRows.map((row) => ({
+          status: row.status,
+          count: Number(row.count),
+        })),
+        monthlyTrend: monthlyRows.map((row) => ({
+          month: row.month,
+          orders: Number(row.orders),
+          revenue: Number(row.revenue),
+        })),
+      },
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.get("/:id", validate(z.object({ body: z.any(), query: z.any(), params: z.object({ id: z.coerce.number().int().positive() }) })), async (req, res, next) => {
-  try {
-    const id = Number(req.params.id);
-    const scope = req.user!.role === "AGENT" ? " AND o.agent_id=?" : "";
-    const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
-    const [orders] = await db.query<any[]>(
-      `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,
+router.get(
+  "/:id",
+  validate(
+    z.object({
+      body: z.any(),
+      query: z.any(),
+      params: z.object({ id: z.coerce.number().int().positive() }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const scope = req.user!.role === "AGENT" ? " AND o.agent_id=?" : "";
+      const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
+      const [orders] = await db.query<any[]>(
+        `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,
        c.full_name customerName,c.email customerEmail,c.phone customerPhone,
        o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
@@ -190,176 +199,497 @@ router.get("/:id", validate(z.object({ body: z.any(), query: z.any(), params: z.
        o.created_at createdAt,o.updated_at updatedAt,u.full_name agentName,u.email agentEmail
        FROM orders o JOIN customers c ON c.id=o.customer_id JOIN users u ON u.id=o.agent_id
        WHERE o.id=?${scope}`,
-      args
-    );
-    const order = orders[0];
-    if (!order) throw new HttpError(404, "Order not found");
-    const [items] = await db.query<any[]>(
-      "SELECT product_id productId,product_name productName,sku,quantity,unit_price unitPrice FROM order_items WHERE order_id=? ORDER BY id",
-      [id]
-    );
-    const [history] = await db.query<any[]>(
-      `SELECT e.id,e.type,e.message,e.created_at createdAt,u.full_name actorName
-       FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY e.created_at,e.id`,
-      [id]
-    );
-    const [deliveryEvents] = await db.query<any[]>(
-      "SELECT status,notes,occurred_at occurredAt FROM delivery_events WHERE order_id=? ORDER BY occurred_at,id",
-      [id]
-    );
-    res.json({ data: { ...order, items, history, deliveryEvents } });
-  } catch (error) { next(error); }
-});
-
-router.post("/", authorize("ADMIN", "AGENT"), validate(createSchema), async (req, res, next) => {
-  const connection = await db.getConnection();
-  try {
-    const agentId = req.user!.role === "AGENT" ? req.user!.id : req.body.agentId;
-    if (!agentId) throw new HttpError(400, "Assigned agent is required");
-    const [agents] = await connection.query<any[]>("SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE", [agentId]);
-    if (!agents.length) throw new HttpError(400, "Assigned agent does not exist or is inactive");
-    const products = await loadProducts(connection, req.body.items);
-    const orderTotal = req.body.items.reduce((sum:number, item:{productId:number;quantity:number}) => {
-      const product = products.find((candidate) => candidate.id === item.productId);
-      return sum + Number(product?.price ?? 0) * item.quantity;
-    }, 0);
-    const cashReceived = req.body.paymentMethod === "Cash" ? req.body.cashReceived : null;
-    if (req.body.paymentMethod === "Cash" && (cashReceived === null || cashReceived === undefined || cashReceived < orderTotal)) {
-      throw new HttpError(400, `Cash received must be at least ${orderTotal.toFixed(2)}`);
-    }
-    const paymentStatus = req.body.paymentMethod === "Cash" ? "PAID" : "UNPAID";
-    const cashChange = req.body.paymentMethod === "Cash" ? Number(cashReceived) - orderTotal : null;
-    await connection.beginTransaction();
-    let trackingNumber = generateTrackingNumber();
-    let result: any;
-    for (let attempt = 0; ; attempt++) {
-      try {
-        [result] = await connection.execute<any>(
-          `INSERT INTO orders(tracking_number,customer_id,agent_id,delivery_address,payment_method,payment_status,cash_received,cash_change)
-           VALUES(?,?,?,?,?,?,?,?)`,
-          [trackingNumber, req.body.customerId, agentId, req.body.deliveryAddress, req.body.paymentMethod, paymentStatus, cashReceived, cashChange]
-        );
-        break;
-      } catch (error: any) {
-        if (error?.code === "ER_DUP_ENTRY" && attempt < 4) { trackingNumber = generateTrackingNumber(); continue; }
-        throw error;
-      }
-    }
-    for (const item of req.body.items) {
-      const product = products.find((candidate) => candidate.id === item.productId);
-      if (!product) throw new HttpError(400, "Selected product does not exist");
-      await connection.execute(
-        "INSERT INTO order_items(order_id,product_id,quantity,unit_price,product_name,sku) VALUES(?,?,?,?,?,?)",
-        [result.insertId, item.productId, item.quantity, product.price, product.name, product.sku]
+        args,
       );
+      const order = orders[0];
+      if (!order) throw new HttpError(404, "Order not found");
+      const [items] = await db.query<any[]>(
+        "SELECT product_id productId,product_name productName,sku,quantity,unit_price unitPrice FROM order_items WHERE order_id=? ORDER BY id",
+        [id],
+      );
+      const [history] = await db.query<any[]>(
+        `SELECT e.id,e.type,e.message,e.created_at createdAt,u.full_name actorName
+       FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY e.created_at,e.id`,
+        [id],
+      );
+      const [deliveryEvents] = await db.query<any[]>(
+        "SELECT status,notes,occurred_at occurredAt FROM delivery_events WHERE order_id=? ORDER BY occurred_at,id",
+        [id],
+      );
+      const sale = await readSale(db, id);
+      const [commissions] = await db.query<any[]>(
+        "SELECT amount,source,breakdown FROM commissions WHERE order_id=?",
+        [id],
+      );
+      res.json({
+        data: {
+          ...order,
+          ...sale,
+          total: pesos(totalCents(sale)),
+          history,
+          deliveryEvents,
+          commission: commissions[0]
+            ? {
+                ...commissions[0],
+                breakdown: jsonValue(commissions[0].breakdown),
+              }
+            : null,
+        },
+      });
+    } catch (error) {
+      next(error);
     }
-    const itemCount = req.body.items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0);
-    await logOrderEvent(connection, result.insertId, req.user!.id, "CREATED", `Order created with ${itemCount} item${itemCount === 1 ? "" : "s"} totaling ₱${orderTotal.toFixed(2)}.`);
-    await connection.commit();
-    res.status(201).json({ data: { id: result.insertId, trackingNumber, orderStatus: "PENDING", paymentStatus, cashReceived, cashChange } });
-  } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
-});
+  },
+);
 
-router.put("/:id", validate(z.object({ body: orderBody, query: z.any(), params: z.object({ id: z.coerce.number().positive() }) })), async (req, res, next) => {
-  const connection = await db.getConnection();
+router.post("/", validate(createSchema), enforceAgentPackageCreation, async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    const scope = req.user!.role === "AGENT" ? " AND agent_id=?" : "";
-    const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
-    const [orders] = await connection.query<any[]>(`SELECT order_status FROM orders WHERE id=?${scope}`, args);
-    if (!orders.length) throw new HttpError(404, "Order not found");
-    if (orders[0].order_status !== "PENDING") throw new HttpError(409, "Only pending orders can be edited");
-    const products = await loadProducts(connection, req.body.items);
-    const agentId = req.user!.role === "ADMIN" ? req.body.agentId : req.user!.id;
-    if (!agentId) throw new HttpError(400, "Assigned agent is required");
-    await connection.beginTransaction();
-    await connection.execute("UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,payment_method=? WHERE id=?", [req.body.customerId, agentId, req.body.deliveryAddress, req.body.paymentMethod, id]);
-    await connection.execute("DELETE FROM order_items WHERE order_id=?", [id]);
-    for (const item of req.body.items) {
-      const product = products.find((candidate) => candidate.id === item.productId);
-      if (!product) throw new HttpError(400, "Selected product does not exist");
-      await connection.execute("INSERT INTO order_items(order_id,product_id,quantity,unit_price,product_name,sku) VALUES(?,?,?,?,?,?)", [id, item.productId, item.quantity, product.price, product.name, product.sku]);
-    }
-    await logOrderEvent(connection, id, req.user!.id, "EDITED", "Order details and items were updated.");
-    await connection.commit();
-    res.json({ data: { id, ...req.body } });
-  } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
+    const data = await transaction(async (c) =>
+      createSale(
+        c,
+        {
+          ...req.body,
+          agentId: req.user!.role === "AGENT" ? req.user!.id : req.body.agentId,
+        },
+        await quote(c, req.body),
+        req.user!.id,
+      ),
+    );
+    res.status(201).json({ data });
+  } catch (e) {
+    next(e);
+  }
 });
-
-const decisionSchema = z.object({ body: z.object({ decision: z.enum(["APPROVE", "REJECT"]) }), query: z.any(), params: z.object({ id: z.coerce.number().positive() }) });
-router.post("/:id/decision", authorize("ADMIN"), validate(decisionSchema), async (req, res, next) => {
-  const connection = await db.getConnection();
-  try {
-    const orderId = Number(req.params.id);
-    await connection.beginTransaction();
-    const [orders] = await connection.query<any[]>("SELECT order_status FROM orders WHERE id=? FOR UPDATE", [orderId]);
-    if (!orders[0] || orders[0].order_status !== "PENDING") throw new HttpError(409, "Only pending orders can be decided");
-    if (req.body.decision === "APPROVE") {
-      const [items] = await connection.query<any[]>("SELECT product_id productId,quantity FROM order_items WHERE order_id=?", [orderId]);
-      await loadProducts(connection, items, true);
-      for (const item of items) {
-        await connection.execute("UPDATE products SET stock_reserved=stock_reserved+? WHERE id=?", [item.quantity, item.productId]);
-        await connection.execute("INSERT INTO inventory_movements(product_id,actor_id,type,quantity,order_id) VALUES(?,?,'RESERVE',?,?)", [item.productId, req.user!.id, item.quantity, orderId]);
-      }
-      await connection.execute("UPDATE orders SET order_status='APPROVED',delivery_status='PREPARING' WHERE id=?", [orderId]);
-      await connection.execute("INSERT INTO delivery_events(order_id,status,notes) VALUES(?,'PREPARING','Order approved and prepared for delivery')", [orderId]);
-      await logOrderEvent(connection, orderId, req.user!.id, "APPROVED", "Order approved; inventory reserved and prepared for delivery.");
-    } else {
-      await connection.execute("UPDATE orders SET order_status='REJECTED' WHERE id=?", [orderId]);
-      await logOrderEvent(connection, orderId, req.user!.id, "REJECTED", "Order rejected.");
+router.put(
+  "/:id",
+  validate(
+    z.object({
+      body: orderBody,
+      query: z.any(),
+      params: z.object({ id: z.coerce.number().int().positive() }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      await transaction(async (c) => {
+        const scope = req.user!.role === "AGENT" ? " AND agent_id=?" : "";
+        const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
+        const [rows] = await c.query<any[]>(
+          `SELECT * FROM orders WHERE id=?${scope} FOR UPDATE`,
+          args,
+        );
+        const o = rows[0];
+        if (!o) throw new HttpError(404, "Order not found");
+        if (o.order_status !== "PENDING")
+          throw new HttpError(409, "Only pending orders can be edited");
+        const [requests] = await c.query<any[]>(
+          "SELECT id FROM customer_order_requests WHERE order_id=?",
+          [id],
+        );
+        if (requests.length)
+          throw new HttpError(
+            409,
+            "Customer-confirmed terms cannot be edited; submit a new confirmed request",
+          );
+        const agentId =
+          req.user!.role === "ADMIN" ? req.body.agentId : req.user!.id;
+        const [agents] = await c.query<any[]>(
+          "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE",
+          [agentId ?? 0],
+        );
+        if (!agents.length)
+          throw new HttpError(400, "Assigned agent must be active");
+        const previous = await readSale(c, id);
+        const addedItems = req.body.items.filter(
+          (i: any) => !previous.items.some((p) => p.productId === i.productId),
+        );
+        assertAgentPackageSelections(req.user!.role, addedItems);
+        const addedPackages = req.body.packages.filter(
+          (p: any) =>
+            !previous.packages.some((i) => i.packageId === p.packageId),
+        );
+        const added =
+          addedItems.length + addedPackages.length
+            ? await quote(c, { items: addedItems, packages: addedPackages })
+            : { items: [], packages: [] };
+        const fresh = {
+          items: req.body.items.map((i: any) => ({
+            ...(previous.items.find((p) => p.productId === i.productId) ??
+              added.items.find((p) => p.productId === i.productId)),
+            quantity: i.quantity,
+          })),
+          packages: req.body.packages.map((p: any) => ({
+            ...(previous.packages.find((i) => i.packageId === p.packageId) ??
+              added.packages.find((i) => i.packageId === p.packageId)),
+            quantity: p.quantity,
+          })),
+        };
+        fresh.packages = fresh.packages.map((p: any) => {
+          const old = previous.packages.find(
+            (x) => x.packageId === p.packageId,
+          );
+          return old ? { ...old, quantity: p.quantity } : p;
+        });
+        fresh.items = fresh.items.map((i: any) => {
+          const old = previous.items.find((x) => x.productId === i.productId);
+          return old ? { ...old, quantity: i.quantity } : i;
+        });
+        await checkStock(c, fresh);
+        const payment = cashPayment(
+          totalCents(fresh),
+          req.body.paymentMethod,
+          req.body.cashReceived,
+          req.body.paymentMethod === "Cash"
+            ? undefined
+            : req.body.paymentMethod === o.payment_method &&
+                totalCents(fresh) === totalCents(previous)
+              ? o.payment_status
+              : "UNPAID",
+        );
+        await c.execute(
+          "UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,payment_method=?,payment_status=?,cash_received=?,cash_change=? WHERE id=?",
+          [
+            req.body.customerId,
+            agentId,
+            req.body.deliveryAddress,
+            req.body.paymentMethod,
+            payment.paymentStatus,
+            payment.cashReceived,
+            payment.cashChange,
+            id,
+          ],
+        );
+        await c.execute("DELETE FROM order_items WHERE order_id=?", [id]);
+        await c.execute("DELETE FROM order_packages WHERE order_id=?", [id]);
+        await saveSale(c, id, fresh);
+        await logOrderEvent(
+          c,
+          id,
+          req.user!.id,
+          "EDITED",
+          "Pending order updated.",
+        );
+        if (o.agent_id !== agentId)
+          await orderChanged(c, id, "order.assigned", "PENDING", req.user!.id);
+      });
+      res.json({ data: { id } });
+    } catch (e) {
+      next(e);
     }
-    await connection.commit();
-    res.json({ data: { id: orderId, orderStatus: req.body.decision === "APPROVE" ? "APPROVED" : "REJECTED" } });
-  } catch (error) { await connection.rollback(); next(error); } finally { connection.release(); }
+  },
+);
+const decisionSchema = z.object({
+  body: z.object({ decision: z.enum(["APPROVE", "REJECT"]) }),
+  query: z.any(),
+  params: z.object({ id: z.coerce.number().int().positive() }),
 });
-
-router.patch("/:id/payment-status", authorize("ADMIN"), validate(z.object({ body: z.object({
-  paymentStatus: z.enum(["UNPAID", "PARTIALLY_PAID", "PAID"]),
-  paymentMethod: z.enum(["Cash", "Cash on delivery", "Bank transfer", "Card"]),
-  cashReceived: z.number().min(0).nullable()
-}), query: z.any(), params: z.object({ id: z.coerce.number().positive() }) })), async (req,res,next)=>{
-  try {
-    const id=Number(req.params.id);
-    let cashReceived:number|null=null;
-    let cashChange:number|null=null;
-    if(req.body.paymentMethod==="Cash"){
-      cashReceived=req.body.cashReceived;
-      if(cashReceived===null)throw new HttpError(400,"Cash received is required for cash payments");
-      const[totals]=await db.query<any[]>("SELECT COALESCE(SUM(quantity*unit_price),0) total FROM order_items WHERE order_id=?",[id]);
-      const total=Number(totals[0]?.total??0);
-      const valid=req.body.paymentStatus==="UNPAID"?cashReceived===0:req.body.paymentStatus==="PARTIALLY_PAID"?cashReceived>0&&cashReceived<total:cashReceived>=total;
-      if(!valid)throw new HttpError(400,"Cash received does not match the selected payment status");
-      cashChange=Math.max(0,cashReceived-total);
+router.post(
+  "/:id/decision",
+  authorize("ADMIN"),
+  validate(decisionSchema),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id),
+        approve = req.body.decision === "APPROVE";
+      await transaction(async (c) => {
+        const [rows] = await c.query<any[]>(
+          "SELECT * FROM orders WHERE id=? FOR UPDATE",
+          [id],
+        );
+        const o = rows[0];
+        if (!o || o.order_status !== "PENDING")
+          throw new HttpError(409, "Only pending orders can be decided");
+        if (approve) {
+          const [agents] = await c.query<any[]>(
+            "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE FOR SHARE",
+            [o.agent_id],
+          );
+          if (!agents.length)
+            throw new HttpError(
+              409,
+              "Assign an active field agent before approval",
+            );
+          const sale = await readSale(c, id);
+          await checkStock(c, sale, true);
+          for (const i of requirements(sale)) {
+            await c.execute(
+              "UPDATE products SET stock_reserved=stock_reserved+? WHERE id=?",
+              [i.quantity, i.productId],
+            );
+            await c.execute(
+              "INSERT INTO inventory_movements(product_id,actor_id,type,quantity,order_id) VALUES(?,?,'RESERVE',?,?)",
+              [i.productId, req.user!.id, i.quantity, id],
+            );
+            await stockEpisode(c, i.productId, req.user!.id);
+          }
+          await c.execute(
+            "UPDATE orders SET order_status='APPROVED',delivery_status='PREPARING',approved_at=UTC_TIMESTAMP(),delivery_changed_at=UTC_TIMESTAMP() WHERE id=?",
+            [id],
+          );
+          await c.execute(
+            "INSERT INTO delivery_events(order_id,status) VALUES(?,'PREPARING')",
+            [id],
+          );
+        } else
+          await c.execute(
+            "UPDATE orders SET order_status='REJECTED' WHERE id=?",
+            [id],
+          );
+        await logOrderEvent(
+          c,
+          id,
+          req.user!.id,
+          approve ? "APPROVED" : "REJECTED",
+          approve ? "Order approved; stock reserved." : "Order rejected.",
+        );
+        await paymentEpisode(c, id);
+        await orderChanged(
+          c,
+          id,
+          approve ? "order.approved" : "order.rejected",
+          approve ? "APPROVED" : "REJECTED",
+          req.user!.id,
+        );
+      });
+      res.json({
+        data: { id, orderStatus: approve ? "APPROVED" : "REJECTED" },
+      });
+    } catch (e) {
+      next(e);
     }
-    const [result]=await db.execute<any>("UPDATE orders SET payment_status=?,payment_method=?,cash_received=?,cash_change=? WHERE id=?",[req.body.paymentStatus,req.body.paymentMethod,cashReceived,cashChange,id]);
-    if(!result.affectedRows)throw new HttpError(404,"Order not found");
-    await logOrderEvent(db,id,req.user!.id,"PAYMENT_UPDATED",`Payment marked as ${req.body.paymentStatus.replaceAll('_',' ').toLowerCase()} via ${req.body.paymentMethod}.`);
-    res.json({data:{id,paymentStatus:req.body.paymentStatus,paymentMethod:req.body.paymentMethod,cashReceived,cashChange}});
-  } catch(error){next(error);}
-});
-
-const deliveryBody = z.object({ deliveryStatus:z.enum(["PREPARING","DISPATCHED","IN_TRANSIT","OUT_FOR_DELIVERY","DELIVERED"]),notes:z.string().max(500).optional(),latitude:z.number().min(-90).max(90).nullable().optional(),longitude:z.number().min(-180).max(180).nullable().optional() });
-router.patch("/:id/delivery-status", validate(z.object({body:deliveryBody,query:z.any(),params:z.object({id:z.coerce.number().positive()})})), async(req,res,next)=>{
-  const connection=await db.getConnection();
-  try{
-    const id=Number(req.params.id);await connection.beginTransaction();
-    const scope=req.user!.role==="AGENT"?" AND agent_id=?":"";const args=req.user!.role==="AGENT"?[id,req.user!.id]:[id];
-    const[orders]=await connection.query<any[]>(`SELECT agent_id,order_status,delivery_status FROM orders WHERE id=?${scope} FOR UPDATE`,args);const order=orders[0];
-    if(!order)throw new HttpError(404,"Order not found");if(order.order_status!=="APPROVED"&&order.order_status!=="COMPLETED")throw new HttpError(409,"Only approved orders can progress through delivery");
-    await connection.execute("UPDATE orders SET delivery_status=?,order_status=IF(?='DELIVERED','COMPLETED',order_status) WHERE id=?",[req.body.deliveryStatus,req.body.deliveryStatus,id]);
-    await connection.execute("INSERT INTO delivery_events(order_id,status,notes,latitude,longitude) VALUES(?,?,?,?,?)",[id,req.body.deliveryStatus,req.body.notes??null,req.body.latitude??null,req.body.longitude??null]);
-    const deliveryLabel=req.body.deliveryStatus.replaceAll('_',' ').toLowerCase();
-    await logOrderEvent(connection,id,req.user!.id,"DELIVERY_UPDATED",`Delivery status set to ${deliveryLabel}.${req.body.notes?` ${req.body.notes}`:""}`);
-    if(req.body.deliveryStatus==="DELIVERED"&&order.delivery_status!=="DELIVERED"){
-      const[items]=await connection.query<any[]>("SELECT product_id productId,quantity,unit_price unitPrice FROM order_items WHERE order_id=?",[id]);
-      let total=0;for(const item of items){await connection.execute("UPDATE products SET stock_on_hand=stock_on_hand-?,stock_reserved=stock_reserved-? WHERE id=?",[item.quantity,item.quantity,item.productId]);total+=item.quantity*item.unitPrice;}
-      const[agents]=await connection.query<any[]>("SELECT commission_rate FROM users WHERE id=?",[order.agent_id]);const rate=agents[0]?.commission_rate??0;
-      await connection.execute("INSERT IGNORE INTO commissions(order_id,agent_id,rate,amount) VALUES(?,?,?,?)",[id,order.agent_id,rate,total*rate/100]);
+  },
+);
+router.patch(
+  "/:id/payment-status",
+  authorize("ADMIN"),
+  validate(
+    z.object({
+      body: z.object({
+        paymentStatus: z.enum(["UNPAID", "PARTIALLY_PAID", "PAID"]),
+        paymentMethod: z.enum([
+          "Cash",
+          "Cash on delivery",
+          "Bank transfer",
+          "Card",
+        ]),
+        cashReceived: z.number().min(0).nullable(),
+      }),
+      query: z.any(),
+      params: z.object({ id: z.coerce.number().int().positive() }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const data = await transaction(async (c) => {
+        const [rows] = await c.query<any[]>(
+          "SELECT o.*,EXISTS(SELECT 1 FROM commissions co WHERE co.order_id=o.id) has_commission FROM orders o WHERE o.id=? FOR UPDATE",
+          [id],
+        );
+        const o = rows[0];
+        if (!o) throw new HttpError(404, "Order not found");
+        if (o.origin === "IMPORTED")
+          throw new HttpError(409, "Imported payment history is read-only");
+        if (["REJECTED", "CANCELLED"].includes(o.order_status))
+          throw new HttpError(
+            409,
+            "Closed orders cannot receive payment changes",
+          );
+        if (
+          (o.has_commission || o.sale_completed_at) &&
+          req.body.paymentStatus !== "PAID"
+        )
+          throw new HttpError(409, "Earned sales cannot have payment reversed");
+        const payment = cashPayment(
+          totalCents(await readSale(c, id)),
+          req.body.paymentMethod,
+          req.body.cashReceived,
+          req.body.paymentStatus,
+        );
+        if (
+          o.payment_status !== payment.paymentStatus ||
+          o.payment_method !== req.body.paymentMethod ||
+          o.cash_received !== payment.cashReceived
+        ) {
+          await c.execute(
+            "UPDATE orders SET payment_status=?,payment_method=?,cash_received=?,cash_change=? WHERE id=?",
+            [
+              payment.paymentStatus,
+              req.body.paymentMethod,
+              payment.cashReceived,
+              payment.cashChange,
+              id,
+            ],
+          );
+          await logOrderEvent(
+            c,
+            id,
+            req.user!.id,
+            "PAYMENT_UPDATED",
+            `Payment marked ${payment.paymentStatus}.`,
+          );
+          await event(
+            c,
+            "order.payment_updated",
+            "ORDER",
+            id,
+            { paymentStatus: payment.paymentStatus },
+            req.user!.id,
+          );
+        }
+        await paymentEpisode(c, id);
+        await completeSale(c, id, req.user!.id);
+        return { id, ...payment, paymentMethod: req.body.paymentMethod };
+      });
+      res.json({ data });
+    } catch (e) {
+      next(e);
     }
-    await connection.commit();res.json({data:{id,deliveryStatus:req.body.deliveryStatus}});
-  }catch(error){await connection.rollback();next(error);}finally{connection.release();}
+  },
+);
+const deliveryBody = z.object({
+  deliveryStatus: z.enum(deliveryStages),
+  notes: z.string().max(500).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
 });
-
-router.delete("/:id",async(req,res,next)=>{try{const id=Number(req.params.id);const scope=req.user!.role==="AGENT"?" AND agent_id=?":"";const args=req.user!.role==="AGENT"?[id,req.user!.id]:[id];const[rows]=await db.query<any[]>(`SELECT order_status,delivery_status FROM orders WHERE id=?${scope}`,args);const order=rows[0];if(!order)throw new HttpError(404,"Order not found");if(order.order_status==="COMPLETED"||order.delivery_status==="DELIVERED")throw new HttpError(409,"Delivered or completed orders cannot be deleted");if(order.order_status==="APPROVED")throw new HttpError(409,"Approved orders with reserved inventory cannot be deleted");await db.execute("DELETE FROM orders WHERE id=?",[id]);res.status(204).send();}catch(error){next(error);}});
-
+router.patch(
+  "/:id/delivery-status",
+  validate(
+    z.object({
+      body: deliveryBody,
+      query: z.any(),
+      params: z.object({ id: z.coerce.number().int().positive() }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      await transaction(async (c) => {
+        const scope = req.user!.role === "AGENT" ? " AND agent_id=?" : "";
+        const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
+        const [rows] = await c.query<any[]>(
+          `SELECT * FROM orders WHERE id=?${scope} FOR UPDATE`,
+          args,
+        );
+        const o = rows[0];
+        if (!o) throw new HttpError(404, "Order not found");
+        if (o.origin === "IMPORTED")
+          throw new HttpError(409, "Imported delivery history is read-only");
+        if (!["APPROVED", "COMPLETED"].includes(o.order_status))
+          throw new HttpError(
+            409,
+            "Only approved orders can progress through delivery",
+          );
+        const transition = deliveryTransition(
+          o.delivery_status,
+          req.body.deliveryStatus,
+        );
+        if (transition === "INVALID")
+          throw new HttpError(409, "Delivery stages can only move forward");
+        if (transition === "NOOP") return;
+        if (req.body.deliveryStatus === "DELIVERED") {
+          for (const i of requirements(await readSale(c, id))) {
+            const [p] = await c.query<any[]>(
+              "SELECT stock_on_hand,stock_reserved FROM products WHERE id=? FOR UPDATE",
+              [i.productId],
+            );
+            if (
+              !p[0] ||
+              p[0].stock_reserved < i.quantity ||
+              p[0].stock_on_hand < i.quantity
+            )
+              throw new HttpError(
+                409,
+                "Reserved stock is inconsistent; contact admin",
+              );
+            await c.execute(
+              "UPDATE products SET stock_on_hand=stock_on_hand-?,stock_reserved=stock_reserved-? WHERE id=?",
+              [i.quantity, i.quantity, i.productId],
+            );
+            await c.execute(
+              "INSERT INTO inventory_movements(product_id,actor_id,type,quantity,order_id) VALUES(?,?,'DEDUCT',?,?)",
+              [i.productId, req.user!.id, i.quantity, id],
+            );
+            await stockEpisode(c, i.productId, req.user!.id);
+          }
+        }
+        await c.execute(
+          "UPDATE orders SET delivery_status=?,order_status=IF(?='DELIVERED','COMPLETED',order_status),delivery_changed_at=UTC_TIMESTAMP() WHERE id=?",
+          [req.body.deliveryStatus, req.body.deliveryStatus, id],
+        );
+        await c.execute(
+          "INSERT INTO delivery_events(order_id,status,notes,latitude,longitude) VALUES(?,?,?,?,?)",
+          [
+            id,
+            req.body.deliveryStatus,
+            req.body.notes ?? null,
+            req.body.latitude ?? null,
+            req.body.longitude ?? null,
+          ],
+        );
+        await logOrderEvent(
+          c,
+          id,
+          req.user!.id,
+          "DELIVERY_UPDATED",
+          `Delivery advanced to ${req.body.deliveryStatus}.`,
+        );
+        await orderChanged(
+          c,
+          id,
+          "order.delivery_changed",
+          req.body.deliveryStatus,
+          req.user!.id,
+        );
+        await completeSale(c, id, req.user!.id);
+      });
+      res.json({ data: { id, deliveryStatus: req.body.deliveryStatus } });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+router.delete(
+  "/:id",
+  validate(
+    z.object({
+      body: z.any(),
+      query: z.any(),
+      params: z.object({ id: z.coerce.number().int().positive() }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      await transaction(async (c) => {
+        const scope = req.user!.role === "AGENT" ? " AND agent_id=?" : "";
+        const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
+        const [rows] = await c.query<any[]>(
+          `SELECT * FROM orders WHERE id=?${scope} FOR UPDATE`,
+          args,
+        );
+        const o = rows[0];
+        if (!o) throw new HttpError(404, "Order not found");
+        if (!["PENDING", "REJECTED"].includes(o.order_status))
+          throw new HttpError(
+            409,
+            "Only pending or rejected orders can be deleted",
+          );
+        const [requests] = await c.query<any[]>(
+          "SELECT id FROM customer_order_requests WHERE order_id=?",
+          [id],
+        );
+        if (requests.length)
+          throw new HttpError(409, "Customer request orders must be retained");
+        await c.execute("DELETE FROM order_events WHERE order_id=?", [id]);
+        await c.execute("DELETE FROM orders WHERE id=?", [id]);
+      });
+      res.status(204).send();
+    } catch (e) {
+      next(e);
+    }
+  },
+);
 export default router;

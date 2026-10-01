@@ -1,115 +1,226 @@
 <div class="agent-detail-page">
   <div class="page-head">
     <div>
-      <button type="button" class="ghost-button back-button" (click)="back()">← Back to agents</button>
+      <button type="button" class="ghost-button back-button" (click)="back()">
+        ← Back to agents
+      </button>
       @if (agent(); as data) {
-        <app-breadcrumb [items]="[{ label: 'Agents', link: '/agents' }, { label: data.fullName }]" />
+        <app-breadcrumb
+          [items]="[{ label: 'Agents', link: '/agents' }, { label: data.fullName }]"
+        />
         <h2>{{ data.fullName }}</h2>
         <div class="status-row">
-          <span [class]="'status ' + (data.active ? 'approved' : 'cancelled')">{{ data.active ? 'Active' : 'Inactive' }}</span>
-          <span class="status">{{ data.commissionRate }}% commission</span>
+          <span [class]="'status ' + (data.active ? 'approved' : 'cancelled')">{{
+            data.active ? 'Active' : 'Inactive'
+          }}</span>
+          <span class="status">Package-based commission</span>
         </div>
-        <div class="contact-line">{{ data.email }} · {{ data.phone }} · Joined {{ data.createdAt | date:'mediumDate' }}</div>
+        <div class="contact-line">
+          {{ data.email }} · {{ data.phone }} · Joined {{ data.createdAt | date: 'mediumDate' }}
+        </div>
       } @else {
-        <app-breadcrumb [items]="[{ label: 'Agents', link: '/agents' }, { label: 'Agent details' }]" />
+        <app-breadcrumb
+          [items]="[{ label: 'Agents', link: '/agents' }, { label: 'Agent details' }]"
+        />
         <h2>Agent details</h2>
       }
     </div>
   </div>
 
-  @if (error()) { <div class="alert">{{ error() }}</div> }
-  @if (loading() && !agent()) { <div class="page-loading">Loading agent…</div> }
+  @if (error()) {
+    <div class="alert">{{ error() }}</div>
+  }
+  @if (loading() && !agent()) {
+    <div class="page-loading">Loading agent…</div>
+  }
 
   @if (agent(); as data) {
     <div class="stat-grid">
-      <div class="stat-tile"><small>Total customers</small><strong>{{ data.customers.length }}</strong></div>
-      <div class="stat-tile"><small>Total orders</small><strong>{{ data.orders.length }}</strong></div>
-      <div class="stat-tile"><small>Closed deals</small><strong>{{ data.closedDeals }}</strong></div>
-      <div class="stat-tile"><small>Total commission</small><strong>{{ data.totalCommission | currency:'PHP':'symbol-narrow' }}</strong></div>
+      <div class="stat-tile">
+        <small>Total customers</small><strong>{{ data.customers.length }}</strong>
+      </div>
+      <div class="stat-tile">
+        <small>Total orders</small><strong>{{ data.orders.length }}</strong>
+      </div>
+      <div class="stat-tile">
+        <small>Closed deals</small><strong>{{ data.closedDeals }}</strong>
+      </div>
+      <div class="stat-tile">
+        <small>Earned commission</small
+        ><strong>{{ data.totalCommission | currency: 'PHP' : 'symbol-narrow' }}</strong>
+      </div>
     </div>
+
+    <app-agent-rewards [agentId]="data.id" [showManagementLink]="true" />
 
     <div class="chart-grid">
       <section class="surface chart-card">
-        <div class="section-head"><h3>Commission trend</h3><p>Last 6 months.</p></div>
+        <div class="section-head">
+          <h3>Commission trend</h3>
+          <p>Last 6 months.</p>
+        </div>
         <div class="bar-chart">
           @for (bar of commissionTrend(); track bar.key; let last = $last) {
-            <div class="bar-column"><span class="bar" [style.height.%]="chartsAnimated() ? bar.height : 0" [class.current]="last" [attr.title]="bar.amount | currency:'PHP':'symbol-narrow'"></span><small>{{ bar.label }}</small></div>
+            <div class="bar-column">
+              <span
+                class="bar"
+                [style.height.%]="chartsAnimated() ? bar.height : 0"
+                [class.current]="last"
+                [attr.title]="bar.amount | currency: 'PHP' : 'symbol-narrow'"
+              ></span
+              ><small>{{ bar.label }}</small>
+            </div>
           }
         </div>
       </section>
 
       <section class="surface chart-card">
-        <div class="section-head"><h3>Order status breakdown</h3><p>Where this agent's orders currently stand.</p></div>
+        <div class="section-head">
+          <h3>Order status breakdown</h3>
+          <p>Where this agent's orders currently stand.</p>
+        </div>
         <div class="breakdown-list">
           @for (item of orderStatusBreakdown(); track item.label) {
             <div class="breakdown-row">
               <span class="breakdown-label">{{ item.label }}</span>
-              <div class="breakdown-track"><span [class]="'breakdown-fill ' + item.statusClass" [style.width.%]="chartsAnimated() ? item.percent : 0"></span></div>
+              <div class="breakdown-track">
+                <span
+                  [class]="'breakdown-fill ' + item.statusClass"
+                  [style.width.%]="chartsAnimated() ? item.percent : 0"
+                ></span>
+              </div>
               <span class="breakdown-count">{{ item.count }}</span>
             </div>
-          } @empty { <div class="empty">No orders yet.</div> }
+          } @empty {
+            <div class="empty">No orders yet.</div>
+          }
         </div>
       </section>
     </div>
 
     <section class="surface">
       <div class="section-head clickable" (click)="toggleSection('customers')">
-        <div><h3>Registered customers</h3><p>Customers assigned to this agent.</p></div>
-        <button type="button" class="collapse-toggle" [attr.aria-expanded]="!isCollapsed('customers')" [attr.aria-label]="isCollapsed('customers') ? 'Expand' : 'Collapse'"><app-icon [name]="isCollapsed('customers') ? 'chevronRight' : 'chevronDown'" /></button>
+        <div>
+          <h3>Registered customers</h3>
+          <p>Customers assigned to this agent.</p>
+        </div>
+        <button
+          type="button"
+          class="collapse-toggle"
+          [attr.aria-expanded]="!isCollapsed('customers')"
+          [attr.aria-label]="isCollapsed('customers') ? 'Expand' : 'Collapse'"
+        >
+          <app-icon [name]="isCollapsed('customers') ? 'chevronRight' : 'chevronDown'" />
+        </button>
       </div>
       <div class="collapsible" [class.collapsed]="isCollapsed('customers')">
         <div class="agent-table">
-          <div class="agent-row agent-row-header"><span>Customer</span><span>Contact</span><span>Address</span><span>Registered</span></div>
+          <div class="agent-row agent-row-header">
+            <span>Customer</span><span>Contact</span><span>Address</span><span>Registered</span>
+          </div>
           @for (customer of data.customers; track customer.id) {
-            <button type="button" class="agent-row agent-row-link" (click)="viewCustomer(customer.fullName)">
+            <button
+              type="button"
+              class="agent-row agent-row-link"
+              (click)="viewCustomer(customer.fullName)"
+            >
               <strong>{{ customer.fullName }}</strong>
-              <span>{{ customer.email }}<small>{{ customer.phone }}</small></span>
+              <span
+                >{{ customer.email }}<small>{{ customer.phone }}</small></span
+              >
               <span>{{ customer.address }}</span>
-              <span>{{ customer.createdAt | date:'mediumDate' }}</span>
+              <span>{{ customer.createdAt | date: 'mediumDate' }}</span>
             </button>
-          } @empty { <div class="empty">No customers registered by this agent yet.</div> }
+          } @empty {
+            <div class="empty">No customers registered by this agent yet.</div>
+          }
         </div>
       </div>
     </section>
 
     <section class="surface">
       <div class="section-head clickable" (click)="toggleSection('orders')">
-        <div><h3>Orders</h3><p>Every order this agent has created or handled.</p></div>
-        <button type="button" class="collapse-toggle" [attr.aria-expanded]="!isCollapsed('orders')" [attr.aria-label]="isCollapsed('orders') ? 'Expand' : 'Collapse'"><app-icon [name]="isCollapsed('orders') ? 'chevronRight' : 'chevronDown'" /></button>
+        <div>
+          <h3>Orders</h3>
+          <p>Every order this agent has created or handled.</p>
+        </div>
+        <button
+          type="button"
+          class="collapse-toggle"
+          [attr.aria-expanded]="!isCollapsed('orders')"
+          [attr.aria-label]="isCollapsed('orders') ? 'Expand' : 'Collapse'"
+        >
+          <app-icon [name]="isCollapsed('orders') ? 'chevronRight' : 'chevronDown'" />
+        </button>
       </div>
       <div class="collapsible" [class.collapsed]="isCollapsed('orders')">
         <div class="agent-table orders">
-          <div class="agent-row agent-row-header"><span>Order</span><span>Customer</span><span>Amount</span><span>Status</span><span>Payment</span></div>
+          <div class="agent-row agent-row-header">
+            <span>Order</span><span>Customer</span><span>Amount</span><span>Status</span
+            ><span>Payment</span>
+          </div>
           @for (order of data.orders; track order.id) {
             <a class="agent-row agent-row-link" [routerLink]="['/orders', order.id]">
-              <strong>{{ order.trackingNumber }}</strong>
+              <span
+                ><strong>{{ order.trackingNumber }}</strong
+                ><small
+                  >{{ commissionExplanation(order) }}
+                  @if (order.commissionStatus === 'EARNED') {
+                    · {{ order.commissionAmount | currency: 'PHP' : 'symbol-narrow' }}
+                  }
+                </small></span
+              >
               <span>{{ order.customerName }}</span>
-              <strong>{{ order.amount | currency:'PHP':'symbol-narrow' }}</strong>
-              <span [class]="'status ' + statusClass(order.deliveryStatus || order.orderStatus)">{{ titleCase(order.deliveryStatus || order.orderStatus) }}</span>
+              <strong>{{ order.amount | currency: 'PHP' : 'symbol-narrow' }}</strong>
+              <span [class]="'status ' + statusClass(order.deliveryStatus || order.orderStatus)">{{
+                titleCase(order.deliveryStatus || order.orderStatus)
+              }}</span>
               <span>{{ titleCase(order.paymentStatus) }}</span>
             </a>
-          } @empty { <div class="empty">No orders yet.</div> }
+          } @empty {
+            <div class="empty">No orders yet.</div>
+          }
         </div>
       </div>
     </section>
 
     <section class="surface">
       <div class="section-head clickable" (click)="toggleSection('commissions')">
-        <div><h3>Commissions</h3><p>Commission earned on delivered orders, at the rate captured when each order closed.</p></div>
-        <button type="button" class="collapse-toggle" [attr.aria-expanded]="!isCollapsed('commissions')" [attr.aria-label]="isCollapsed('commissions') ? 'Expand' : 'Collapse'"><app-icon [name]="isCollapsed('commissions') ? 'chevronRight' : 'chevronDown'" /></button>
+        <div>
+          <h3>Commissions</h3>
+          <p>
+            Package earnings require delivery and full payment. Earlier legacy records retain their
+            captured rates. Standalone products earn no commission.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="collapse-toggle"
+          [attr.aria-expanded]="!isCollapsed('commissions')"
+          [attr.aria-label]="isCollapsed('commissions') ? 'Expand' : 'Collapse'"
+        >
+          <app-icon [name]="isCollapsed('commissions') ? 'chevronRight' : 'chevronDown'" />
+        </button>
       </div>
       <div class="collapsible" [class.collapsed]="isCollapsed('commissions')">
         <div class="agent-table commissions">
-          <div class="agent-row agent-row-header"><span>Order</span><span>Customer</span><span>Rate</span><span>Amount</span><span>Date</span></div>
+          <div class="agent-row agent-row-header">
+            <span>Order</span><span>Customer</span><span>Rate</span><span>Amount</span
+            ><span>Date</span>
+          </div>
           @for (item of data.commissions; track item.id) {
             <a class="agent-row agent-row-link" [routerLink]="['/orders', item.orderId]">
               <strong>{{ item.trackingNumber }}</strong>
               <span>{{ item.customerName }}</span>
-              <span>{{ item.rate }}%</span>
-              <strong>{{ item.amount | currency:'PHP':'symbol-narrow' }}</strong>
-              <span>{{ item.createdAt | date:'mediumDate' }}</span>
+              <span>{{
+                item.source === 'PACKAGE' ? 'Package terms' : 'Legacy ' + item.rate + '%'
+              }}</span>
+              <strong>{{ item.amount | currency: 'PHP' : 'symbol-narrow' }}</strong>
+              <span>{{ item.createdAt | date: 'mediumDate' }}</span>
             </a>
-          } @empty { <div class="empty">No commissions posted yet.</div> }
+          } @empty {
+            <div class="empty">No commissions posted yet.</div>
+          }
         </div>
       </div>
     </section>

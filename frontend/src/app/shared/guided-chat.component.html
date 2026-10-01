@@ -1,0 +1,258 @@
+<div class="guided-chat">
+  @if (open()) {
+    <section
+      #chatPanel
+      [id]="popupId"
+      class="chat-panel"
+      role="dialog"
+      aria-label="Guided TNL assistant"
+      tabindex="-1"
+    >
+      <header class="chat-header">
+        <div class="chat-brand">
+          <span class="brand-icon"><app-icon name="packageSearch" /></span>
+          <div>
+            <h3>TNL assistant</h3>
+            <p>Catalog &amp; order help</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button
+            class="restart-button"
+            (click)="choose('')"
+            aria-label="Start again"
+            title="Start again"
+          >
+            <app-icon name="restore" /><span>Start again</span>
+          </button>
+          <button
+            class="close-button"
+            (click)="close()"
+            aria-label="Close assistant"
+            title="Close assistant"
+          >
+            <app-icon name="close" />
+          </button>
+        </div>
+      </header>
+      <div class="chat-body" [attr.aria-busy]="busy()">
+        <div class="chat-intro">
+          <h4>How can I help you?</h4>
+          <p>Choose a topic to explore current offers or check your order.</p>
+        </div>
+        <div class="topic-grid" aria-label="Assistant topics">
+          @for (t of topics; track t.id) {
+            <button
+              class="topic-button"
+              (click)="choose(t.id)"
+              [attr.aria-label]="t.label"
+              [attr.aria-pressed]="topic() === t.id"
+            >
+              <span class="topic-icon"><app-icon [name]="t.icon" /></span>
+              <span class="topic-copy"
+                ><strong>{{ t.label }}</strong
+                ><span>{{ t.description }}</span></span
+              >
+              <app-icon class="topic-arrow" name="chevronRight" />
+            </button>
+          }
+        </div>
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+        @if (
+          notice() &&
+          !(['orders', 'followup', 'request'].includes(topic()) && session()?.role !== 'CUSTOMER')
+        ) {
+          <p class="notice" role="status">{{ notice() }}</p>
+        }
+        @if (
+          ['orders', 'followup', 'request'].includes(topic()) && session()?.role !== 'CUSTOMER'
+        ) {
+          <div class="sign-in-panel">
+            <div>
+              <strong>Your account keeps your orders private</strong>
+              <p>Sign in or register to use personal order actions.</p>
+            </div>
+            <a class="button primary" href="/portal"
+              >Customer sign in or register<app-icon name="chevronRight"
+            /></a>
+          </div>
+        }
+        @if (topic() === 'catalog' || (topic() === 'request' && session()?.role === 'CUSTOMER')) {
+          <form class="fields" (ngSubmit)="browse()">
+            <label
+              >What offer are you looking for?<input
+                name="search"
+                [(ngModel)]="search"
+                placeholder="Product or package name" /></label
+            ><button [disabled]="busy()">Search catalog</button>
+          </form>
+        }
+        @if (topic() === 'recommend') {
+          <form class="fields" (ngSubmit)="recommend()">
+            <label
+              >Which category?<select name="category" [(ngModel)]="categoryId">
+                <option [ngValue]="0">Any category</option>
+                @for (c of categories(); track c.id) {
+                  <option [ngValue]="c.id">{{ c.name }}</option>
+                }
+              </select></label
+            ><label
+              >Maximum budget in pesos<input
+                name="budget"
+                type="number"
+                min="0.01"
+                step="0.01"
+                [(ngModel)]="budget"
+                required /></label
+            ><button [disabled]="busy()">Show available matches</button>
+          </form>
+        }
+        @if (topic() === 'track') {
+          <form class="fields" (ngSubmit)="track()">
+            <label
+              >What is your tracking number?<input
+                name="tracking"
+                [(ngModel)]="trackingNumber"
+                required
+                maxlength="40" /></label
+            ><button [disabled]="busy()">Check current status</button>
+          </form>
+        }
+        @for (o of offers(); track o.kind + o.id) {
+          <article class="row offer-row">
+            <div class="offer-copy">
+              <span class="offer-kind">{{ o.kind === 'PACKAGE' ? 'Package' : 'Product' }}</span>
+              <strong>{{ o.name }}</strong>
+              <p>{{ o.description }}</p>
+              @for (c of o.components; track c.productId) {
+                <small>{{ c.productName }} × {{ c.quantity }}</small>
+              }
+              <small class="availability" [class.unavailable]="!o.available">{{
+                o.available ? 'Available' : 'Currently unavailable'
+              }}</small>
+            </div>
+            <div class="offer-action">
+              <strong>{{ o.price | currency: 'PHP' : 'symbol-narrow' }}</strong
+              ><button (click)="select(o)" [disabled]="!o.available">Add to request</button>
+            </div>
+          </article>
+        }
+        @if (topic() === 'orders' && session()?.role === 'CUSTOMER') {
+          @for (o of orders(); track o.id) {
+            <div class="row">
+              <strong>{{ o.trackingNumber }} · {{ o.deliveryStatus || o.orderStatus }}</strong
+              ><button (click)="viewOrder(o.id)">Show details</button>
+            </div>
+          } @empty {
+            <p>No orders recorded for your account yet.</p>
+          }
+        }
+        @if (topic() === 'followup' && session()?.role === 'CUSTOMER') {
+          @if (orders().length) {
+            <form
+              class="followup-form"
+              #followupForm="ngForm"
+              (ngSubmit)="followupForm.valid && followup()"
+              aria-labelledby="followup-title"
+            >
+              <div class="followup-heading">
+                <span class="followup-icon"><app-icon name="agents" /></span>
+                <div>
+                  <h4 id="followup-title">Ask your agent for an update</h4>
+                  <p>Choose an order and let your field agent know how they can help.</p>
+                </div>
+              </div>
+              <label class="followup-field"
+                >Which order?
+                <span class="followup-select">
+                  <select
+                    name="order"
+                    [(ngModel)]="orderId"
+                    (ngModelChange)="viewOrder(orderId)"
+                    required
+                  >
+                    @for (o of orders(); track o.id) {
+                      <option [ngValue]="o.id">
+                        {{ o.trackingNumber }} · {{ o.deliveryStatus || o.orderStatus }}
+                      </option>
+                    }
+                  </select>
+                  <app-icon name="chevronDown" />
+                </span>
+              </label>
+              <label class="followup-field"
+                >What update do you need?
+                <textarea
+                  name="message"
+                  [(ngModel)]="message"
+                  minlength="2"
+                  maxlength="1000"
+                  required
+                  rows="5"
+                  placeholder="For example, when will my order arrive?"
+                  aria-describedby="followup-message-hint followup-message-count"
+                ></textarea>
+              </label>
+              <div class="followup-message-meta">
+                <span id="followup-message-hint"
+                  >Include any details that will help your agent.</span
+                ><span id="followup-message-count">{{ message.length }} / 1,000</span>
+              </div>
+              <div class="followup-actions">
+                <p><app-icon name="info" />Your agent’s reply will appear in your order details.</p>
+                <button
+                  class="primary followup-submit"
+                  [disabled]="!orderId || busy() || followupForm.invalid"
+                >
+                  <app-icon name="bell" />{{ busy() ? 'Sending…' : 'Notify my agent' }}
+                </button>
+              </div>
+            </form>
+          } @else {
+            <div class="followup-empty">
+              <app-icon name="orders" />
+              <h4>No orders to follow up on yet</h4>
+              <p>Your orders will appear here once they’re recorded.</p>
+            </div>
+          }
+        }
+        @if (result(); as r) {
+          <div class="panel order-result">
+            <strong>{{ r.trackingNumber }} · {{ r.deliveryStatus || r.orderStatus }}</strong>
+            @if (r.paymentStatus) {
+              <p>Payment: {{ r.paymentStatus }}</p>
+            }
+            @for (e of r.events || r.deliveryEvents; track $index) {
+              <small>{{ e.status }} · {{ e.occurredAt | date: 'medium' }}</small>
+            }
+            @for (f of r.followups; track f.id) {
+              <p>
+                {{ f.message }}<small>{{ f.reply || 'Waiting for your agent’s reply' }}</small>
+              </p>
+            }
+          </div>
+        }
+      </div>
+      <footer class="chat-footer">
+        <app-icon name="info" />
+        <p>
+          Answers use the current catalog and recorded order status. For more help, send your
+          assigned agent an order follow-up request.
+        </p>
+      </footer>
+    </section>
+  }
+  <button
+    #launcher
+    class="primary chat-toggle"
+    (click)="toggle()"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="popupId"
+    aria-haspopup="dialog"
+  >
+    <app-icon [name]="open() ? 'chevronDown' : 'packageSearch'" />
+    {{ open() ? 'Hide assistant' : 'Ask TNL assistant' }}
+  </button>
+</div>

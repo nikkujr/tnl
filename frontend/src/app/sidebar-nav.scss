@@ -1,3 +1,19 @@
+.sidebar nav {
+  padding: 3px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(185, 178, 238, .4) transparent;
+}
+
+// Chromium uses the rounded custom thumb; Firefox uses the thin native scrollbar.
+@supports selector(::-webkit-scrollbar) {
+  .sidebar nav { scrollbar-width: auto; scrollbar-color: auto; }
+  .sidebar nav::-webkit-scrollbar { width: 6px; }
+  .sidebar nav::-webkit-scrollbar-track { background: transparent; }
+  .sidebar nav::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185, 178, 238, .4); }
+  .sidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(185, 178, 238, .7); }
+  .sidebar nav::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+}
+
 .admin-sidebar nav button {
   position: relative;
   isolation: isolate;

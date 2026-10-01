@@ -1,0 +1,198 @@
+:host {
+  display: block;
+  margin-bottom: 24px;
+  color: var(--ink, #25233a);
+}
+.rewards-panel {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--line, #dddbea);
+  border-radius: 16px;
+  background: var(--color-surface, #fff);
+  box-shadow: var(--shadow-sm);
+}
+header,
+.target-heading,
+.progress-caption,
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.eyebrow {
+  color: var(--green, #7167c9);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+h3 {
+  margin: 6px 0;
+  font-size: 20px;
+}
+h4 {
+  margin: 0;
+  font-size: 14px;
+}
+p,
+small {
+  color: var(--muted, #76738a);
+  line-height: 1.6;
+}
+header p {
+  margin: 0;
+  font-size: 12px;
+}
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+input {
+  min-height: 42px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line, #dddbea);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  color: inherit;
+  font: inherit;
+}
+input:focus-visible,
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--green, #7167c9);
+  outline-offset: 3px;
+}
+.reward-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
+.reward-totals > div {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--color-accent-bg, #f0edff);
+}
+.reward-totals span {
+  font-size: 12px;
+  color: var(--muted, #76738a);
+}
+.reward-totals strong {
+  font-size: 24px;
+  overflow-wrap: anywhere;
+  color: var(--green, #7167c9);
+}
+.target {
+  padding: 18px;
+  border: 1px solid var(--line, #dddbea);
+  border-radius: 12px;
+}
+.target p {
+  margin: 12px 0;
+  font-size: 12px;
+}
+.badge {
+  padding: 6px 10px;
+  border-radius: 20px;
+  color: var(--green, #7167c9);
+  background: var(--color-accent-bg, #f0edff);
+  font-size: 11px;
+}
+.badge.approved {
+  color: var(--status-success-text, #2b654e);
+  background: var(--status-success-bg, #e2f1ea);
+}
+.progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--color-surface-alt, #f8f7fb);
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--green, #7167c9);
+  border-radius: inherit;
+}
+.progress-caption {
+  margin: 10px 0;
+  font-size: 12px;
+}
+.target small,
+footer small {
+  font-size: 11px;
+}
+.reward-history {
+  margin-top: 22px;
+}
+.reward-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line, #dddbea);
+}
+.reward-kind {
+  font-size: 12px;
+  font-weight: 700;
+}
+.reward-row p {
+  margin: 4px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.reward-row small {
+  font-size: 11px;
+}
+.reward-row > strong {
+  font-size: 16px;
+}
+.message {
+  margin: 16px 0;
+  font-size: 12px;
+}
+.error {
+  color: var(--status-danger-text, #b42318);
+}
+button {
+  padding: 6px 10px;
+  border: 1px solid var(--line, #dddbea);
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  color: inherit;
+  cursor: pointer;
+}
+footer {
+  margin-top: 16px;
+}
+a {
+  color: var(--green, #7167c9);
+  font-size: 12px;
+  font-weight: 600;
+}
+@media (max-width: 620px) {
+  .rewards-panel {
+    padding: 18px;
+  }
+  header {
+    align-items: flex-start;
+  }
+  label {
+    width: 100%;
+  }
+  .reward-totals {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .reward-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}

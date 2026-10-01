@@ -1,85 +1,218 @@
 <div class="order-detail-page">
   <div class="page-head">
     <div>
-      <button type="button" class="ghost-button back-button" (click)="back()"><app-icon name="chevronRight" class="flip" />Back to orders</button>
+      <button type="button" class="ghost-button back-button" (click)="back()">
+        <app-icon name="chevronRight" class="flip" />Back to orders
+      </button>
       @if (order(); as data) {
-        <app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: data.trackingNumber }]" />
+        <app-breadcrumb
+          [items]="[{ label: 'Orders', link: '/orders' }, { label: data.trackingNumber }]"
+        />
         <h2>{{ data.trackingNumber }}</h2>
         <div class="status-row">
-          <span [class]="'status ' + statusClass(displayStatus(data))">{{ displayStatus(data) }}</span>
-          <span [class]="'status ' + statusClass(data.paymentStatus)">{{ titleCase(data.paymentStatus) }}</span>
-          @if (data.deliveryStatus) { <span [class]="'status ' + statusClass(data.deliveryStatus)">{{ titleCase(data.deliveryStatus) }}</span> }
+          <span [class]="'status ' + statusClass(displayStatus(data))">{{
+            displayStatus(data)
+          }}</span>
+          <span [class]="'status ' + statusClass(data.paymentStatus)">{{
+            titleCase(data.paymentStatus)
+          }}</span>
+          @if (data.deliveryStatus) {
+            <span [class]="'status ' + statusClass(data.deliveryStatus)">{{
+              titleCase(data.deliveryStatus)
+            }}</span>
+          }
         </div>
       } @else {
-        <app-breadcrumb [items]="[{ label: 'Orders', link: '/orders' }, { label: 'Order details' }]" />
+        <app-breadcrumb
+          [items]="[{ label: 'Orders', link: '/orders' }, { label: 'Order details' }]"
+        />
         <h2>Order details</h2>
       }
     </div>
     @if (order(); as data) {
       <div class="action-bar">
-        @if (data.orderStatus === 'PENDING') { <button type="button" class="secondary-button" (click)="editOrder()"><app-icon name="edit" />Edit order</button> }
-        @if (session().role === 'ADMIN' && data.orderStatus === 'PENDING') {
-          <button type="button" class="secondary-button approve" (click)="decideOrder('APPROVE')"><app-icon name="check" />Approve</button>
-          <button type="button" class="secondary-button reject" (click)="decideOrder('REJECT')"><app-icon name="close" />Reject</button>
+        @if (data.orderStatus === 'PENDING') {
+          <button type="button" class="secondary-button" (click)="editOrder()">
+            <app-icon name="edit" />Edit order
+          </button>
         }
-        @if (session().role === 'ADMIN') { <button type="button" class="secondary-button" (click)="updatePayment()"><app-icon name="commissions" />Payment status</button> }
-        @if (data.orderStatus === 'APPROVED') { <button type="button" class="secondary-button" (click)="advanceDelivery()"><app-icon name="tracking" />Advance delivery</button> }
-        @if (data.orderStatus !== 'APPROVED' && data.orderStatus !== 'COMPLETED') { <button type="button" class="danger-button" (click)="removeOrder()"><app-icon name="delete" />Delete order</button> }
+        @if (session().role === 'ADMIN' && data.orderStatus === 'PENDING') {
+          <button type="button" class="secondary-button approve" (click)="decideOrder('APPROVE')">
+            <app-icon name="check" />Approve
+          </button>
+          <button type="button" class="secondary-button reject" (click)="decideOrder('REJECT')">
+            <app-icon name="close" />Reject
+          </button>
+        }
+        @if (session().role === 'ADMIN') {
+          <button type="button" class="secondary-button" (click)="updatePayment()">
+            <app-icon name="commissions" />Payment status
+          </button>
+        }
+        @if (data.orderStatus === 'APPROVED') {
+          <button type="button" class="secondary-button" (click)="advanceDelivery()">
+            <app-icon name="tracking" />Advance delivery
+          </button>
+        }
+        @if (data.orderStatus !== 'APPROVED' && data.orderStatus !== 'COMPLETED') {
+          <button type="button" class="danger-button" (click)="removeOrder()">
+            <app-icon name="delete" />Delete order
+          </button>
+        }
       </div>
     }
   </div>
 
-  @if (notice()) { <div class="alert success">{{ notice() }}</div> }
-  @if (error()) { <div class="alert">{{ error() }}</div> }
-  @if (loading() && !order()) { <div class="page-loading">Loading order…</div> }
+  @if (notice()) {
+    <div class="alert success">{{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="alert">{{ error() }}</div>
+  }
+  @if (loading() && !order()) {
+    <div class="page-loading">Loading order…</div>
+  }
 
   @if (order(); as data) {
     <div class="detail-layout">
       <div class="main-column">
         <section class="surface">
-          <div class="section-head"><h3>Overview</h3><p>Who placed this order, who's handling it, and where it's going.</p></div>
+          <div class="section-head">
+            <h3>Overview</h3>
+            <p>Who placed this order, who's handling it, and where it's going.</p>
+          </div>
           <div class="overview-grid">
-            <div><small>Customer</small><strong>{{ data.customerName }}</strong><span>{{ data.customerEmail }} · {{ data.customerPhone }}</span></div>
-            <div><small>Assigned agent</small><strong>{{ data.agentName }}</strong><span>{{ data.agentEmail }}</span></div>
-            <div><small>Delivery address</small><strong>{{ data.deliveryAddress }}</strong></div>
+            <div>
+              <small>Customer</small><strong>{{ data.customerName }}</strong
+              ><span>{{ data.customerEmail }} · {{ data.customerPhone }}</span>
+            </div>
+            <div>
+              <small>Assigned agent</small><strong>{{ data.agentName }}</strong
+              ><span>{{ data.agentEmail }}</span>
+            </div>
+            <div>
+              <small>Delivery address</small><strong>{{ data.deliveryAddress }}</strong>
+            </div>
             <div>
               <small>Payment</small>
-              <strong>{{ titleCase(data.paymentMethod) }} · {{ titleCase(data.paymentStatus) }}</strong>
+              <strong
+                >{{ titleCase(data.paymentMethod) }} · {{ titleCase(data.paymentStatus) }}</strong
+              >
               @if (data.paymentMethod === 'Cash' && data.cashReceived !== null) {
-                <span>Received {{ data.cashReceived | currency:'PHP':'symbol-narrow' }} · Change {{ data.cashChange | currency:'PHP':'symbol-narrow' }}</span>
+                <span
+                  >Received {{ data.cashReceived | currency: 'PHP' : 'symbol-narrow' }} · Change
+                  {{ data.cashChange | currency: 'PHP' : 'symbol-narrow' }}</span
+                >
               }
             </div>
-            <div><small>Order placed</small><strong>{{ data.createdAt | date:'medium' }}</strong></div>
-            <div><small>Last updated</small><strong>{{ data.updatedAt | date:'medium' }}</strong></div>
+            <div>
+              <small>Order placed</small><strong>{{ data.createdAt | date: 'medium' }}</strong>
+            </div>
+            <div>
+              <small>Last updated</small><strong>{{ data.updatedAt | date: 'medium' }}</strong>
+            </div>
           </div>
         </section>
 
         <section class="surface">
-          <div class="section-head"><h3>Items</h3><p>{{ data.items.length }} product{{ data.items.length === 1 ? '' : 's' }} on this order.</p></div>
+          <div class="section-head">
+            <h3>Items</h3>
+            <p>
+              {{ data.items.length }} product{{ data.items.length === 1 ? '' : 's' }} on this order.
+            </p>
+          </div>
           <div class="items-table">
-            <div class="item-row item-header"><span>Product</span><span>Price</span><span>Quantity</span><span>Subtotal</span></div>
+            <div class="item-row item-header">
+              <span>Product</span><span>Price</span><span>Quantity</span><span>Subtotal</span>
+            </div>
             @for (item of data.items; track item.productId) {
-              <div class="item-row"><span><strong>{{ item.productName }}</strong><small>{{ item.sku }}</small></span><span>{{ item.unitPrice | currency:'PHP':'symbol-narrow' }}</span><span>{{ item.quantity }}</span><strong>{{ item.unitPrice * item.quantity | currency:'PHP':'symbol-narrow' }}</strong></div>
+              <div class="item-row">
+                <span
+                  ><strong>{{ item.productName }}</strong
+                  ><small>{{ item.sku }}</small></span
+                ><span>{{ item.unitPrice | currency: 'PHP' : 'symbol-narrow' }}</span
+                ><span>{{ item.quantity }}</span
+                ><strong>{{
+                  item.unitPrice * item.quantity | currency: 'PHP' : 'symbol-narrow'
+                }}</strong>
+              </div>
             }
-            <div class="item-row item-total"><span></span><span></span><span>Total</span><strong>{{ orderTotal() | currency:'PHP':'symbol-narrow' }}</strong></div>
+            @for (p of data.packages; track p.packageId) {
+              <div class="item-row">
+                <span
+                  ><strong>{{ p.name }}</strong>
+                  @for (c of p.components; track c.productId) {
+                    <small>{{ c.productName }} × {{ c.quantity }} per package</small>
+                  }
+                  <small
+                    >Commission:
+                    {{
+                      p.commissionType === 'FIXED'
+                        ? (p.commissionValue | currency: 'PHP' : 'symbol-narrow')
+                        : p.commissionValue + '%'
+                    }}</small
+                  ></span
+                ><span>{{ p.sellingPrice | currency: 'PHP' : 'symbol-narrow' }}</span
+                ><span>{{ p.quantity }}</span
+                ><strong>{{
+                  p.sellingPrice * p.quantity | currency: 'PHP' : 'symbol-narrow'
+                }}</strong>
+              </div>
+            }
+            <div class="item-row item-total">
+              <span></span><span></span><span>Total</span
+              ><strong>{{ orderTotal() | currency: 'PHP' : 'symbol-narrow' }}</strong>
+            </div>
+            @if (data.commission; as commission) {
+              <div class="section-head">
+                <h3>
+                  Earned commission: {{ commission.amount | currency: 'PHP' : 'symbol-narrow' }}
+                </h3>
+                @for (line of commission.breakdown; track $index) {
+                  <p>{{ line.name }} · {{ line.amount | currency: 'PHP' : 'symbol-narrow' }}</p>
+                }
+              </div>
+            } @else {
+              <p class="section-head">
+                Package commission becomes earned after delivery and full payment.
+              </p>
+            }
           </div>
         </section>
       </div>
 
       <aside class="side-column">
         <section class="surface">
-          <div class="section-head"><h3>Delivery progress</h3><p>Where this order stands, from preparation to drop-off.</p></div>
+          <div class="section-head">
+            <h3>Delivery progress</h3>
+            <p>Where this order stands, from preparation to drop-off.</p>
+          </div>
           @if (data.deliveryStatus) {
             <div class="progress-track">
               @for (item of deliveryProgress(); track item.step.value) {
-                <div class="progress-node" [class.complete]="item.reached" [class.current]="item.current">
+                <div
+                  class="progress-node"
+                  [class.complete]="item.reached"
+                  [class.current]="item.current"
+                >
                   <span class="progress-line" [class.filled]="item.reached"></span>
-                  <span class="progress-marker">@if (item.reached && !item.current) { <app-icon name="check" /> } @else { <i></i> }</span>
+                  <span class="progress-marker">
+                    @if (item.reached && !item.current) {
+                      <app-icon name="check" />
+                    } @else {
+                      <i></i>
+                    }
+                  </span>
                   <div class="progress-text">
                     <strong>{{ item.step.label }}</strong>
                     <small>{{ item.step.description }}</small>
                     @if (item.event) {
-                      <small class="progress-time">{{ item.event.occurredAt | date:'medium' }}@if(item.event.notes){ · {{ item.event.notes }}}</small>
+                      <small class="progress-time"
+                        >{{ item.event.occurredAt | date: 'medium' }}
+                        @if (item.event.notes) {
+                          · {{ item.event.notes }}
+                        }
+                      </small>
                     } @else if (item.current) {
                       <small class="progress-time">In progress</small>
                     }
@@ -88,12 +221,17 @@
               }
             </div>
           } @else {
-            <div class="empty">Delivery hasn't started yet — approve the order to begin tracking progress.</div>
+            <div class="empty">
+              Delivery hasn't started yet — approve the order to begin tracking progress.
+            </div>
           }
         </section>
 
         <section class="surface history-column">
-          <div class="section-head"><h3>History</h3><p>Every recorded change for this order.</p></div>
+          <div class="section-head">
+            <h3>History</h3>
+            <p>Every recorded change for this order.</p>
+          </div>
           <div class="history-list">
             @for (event of data.history; track event.id) {
               <div class="history-item">
@@ -101,10 +239,17 @@
                 <span class="history-line"></span>
                 <div class="history-text">
                   <strong>{{ event.message }}</strong>
-                  <small>{{ event.createdAt | date:'medium' }}@if(event.actorName){ · {{ event.actorName }}}</small>
+                  <small
+                    >{{ event.createdAt | date: 'medium' }}
+                    @if (event.actorName) {
+                      · {{ event.actorName }}
+                    }
+                  </small>
                 </div>
               </div>
-            } @empty { <div class="empty">No history recorded yet.</div> }
+            } @empty {
+              <div class="empty">No history recorded yet.</div>
+            }
           </div>
         </section>
       </aside>
@@ -113,5 +258,9 @@
 </div>
 
 @if (actionDialog(); as dialog) {
-  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog($event)" />
+  <app-action-dialog
+    [config]="dialog"
+    (cancelled)="closeActionDialog()"
+    (confirmed)="confirmActionDialog($event)"
+  />
 }

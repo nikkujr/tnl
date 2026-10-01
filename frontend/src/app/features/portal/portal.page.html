@@ -1,0 +1,519 @@
+<main class="business portal-page">
+  <header class="bar portal-header">
+    <a class="portal-brand" href="/" aria-label="TNL Track home"
+      ><span class="brand-mark">T</span><span><strong>TNL</strong><small>TRACK</small></span></a
+    >
+    <div class="actions">
+      @if (session()?.role === 'CUSTOMER') {
+        <button class="sign-out" (click)="logout()"><app-icon name="logout" />Sign out</button>
+      } @else {
+        <a class="portal-link" href="#offers">Browse offers</a>
+        <a class="portal-link staff-link" href="/">Staff sign in<app-icon name="chevronRight" /></a>
+      }
+    </div>
+  </header>
+  @if (session()?.role === 'CUSTOMER') {
+    <div class="portal-welcome">
+      <span class="eyebrow">Your customer space</span>
+      <h1>Welcome back, {{ session()?.fullName }}.</h1>
+      <p>Your offers, requests, and deliveries, all in one place.</p>
+    </div>
+  }
+  @if (error() && session()?.role === 'CUSTOMER') {
+    <div class="error" role="alert">{{ error() }}</div>
+  }
+  @if (notice() && session()?.role === 'CUSTOMER') {
+    <div class="notice" role="status">{{ notice() }}</div>
+  }
+  @if (unsubscribe) {
+    <section class="panel">
+      <h3>Marketing preference</h3>
+      <p>Stop promotional emails. Account and order updates will continue.</p>
+      <button (click)="stopMarketing()">Unsubscribe from marketing</button>
+    </section>
+  }
+  @if (session()?.role !== 'CUSTOMER') {
+    <section class="portal-hero" aria-label="Customer portal">
+      <div class="portal-intro">
+        <span class="intro-badge"><app-icon name="account" />Your customer space</span>
+        <h1>A simpler way<br />to shop and track.</h1>
+        <p class="intro-description">
+          Find your next favorite, connect with your field agent, and follow your orders from here.
+        </p>
+        <div class="portal-benefits">
+          <div>
+            <span class="benefit-icon"><app-icon name="catalog" /></span>
+            <div>
+              <strong>Discover something good</strong>
+              <p>Explore the latest products and package offers.</p>
+            </div>
+          </div>
+          <div>
+            <span class="benefit-icon"><app-icon name="agents" /></span>
+            <div>
+              <strong>A little help from your agent</strong>
+              <p>Send a request and let your field agent handle the next steps.</p>
+            </div>
+          </div>
+          <div>
+            <span class="benefit-icon"><app-icon name="tracking" /></span>
+            <div>
+              <strong>Stay close to every order</strong>
+              <p>Check delivery progress and ask your agent for an update.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <section class="panel auth-card" aria-labelledby="auth-title">
+        @if (mode === 'login' || mode === 'register') {
+          <div class="auth-switch" aria-label="Account access">
+            <button
+              type="button"
+              [class.active]="mode === 'login'"
+              [attr.aria-pressed]="mode === 'login'"
+              [disabled]="busy()"
+              (click)="setMode('login')"
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              [class.active]="mode === 'register'"
+              [attr.aria-pressed]="mode === 'register'"
+              [disabled]="busy()"
+              (click)="setMode('register')"
+            >
+              Create account
+            </button>
+          </div>
+        } @else {
+          <button class="back-link" type="button" [disabled]="busy()" (click)="setMode('login')">
+            ← Back to sign in
+          </button>
+        }
+        <form #authForm="ngForm" (ngSubmit)="authForm.valid && auth()" [attr.aria-busy]="busy()">
+          <h2 id="auth-title">{{ authTitle() }}</h2>
+          <p class="auth-description">{{ authDescription() }}</p>
+          @if (error()) {
+            <div class="error" role="alert">
+              <app-icon name="alertCircle" /><span>{{ error() }}</span>
+            </div>
+          }
+          @if (notice()) {
+            <div class="notice" role="status">
+              <app-icon name="checkCircle" /><span>{{ notice() }}</span>
+            </div>
+          }
+          <div class="fields auth-fields" [class.registration]="mode === 'register'">
+            @if (['login', 'register', 'forgot'].includes(mode)) {
+              <label class="wide"
+                >Email<input
+                  name="email"
+                  type="email"
+                  [(ngModel)]="email"
+                  required
+                  autocomplete="email"
+                  placeholder="you@example.com"
+              /></label>
+            }
+            @if (mode !== 'forgot') {
+              <label class="wide"
+                >{{
+                  mode === 'verify'
+                    ? 'Password for an invitation (leave blank for a registration link)'
+                    : 'Password'
+                }}<input
+                  name="password"
+                  type="password"
+                  [(ngModel)]="password"
+                  minlength="8"
+                  maxlength="72"
+                  [required]="mode !== 'verify'"
+                  [autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
+                  [placeholder]="
+                    mode === 'login' ? 'Enter your password' : 'At least 8 characters'
+                  "
+              /></label>
+            }
+            @if (mode === 'register') {
+              <label
+                >Full name<input
+                  name="fullName"
+                  [(ngModel)]="fullName"
+                  autocomplete="name"
+                  placeholder="Your full name"
+                  required
+                  minlength="2" /></label
+              ><label
+                >PH mobile number<input
+                  name="phone"
+                  type="tel"
+                  autocomplete="tel"
+                  [(ngModel)]="phone"
+                  placeholder="09XXXXXXXXX"
+                  required /></label
+              ><label class="wide"
+                >Address<textarea
+                  name="address"
+                  [(ngModel)]="address"
+                  autocomplete="street-address"
+                  placeholder="Street, barangay, city"
+                  rows="2"
+                  required
+                  minlength="5"
+                ></textarea></label
+              ><label class="wide consent"
+                ><span
+                  ><input type="checkbox" name="optin" [(ngModel)]="marketingOptIn" />I would like
+                  promotional campaigns, welcome emails, and purchase follow-ups.</span
+                ></label
+              >
+            }
+          </div>
+          @if (mode === 'login') {
+            <div class="forgot-link">
+              <button type="button" [disabled]="busy()" (click)="setMode('forgot')">
+                Forgot password?
+              </button>
+            </div>
+          }
+          <button class="primary auth-submit" [disabled]="busy() || authForm.invalid">
+            {{
+              busy()
+                ? 'Working…'
+                : mode === 'verify'
+                  ? 'Activate account'
+                  : mode === 'reset'
+                    ? 'Reset password'
+                    : mode === 'register'
+                      ? 'Register and verify email'
+                      : mode === 'forgot'
+                        ? 'Email reset link'
+                        : 'Sign in'
+            }}
+          </button>
+        </form>
+        <p class="auth-footnote">
+          <app-icon name="checkCircle" /><span
+            >Verify your email to connect your account with your existing orders.</span
+          >
+        </p>
+      </section>
+    </section>
+  }
+  @if (session()?.role === 'CUSTOMER') {
+    <nav class="actions customer-navigation" aria-label="Customer navigation">
+      <button
+        [class.active]="tab === 'catalog'"
+        [attr.aria-current]="tab === 'catalog' ? 'page' : null"
+        (click)="tab = 'catalog'"
+      >
+        <app-icon name="catalog" />Catalog
+      </button>
+      <button
+        [class.active]="tab === 'request'"
+        [attr.aria-current]="tab === 'request' ? 'page' : null"
+        (click)="tab = 'request'"
+      >
+        <app-icon name="plus" />New request <span class="cart-count">{{ cart().length }}</span>
+      </button>
+      <button
+        [class.active]="tab === 'requests'"
+        [attr.aria-current]="tab === 'requests' ? 'page' : null"
+        (click)="tab = 'requests'; load()"
+      >
+        My requests
+      </button>
+      <button
+        [class.active]="tab === 'orders'"
+        [attr.aria-current]="tab === 'orders' ? 'page' : null"
+        (click)="tab = 'orders'; load()"
+      >
+        My orders
+      </button>
+      <button
+        [class.active]="tab === 'preferences'"
+        [attr.aria-current]="tab === 'preferences' ? 'page' : null"
+        (click)="tab = 'preferences'"
+      >
+        Preferences
+      </button>
+    </nav>
+  }
+  @if (tab === 'catalog') {
+    <section class="catalog-section" id="offers">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Find your next favorite</span>
+          <h2>Explore our offers.</h2>
+          <p>Products and packages, ready for your next request.</p>
+        </div>
+      </div>
+      <section class="panel catalog-search">
+        <form class="fields" (ngSubmit)="loadCatalog()">
+          <label
+            >Search products and packages<input
+              #catalogSearchInput
+              name="search"
+              [(ngModel)]="search"
+              placeholder="Name or description" /></label
+          ><button class="primary" [disabled]="catalogLoading()">Search</button>
+        </form>
+      </section>
+      @if (catalogLoading()) {
+        <p role="status" class="catalog-summary">Loading offers…</p>
+      } @else if (catalogError()) {
+        <div class="error" role="alert">
+          <span>{{ catalogError() }}</span
+          ><button type="button" (click)="loadCatalog()">Retry</button>
+        </div>
+      } @else {
+        <p #catalogSummary class="catalog-summary" tabindex="-1" role="status">
+          Showing {{ catalogStart() }}–{{ catalogEnd() }} of {{ offers().length }} offers
+        </p>
+        <div class="grid">
+          @for (o of visibleOffers(); track o.kind + o.id) {
+            <article class="panel offer-card">
+              <div class="offer-top">
+                <span class="offer-icon"
+                  ><app-icon [name]="o.kind === 'PACKAGE' ? 'catalog' : 'products'" /></span
+                ><span class="tag">{{ o.kind === 'PACKAGE' ? 'Package' : 'Product' }}</span>
+              </div>
+              <h3>{{ o.name }}</h3>
+              @if (o.description) {
+                <p>{{ o.description }}</p>
+              }
+              @for (c of o.components; track c.productId) {
+                <small>{{ c.productName }} × {{ c.quantity }}</small>
+              }
+              <div class="offer-meta">
+                <strong>{{ o.price | currency: 'PHP' : 'symbol-narrow' }}</strong
+                ><span class="availability" [class.unavailable]="!o.available">{{
+                  o.available ? 'Available' : 'Unavailable'
+                }}</span>
+              </div>
+              <button class="primary" (click)="add(o)" [disabled]="!o.available">
+                Add to request
+              </button>
+            </article>
+          } @empty {
+            <div class="panel catalog-empty">
+              <app-icon name="packageSearch" />
+              <h3>No offers found</h3>
+              <p>Try a different search or check back for new offers.</p>
+            </div>
+          }
+        </div>
+        @if (catalogPageCount() > 1) {
+          <nav class="catalog-pagination" aria-label="Catalog pages">
+            <span>Page {{ catalogPage() }} of {{ catalogPageCount() }}</span>
+            <div class="actions">
+              <button
+                type="button"
+                [disabled]="catalogPage() === 1"
+                (click)="changeCatalogPage(catalogPage() - 1)"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                [disabled]="catalogPage() === catalogPageCount()"
+                (click)="changeCatalogPage(catalogPage() + 1)"
+              >
+                Next
+              </button>
+            </div>
+          </nav>
+        }
+      }
+    </section>
+  }
+  @if (session()?.role === 'CUSTOMER') {
+    @if (tab === 'request') {
+      <form class="panel request-form" (ngSubmit)="submit()">
+        <div class="request-heading">
+          <h3>Review your order request</h3>
+          @if (cart().length) {
+            <button type="button" class="add-offers" [disabled]="busy()" (click)="browseOffers()">
+              <app-icon name="plus" />Add products or packages
+            </button>
+          }
+        </div>
+        <p>
+          Your request does not reserve stock. Your field agent will convert it into an order for
+          admin approval.
+        </p>
+        @for (l of cart(); track l.offer.kind + l.offer.id; let i = $index) {
+          <div class="row">
+            <div>
+              <strong>{{ l.offer.name }}</strong
+              ><small>{{ l.offer.price | currency: 'PHP' : 'symbol-narrow' }} each</small>
+            </div>
+            <label
+              >Quantity<input
+                [name]="'quantity' + i"
+                type="number"
+                min="1"
+                max="10000"
+                [ngModel]="l.quantity"
+                (ngModelChange)="quantity(i, $event)"
+                required /></label
+            ><button type="button" (click)="remove(i)">Remove</button>
+          </div>
+        } @empty {
+          <div class="request-empty">
+            <span class="request-empty-icon"><app-icon name="catalog" /></span>
+            <strong>Your request is empty</strong>
+            <p>Choose products or packages from the catalog to get started.</p>
+            <button type="button" class="primary add-offers" (click)="browseOffers()">
+              <app-icon name="plus" />Add products or packages
+            </button>
+          </div>
+        }
+        <strong>Total: {{ total() | currency: 'PHP' : 'symbol-narrow' }}</strong>
+        <div class="fields">
+          <label
+            >Delivery address<textarea
+              name="delivery"
+              [(ngModel)]="deliveryAddress"
+              required
+              minlength="5"
+              maxlength="500"
+            ></textarea></label
+          ><label
+            >Payment method<select name="payment" [(ngModel)]="paymentMethod">
+              <option>Cash on delivery</option>
+              <option>Bank transfer</option>
+              <option>Card</option>
+            </select></label
+          >
+        </div>
+        <button class="primary" [disabled]="busy() || !cart().length">
+          Confirm and submit request
+        </button>
+      </form>
+    }
+    @if (tab === 'requests') {
+      <section class="panel">
+        <h3>My requests</h3>
+        @for (r of requests(); track r.id) {
+          <div class="row">
+            <div>
+              <strong>Request #{{ r.id }} · {{ r.status }}</strong
+              ><small
+                >{{ r.agentName || 'Awaiting admin assignment' }} ·
+                {{ r.createdAt | date: 'medium' }}</small
+              >
+              @for (p of r.packages; track p.packageId) {
+                <small>{{ p.name }} × {{ p.quantity }}</small>
+              }
+              @for (i of r.items; track i.productId) {
+                <small>{{ i.productName }} × {{ i.quantity }}</small>
+              }
+              @if (r.declineReason) {
+                <p>{{ r.declineReason }}</p>
+              }
+            </div>
+            <div>
+              <strong>{{ r.total | currency: 'PHP' : 'symbol-narrow' }}</strong>
+              @if (r.orderId) {
+                <button (click)="view(r.orderId)">View order</button>
+              }
+            </div>
+          </div>
+        } @empty {
+          <p>No requests submitted.</p>
+        }
+      </section>
+    }
+    @if (tab === 'orders') {
+      <section class="panel">
+        <h3>My orders</h3>
+        @for (o of orders(); track o.id) {
+          <div class="row">
+            <div>
+              <strong>{{ o.trackingNumber }}</strong
+              ><small
+                >{{ o.deliveryStatus || o.orderStatus }} · {{ o.paymentStatus }} ·
+                {{ o.createdAt | date: 'medium' }}</small
+              ><small>Agent: {{ o.agentName }}</small>
+            </div>
+            <div>
+              <strong>{{ o.total | currency: 'PHP' : 'symbol-narrow' }}</strong
+              ><button (click)="view(o.id)">Details and follow-up</button>
+            </div>
+          </div>
+        } @empty {
+          <p>No orders recorded yet.</p>
+        }
+      </section>
+      @if (detail(); as o) {
+        <section class="panel">
+          <h3>{{ o.trackingNumber }}</h3>
+          <p>
+            {{ o.deliveryStatus || o.orderStatus }} · Payment: {{ o.paymentStatus }} · Agent:
+            {{ o.agentName }}
+          </p>
+          <p>{{ o.deliveryAddress }}</p>
+          @for (p of o.packages; track p.packageId) {
+            <div class="row">
+              <strong>{{ p.name }} × {{ p.quantity }}</strong
+              ><span>{{ p.quantity * p.sellingPrice | currency: 'PHP' : 'symbol-narrow' }}</span>
+            </div>
+          }
+          @for (i of o.items; track i.productId) {
+            <div class="row">
+              <strong>{{ i.productName }} × {{ i.quantity }}</strong
+              ><span>{{ i.quantity * i.unitPrice | currency: 'PHP' : 'symbol-narrow' }}</span>
+            </div>
+          }
+          <p>Total: {{ o.total | currency: 'PHP' : 'symbol-narrow' }}</p>
+          <h3>Delivery timeline</h3>
+          @for (e of o.deliveryEvents; track $index) {
+            <p>{{ e.status }} · {{ e.occurredAt | date: 'medium' }}</p>
+          }
+          <h3>Agent follow-ups</h3>
+          @for (f of o.followups; track f.id) {
+            <div class="row">
+              <p>
+                {{ f.message }}<small>{{ f.createdAt | date: 'medium' }}</small>
+              </p>
+              <p>
+                {{ f.reply || 'Awaiting agent reply' }}
+                @if (f.repliedAt) {
+                  <small>{{ f.repliedAt | date: 'medium' }}</small>
+                }
+              </p>
+            </div>
+          }
+          <form class="fields" (ngSubmit)="followup()">
+            <label
+              >Ask for an update<textarea
+                name="followup"
+                [(ngModel)]="followupMessage"
+                minlength="2"
+                maxlength="1000"
+                required
+              ></textarea></label
+            ><button class="primary">Notify my agent</button>
+          </form>
+        </section>
+      }
+    }
+    @if (tab === 'preferences') {
+      <form class="panel" (ngSubmit)="preferences()">
+        <h3>Email preferences</h3>
+        <label
+          ><input type="checkbox" name="marketing" [(ngModel)]="marketingOptIn" />Receive
+          promotional campaigns, welcome emails, and purchase follow-ups.</label
+        >
+        <p>Order updates and account emails remain enabled.</p>
+        <button>Save preference</button>
+      </form>
+    }
+  }
+  <app-guided-chat (offerSelected)="add($event)" />
+  <footer class="portal-footer">
+    <span>TNL TRACK · Your customer space</span><a href="/">Back to home</a>
+  </footer>
+</main>

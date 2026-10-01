@@ -1,4 +1,16 @@
 @use '../../shared/styles/tokens';
 
-:host { display: block; color: var(--ink, #1d2939); }
-.agents-list-page { max-width: 1200px; margin: 0 auto; }
+:host {
+  display: block;
+  color: var(--ink, #1d2939);
+}
+.agents-list-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.page-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}

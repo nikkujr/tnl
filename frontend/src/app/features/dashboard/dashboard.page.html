@@ -10,6 +10,10 @@
     }
   </div>
 
+  @if (session()?.role === 'AGENT') {
+    <app-agent-rewards [agentId]="session()!.id" />
+  }
+
   <div class="dashboard-grid">
     <article class="panel chart-panel">
       <div class="panel-title"><div><span class="eyebrow">Performance</span><h3>Revenue overview</h3></div><span class="period-button">Last 6 months</span></div>

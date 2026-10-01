@@ -1,0 +1,447 @@
+<div class="performance-page">
+  <app-breadcrumb
+    [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Agent performance' }]"
+  />
+  <div class="page-heading">
+    <div>
+      <span class="eyebrow">Sales team</span>
+      <h2>Agent performance</h2>
+      <p>See who’s selling, track monthly goals, and recognize results.</p>
+    </div>
+    <label class="month-picker"
+      >Reporting month<input
+        type="month"
+        aria-label="Reporting month"
+        [(ngModel)]="month"
+        (ngModelChange)="success.set(''); load()"
+        [disabled]="saving()"
+        min="2000-01"
+        max="2100-12"
+    /></label>
+  </div>
+  <p class="scope-note">
+    Asia/Manila · Sales count when an order is delivered and fully paid. Includes packages and
+    standalone products. Historical imports and legacy sales are excluded.
+  </p>
+  <div class="tabs" role="group" aria-label="Performance views">
+    <button
+      [class.selected]="tab() === 'overview'"
+      [disabled]="saving()"
+      [attr.aria-pressed]="tab() === 'overview'"
+      (click)="tab.set('overview')"
+    >
+      Overview
+    </button>
+    <button
+      [class.selected]="tab() === 'targets'"
+      [disabled]="saving()"
+      [attr.aria-pressed]="tab() === 'targets'"
+      (click)="tab.set('targets')"
+    >
+      Targets &amp; incentives
+    </button>
+    <button
+      [class.selected]="tab() === 'rewards'"
+      [disabled]="saving()"
+      [attr.aria-pressed]="tab() === 'rewards'"
+      (click)="tab.set('rewards')"
+    >
+      Bonuses &amp; history
+    </button>
+  </div>
+  @if (error()) {
+    <div class="notice error" role="alert">
+      {{ error() }}
+      @if (!report() && !loading()) {
+        <button (click)="load()">Try again</button>
+      }
+    </div>
+  }
+  @if (success()) {
+    <div class="notice success" role="status">{{ success() }}</div>
+  }
+  @if (loading()) {
+    <div class="panel empty" role="status">Loading agent performance…</div>
+  }
+  @if (report(); as data) {
+    <div class="stat-grid">
+      <article class="stat">
+        <small>Completed sales</small
+        ><strong>{{ data.totals.sales | currency: 'PHP' : 'symbol-narrow' }}</strong
+        ><span>{{ data.totals.deals }} completed deals</span>
+      </article>
+      <article class="stat">
+        <small>Package commission</small
+        ><strong>{{ data.totals.commission | currency: 'PHP' : 'symbol-narrow' }}</strong
+        ><span>Posted during this month</span>
+      </article>
+      <article class="stat">
+        <small>Targets reached</small
+        ><strong
+          >{{ data.totals.targetsMet }} <em>/ {{ data.totals.targetsSet }}</em></strong
+        ><span>Agents with a monthly target</span>
+      </article>
+      <article class="stat">
+        <small>Approved rewards</small
+        ><strong>{{
+          data.totals.incentives + data.totals.bonuses | currency: 'PHP' : 'symbol-narrow'
+        }}</strong
+        ><span>Incentives and bonuses · separate from commission</span>
+      </article>
+    </div>
+    @if (tab() === 'overview') {
+      <div class="charts">
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>Top selling agents</h3>
+              <p>Top five by completed sales this month</p>
+            </div>
+          </div>
+          <div class="ranking-chart">
+            @for (agent of topAgents(); track agent.id) {
+              <div class="ranking-line">
+                <span class="rank">{{ agent.rank }}</span>
+                <div>
+                  <div class="ranking-label">
+                    <a [routerLink]="['/agents', agent.id]">{{ agent.fullName }}</a
+                    ><strong>{{ agent.sales | currency: 'PHP' : 'symbol-narrow' }}</strong>
+                  </div>
+                  <div class="bar-track">
+                    <span [style.width.%]="(agent.sales / maximumSales()) * 100"></span>
+                  </div>
+                  <small>{{ agent.deals }} completed deals</small>
+                </div>
+              </div>
+            } @empty {
+              <div class="empty">
+                No completed sales this month. Delivered orders with outstanding payments will count
+                once fully paid.
+              </div>
+            }
+          </div>
+        </section>
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>Daily completed sales</h3>
+              <p>Team sales by financial completion date</p>
+            </div>
+          </div>
+          <div class="trend">
+            <div class="chart-scale">
+              <span>{{
+                maximumDaily() === 1 && data.totals.sales === 0
+                  ? 0
+                  : (maximumDaily() | currency: 'PHP' : 'symbol-narrow')
+              }}</span
+              ><span>₱0</span>
+            </div>
+            <svg viewBox="0 0 700 200" role="img" aria-label="Daily completed sales trend">
+              <title>
+                Completed sales for {{ data.period }}. Daily values appear in the table below.
+              </title>
+              <line x1="20" y1="30" x2="680" y2="30" class="grid-line" />
+              <line x1="20" y1="100" x2="680" y2="100" class="grid-line" />
+              <line x1="20" y1="170" x2="680" y2="170" class="grid-line" />
+              <polyline [attr.points]="trendPoints()" />
+              <text x="20" y="195">Day 1</text>
+              <text x="625" y="195">Day {{ data.trend.length }}</text>
+            </svg>
+          </div>
+          <details class="daily-details">
+            <summary>View daily figures</summary>
+            <div class="daily-table">
+              @for (day of data.trend; track day.day) {
+                <div>
+                  <span>{{ day.day | date: 'MMM d' : 'UTC' }}</span
+                  ><span>{{ day.deals }} deals</span
+                  ><strong>{{ day.sales | currency: 'PHP' : 'symbol-narrow' }}</strong>
+                </div>
+              }
+            </div>
+          </details>
+        </section>
+      </div>
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <h3>Team leaderboard</h3>
+            <p>All agents · ranked by completed sales, then deals</p>
+          </div>
+          <button class="secondary" (click)="tab.set('targets')">Manage targets</button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Rank / agent</th>
+                <th>Completed sales</th>
+                <th>Deals</th>
+                <th>Open orders*</th>
+                <th>Commission</th>
+                <th>Target progress</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (agent of data.agents; track agent.id) {
+                <tr>
+                  <td>
+                    <a [routerLink]="['/agents', agent.id]"
+                      >{{ agent.rank }}. {{ agent.fullName }}</a
+                    >
+                    @if (!agent.active) {
+                      <small>Inactive</small>
+                    }
+                  </td>
+                  <td>
+                    <strong>{{ agent.sales | currency: 'PHP' : 'symbol-narrow' }}</strong>
+                  </td>
+                  <td>{{ agent.deals }}</td>
+                  <td>
+                    {{ agent.pipeline }}<small>{{ agent.pending }} awaiting approval</small>
+                  </td>
+                  <td>{{ agent.commission | currency: 'PHP' : 'symbol-narrow' }}</td>
+                  <td>
+                    @if (agent.targetId) {
+                      <div class="progress-track">
+                        <span [style.width.%]="progressWidth(agent)"></span>
+                      </div>
+                      <small
+                        >{{ agent.progress | number: '1.0-1' }}% of
+                        {{ agent.salesTarget | currency: 'PHP' : 'symbol-narrow' }}</small
+                      >
+                    } @else {
+                      <span class="muted">No target set</span>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="empty">
+                    No field agents yet. <a routerLink="/agents">Add an agent</a> to start tracking
+                    performance.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="table-note">
+          *Open orders were created in this month and still await approval, delivery, or full
+          payment.
+        </p>
+      </section>
+    }
+    @if (tab() === 'targets') {
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <h3>Monthly targets &amp; incentives</h3>
+            <p>
+              Set a sales goal and an optional fixed reward. Approve the incentive after the target
+              is reached.
+            </p>
+          </div>
+        </div>
+        <div class="target-list">
+          @for (agent of data.agents; track agent.id) {
+            <article class="target-card">
+              <div class="target-title">
+                <a [routerLink]="['/agents', agent.id]">{{ agent.fullName }}</a
+                ><span class="badge" [class.eligible]="agent.incentiveStatus === 'ELIGIBLE'">{{
+                  incentiveLabel(agent)
+                }}</span>
+              </div>
+              @if (agent.targetId) {
+                <div class="target-value">
+                  <strong>{{ agent.sales | currency: 'PHP' : 'symbol-narrow' }}</strong
+                  ><span>of {{ agent.salesTarget | currency: 'PHP' : 'symbol-narrow' }}</span>
+                </div>
+                <div
+                  class="progress-track"
+                  role="progressbar"
+                  [attr.aria-label]="agent.fullName + ' monthly sales target'"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  [attr.aria-valuenow]="progressWidth(agent)"
+                >
+                  <span [style.width.%]="progressWidth(agent)"></span>
+                </div>
+                <p>
+                  {{ agent.progress | number: '1.0-1' }}% reached · Incentive
+                  {{ agent.incentiveAmount | currency: 'PHP' : 'symbol-narrow' }}
+                </p>
+              } @else {
+                <p>No sales target for this month.</p>
+              }
+              <div class="target-actions">
+                <button
+                  class="secondary"
+                  (click)="editTarget(agent)"
+                  [disabled]="saving() || agent.incentiveStatus === 'APPROVED'"
+                >
+                  {{ agent.targetId ? 'Edit target' : 'Set target' }}
+                </button>
+                @if (agent.incentiveStatus === 'ELIGIBLE') {
+                  <button class="primary" [disabled]="saving()" (click)="approveIncentive(agent)">
+                    Approve
+                    {{ agent.incentiveAmount | currency: 'PHP' : 'symbol-narrow' }} incentive
+                  </button>
+                }
+                @if (agent.incentiveStatus === 'APPROVED') {
+                  <small>Terms locked after approval</small>
+                }
+              </div>
+            </article>
+          } @empty {
+            <div class="empty">Add field agents first to set monthly targets.</div>
+          }
+        </div>
+      </section>
+      @if (editing(); as agent) {
+        <section class="panel editor">
+          <h3>{{ agent.targetId ? 'Edit' : 'Set' }} target · {{ agent.fullName }}</h3>
+          <p>{{ data.period }} · Sales include delivered, fully paid orders.</p>
+          <form (ngSubmit)="saveTarget()">
+            <label
+              >Sales target (₱)<input
+                name="salesTarget"
+                type="number"
+                [(ngModel)]="salesTarget"
+                min="0.01"
+                max="9999999999.99"
+                step="0.01"
+                required /></label
+            ><label
+              >Incentive for reaching target (₱)<input
+                name="incentiveAmount"
+                type="number"
+                [(ngModel)]="incentiveAmount"
+                min="0"
+                max="9999999999.99"
+                step="0.01"
+                required
+              /><small>Use 0 for a target without a financial incentive.</small></label
+            >
+            <div class="form-actions">
+              <button
+                type="button"
+                class="secondary"
+                (click)="editing.set(null)"
+                [disabled]="saving()"
+              >
+                Cancel</button
+              ><button type="submit" class="primary" [disabled]="saving()">
+                {{ saving() ? 'Saving…' : 'Save monthly target' }}
+              </button>
+            </div>
+          </form>
+        </section>
+      }
+    }
+    @if (tab() === 'rewards') {
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <h3>Bonuses &amp; approval history</h3>
+            <p>
+              Approved rewards for {{ data.period }}. These records track awards; they do not record
+              payouts.
+            </p>
+          </div>
+          <button
+            class="primary"
+            (click)="openBonus()"
+            [disabled]="!data.agents.length || saving() || bonusOpen()"
+          >
+            Add bonus
+          </button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Agent / reward</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Approved by</th>
+                <th>Recorded</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (reward of data.rewards; track reward.id) {
+                <tr>
+                  <td>
+                    <a [routerLink]="['/agents', reward.agentId]">{{ reward.agentName }}</a
+                    ><small>{{ reward.kind === 'BONUS' ? 'Bonus' : 'Target incentive' }}</small>
+                  </td>
+                  <td>
+                    <strong>{{ reward.amount | currency: 'PHP' : 'symbol-narrow' }}</strong>
+                  </td>
+                  <td>{{ reward.reason }}</td>
+                  <td>{{ reward.approvedBy }}</td>
+                  <td>{{ reward.createdAt | date: 'medium' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="empty">
+                    No approved rewards this month. Approve a qualified incentive or add a bonus
+                    with a reason.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+      @if (bonusOpen()) {
+        <section class="panel editor">
+          <h3>Approve a bonus</h3>
+          <p>The award will be recorded for {{ data.period }} with your admin approval.</p>
+          <form (ngSubmit)="saveBonus()">
+            <label
+              >Agent<select name="bonusAgent" [(ngModel)]="bonusAgentId" required>
+                @for (agent of data.agents; track agent.id) {
+                  <option [ngValue]="agent.id">
+                    {{ agent.fullName }}{{ agent.active ? '' : ' (inactive)' }}
+                  </option>
+                }
+              </select></label
+            ><label
+              >Bonus amount (₱)<input
+                name="bonusAmount"
+                type="number"
+                [(ngModel)]="bonusAmount"
+                min="0.01"
+                max="9999999999.99"
+                step="0.01"
+                required /></label
+            ><label class="wide"
+              >Reason<textarea
+                name="bonusReason"
+                [(ngModel)]="bonusReason"
+                minlength="3"
+                maxlength="500"
+                required
+                placeholder="Describe the achievement being recognized"
+              ></textarea>
+            </label>
+            <div class="form-actions">
+              <button
+                type="button"
+                class="secondary"
+                (click)="bonusOpen.set(false)"
+                [disabled]="saving()"
+              >
+                Cancel</button
+              ><button class="primary" type="submit" [disabled]="saving()">
+                {{ saving() ? 'Saving…' : 'Approve and record bonus' }}
+              </button>
+            </div>
+          </form>
+        </section>
+      }
+    }
+  }
+</div>

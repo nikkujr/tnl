@@ -1,0 +1,134 @@
+:host { min-height: 100vh; background: radial-gradient(ellipse at 8% 14%, rgba(139, 130, 219, .1), transparent 40%), var(--paper, #f5f3fa); }
+.portal-page { max-width: 1180px; padding: 28px 32px 0; font-size: 14px; }
+.portal-header { padding-bottom: 24px; margin-bottom: 0; border-bottom: 1px solid var(--line); }
+.portal-brand { display: flex; align-items: center; gap: 11px; color: var(--ink); text-decoration: none; }
+.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(145deg, #9188df, #6e63c4); font-size: 24px; font-weight: 800; box-shadow: 0 4px 12px rgba(113, 103, 201, .2); }
+.portal-brand strong { font-size: 20px; letter-spacing: -.04em; }
+.portal-brand small { margin-top: 2px; font-size: 9px; letter-spacing: .28em; font-weight: 700; }
+.portal-link { display: inline-flex; align-items: center; gap: 5px; padding: 8px 0; color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 600; }
+.portal-link:hover { color: var(--green); }
+.portal-link app-icon { width: 14px; height: 14px; }
+.portal-header .actions { gap: 24px; }
+.sign-out { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.sign-out app-icon { width: 16px; height: 16px; }
+.portal-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 70px; align-items: center; padding: 64px 0 60px; }
+.intro-badge { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--green); background: var(--color-surface); font-size: 11px; font-weight: 650; }
+.intro-badge app-icon { width: 15px; height: 15px; }
+.portal-intro h1 { margin: 22px 0 18px; font-size: clamp(32px, 3.7vw, 48px); font-weight: 750; line-height: 1.13; letter-spacing: -.045em; }
+.intro-description { max-width: 390px; font-size: 15px; line-height: 1.75; }
+.portal-benefits { display: grid; gap: 22px; margin-top: 34px; }
+.portal-benefits > div { display: flex; gap: 13px; align-items: flex-start; }
+.benefit-icon { flex: none; width: 37px; height: 37px; display: grid; place-items: center; border-radius: 11px; color: var(--green); background: var(--color-accent-bg, #eeeafa); }
+.benefit-icon app-icon { width: 19px; height: 19px; }
+.portal-benefits strong { display: block; margin-top: 2px; font-size: 13px; font-weight: 650; }
+.portal-benefits p { margin: 5px 0 0; font-size: 12px; line-height: 1.6; }
+.auth-card { width: 100%; margin: 0; padding: 30px; border-radius: 22px; box-shadow: 0 16px 48px rgba(48, 45, 79, .06), 0 2px 5px rgba(48, 45, 79, .03); }
+.auth-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 30px; border: 1px solid var(--color-border-subtle, #eeebf4); border-radius: 11px; background: var(--color-surface-alt, #f7f5fa); }
+.auth-switch button { min-height: 37px; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 650; }
+.auth-switch button.active { border-color: var(--line); color: var(--green); background: var(--color-surface); box-shadow: 0 2px 4px rgba(48, 45, 79, .05); }
+.auth-card h2 { font-size: 26px; font-weight: 750; letter-spacing: -.035em; }
+.auth-description { margin: 10px 0 24px; font-size: 12px; }
+.auth-fields { grid-template-columns: 1fr; gap: 18px; margin: 0; }
+.auth-fields.registration { grid-template-columns: 1fr 1fr; gap: 16px; }
+.auth-fields label { font-size: 12px; font-weight: 600; gap: 8px; }
+.auth-fields input, .auth-fields textarea { min-height: 46px; padding: 12px 13px; border-radius: 10px; font-size: 13px; font-weight: 400; }
+input::placeholder, textarea::placeholder { color: var(--color-text-faint, #98a2b3); }
+input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--green); box-shadow: 0 0 0 3px rgba(139, 130, 219, .14); }
+button:focus-visible, a:focus-visible { outline: 3px solid rgba(139, 130, 219, .45); outline-offset: 3px; }
+.consent > span { display: flex; align-items: flex-start; gap: 9px; color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.6; }
+.consent input[type='checkbox'] { flex: none; width: 15px; height: 15px; min-height: 0; padding: 0; margin: 2px 0 0; accent-color: var(--green); }
+.forgot-link { display: flex; justify-content: flex-end; margin-top: 10px; }
+.forgot-link button, .back-link { padding: 4px 0; border: 0; background: transparent; color: var(--green); font-size: 11px; font-weight: 600; }
+.back-link { margin-bottom: 24px; }
+.auth-submit { width: 100%; min-height: 46px; margin-top: 22px; border-radius: 10px; font-size: 13px; font-weight: 650; box-shadow: 0 5px 12px rgba(113, 103, 201, .15); }
+button.primary:hover:not(:disabled) { background: var(--color-accent-hover, #6258b8); }
+.auth-footnote { display: flex; align-items: flex-start; gap: 8px; padding-top: 18px; margin: 24px 0 0; border-top: 1px solid var(--line); font-size: 11px; line-height: 1.6; }
+.auth-footnote app-icon { flex: none; width: 14px; height: 14px; margin-top: 2px; color: var(--green); }
+.error, .notice { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.6; border: 1px solid transparent; }
+.error { color: var(--status-danger-text, #b42318); background: var(--status-danger-bg, #fff0ee); }
+.notice { color: var(--status-success-text, #166534); background: var(--status-success-bg, #edf8f1); }
+.error app-icon, .notice app-icon { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.portal-welcome { padding: 38px 0 14px; }
+.portal-welcome h1 { margin: 10px 0; font-size: 32px; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.eyebrow { color: var(--green); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+.customer-navigation { gap: 6px; margin: 14px 0 32px; padding: 6px; border: 1px solid var(--line); border-radius: 13px; background: var(--color-surface); }
+.customer-navigation button { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; }
+.customer-navigation button.active { color: var(--green); background: var(--color-accent-bg); }
+.customer-navigation app-icon { width: 16px; height: 16px; }
+.cart-count { min-width: 19px; padding: 2px 5px; border-radius: 6px; background: var(--color-surface-alt); font-size: 10px; text-align: center; }
+.catalog-section { padding-top: 26px; scroll-margin-top: 24px; }
+.section-heading { margin-bottom: 24px; }
+.section-heading h2 { margin: 8px 0; font-size: 28px; letter-spacing: -.035em; }
+.section-heading p { margin: 0; font-size: 13px; }
+.catalog-search { padding: 16px 20px; }
+.catalog-search .fields { grid-template-columns: 1fr auto; align-items: end; margin: 0; }
+.catalog-search label { font-size: 11px; font-weight: 600; }
+.catalog-search input { min-height: 42px; }
+.catalog-search button { min-height: 42px; font-size: 12px; }
+.grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.offer-card { display: flex; flex-direction: column; min-width: 0; padding: 16px; margin: 0; border-radius: 12px; }
+.offer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.offer-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; color: var(--green); background: var(--color-accent-bg); }
+.offer-icon app-icon { width: 18px; height: 18px; }
+.tag { color: var(--muted); font-size: 10px; padding: 5px 8px; border-radius: 6px; }
+.offer-card h3 { font-size: 16px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.offer-card p { margin: 0 0 14px; font-size: 12px; }
+.offer-card small { font-size: 11px; }
+.offer-meta { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-top: auto; padding: 12px 0; }
+.offer-meta > strong { font-size: 20px; letter-spacing: -.03em; }
+.availability { color: var(--status-success-text); font-size: 10px; }
+.availability.unavailable { color: var(--muted); }
+.offer-card > button { min-height: 40px; font-size: 12px; font-weight: 650; }
+.catalog-empty { grid-column: 1/-1; padding: 40px; text-align: center; }
+.catalog-empty app-icon { width: 32px; height: 32px; margin-bottom: 14px; color: var(--green); }
+.catalog-summary { margin: 0 0 14px; font-size: 12px; scroll-margin-top: 24px; }
+.catalog-summary:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
+.catalog-pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.catalog-pagination button { min-height: 40px; color: var(--ink); }
+.request-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+.request-heading h3 { margin: 0; }
+.add-offers { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; font-size: 12px; font-weight: 600; }
+.add-offers app-icon { width: 16px; height: 16px; }
+.request-heading .add-offers { color: var(--green); background: var(--color-accent-bg); border-color: transparent; }
+.request-empty { display: flex; flex-direction: column; align-items: center; padding: 28px 18px; margin: 24px 0; border: 1px dashed var(--line); border-radius: 12px; background: var(--color-surface-alt); text-align: center; }
+.request-empty-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 14px; border-radius: 12px; background: var(--color-accent-bg); color: var(--green); }
+.request-empty-icon app-icon { width: 24px; height: 24px; }
+.request-empty > strong { font-size: 15px; }
+.request-empty p { margin: 8px 0 18px; font-size: 12px; }
+.request-form .row { align-items: center; }
+.request-form .row > div { flex: 1; min-width: 160px; }
+.request-form .row > label { display: grid; gap: 6px; width: 96px; font-size: 12px; }
+.row > div { min-width: 0; }
+.row strong, .row p { overflow-wrap: anywhere; }
+.portal-footer { display: flex; justify-content: space-between; gap: 15px; padding: 24px 0 100px; margin-top: 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+.portal-footer a { color: inherit; text-decoration: none; }
+@media (max-width: 960px) {
+  .portal-hero { gap: 32px; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); }
+  .portal-intro h1 { font-size: 36px; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .portal-page { padding: 20px 20px 0; }
+  .portal-header { padding-bottom: 20px; }
+  .portal-header .actions { gap: 16px; }
+  .portal-hero { grid-template-columns: 1fr; gap: 28px; padding: 36px 0; }
+  .portal-intro { text-align: center; }
+  .portal-intro h1 { margin: 16px 0 12px; font-size: 36px; }
+  .intro-description { margin: 0 auto; font-size: 13px; max-width: 360px; }
+  .portal-benefits { display: none; }
+  .auth-card { max-width: 440px; justify-self: center; padding: 26px; }
+  .customer-navigation { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  .customer-navigation button { flex: none; }
+}
+@media (max-width: 480px) {
+  .portal-page { padding-inline: 16px; }
+  .portal-header .actions { gap: 12px; }
+  .portal-link { font-size: 11px; }
+  .staff-link app-icon { display: none; }
+  .auth-card { padding: 24px 20px; border-radius: 18px; }
+  .auth-card h2 { font-size: 24px; }
+  .auth-fields.registration { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; }
+  .portal-welcome h1 { font-size: 27px; }
+  .portal-footer { flex-wrap: wrap; }
+}

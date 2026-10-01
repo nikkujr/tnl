@@ -1,0 +1,106 @@
+<div class="business">
+  <div class="bar">
+    <div>
+      <h2>Customer requests and follow-ups</h2>
+      <p>Handle customer requests before admin approval. Submitted terms are preserved.</p>
+    </div>
+    <button (click)="load()">Refresh</button>
+  </div>
+  @if (error()) {
+    <div class="error" role="alert">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="notice" role="status">{{ notice() }}</div>
+  }
+  <section class="panel">
+    <h3>Order requests</h3>
+    @for (r of requests(); track r.id) {
+      <article class="row">
+        <div>
+          <strong>#{{ r.id }} · {{ r.customerName }}</strong
+          ><small
+            >{{ r.status }} · {{ r.agentName || 'Awaiting admin assignment' }} ·
+            {{ r.created_at | date: 'medium' }}</small
+          >
+          <p>{{ r.delivery_address }}</p>
+          @for (p of r.snapshot.packages; track p.packageId) {
+            <small>{{ p.name }} × {{ p.quantity }}</small>
+          }
+          @for (i of r.snapshot.items; track i.productId) {
+            <small>{{ i.productName }} × {{ i.quantity }}</small>
+          }
+          <strong>{{ total(r) | currency: 'PHP' : 'symbol-narrow' }}</strong>
+          @if (r.decline_reason) {
+            <p>{{ r.decline_reason }}</p>
+          }
+        </div>
+        <div>
+          @if (r.status === 'SUBMITTED') {
+            @if (session()?.role === 'ADMIN') {
+              <label class="field"
+                >Assign field agent<select [(ngModel)]="assignments[r.id]">
+                  <option [ngValue]="undefined">Choose an agent</option>
+                  @for (a of agents(); track a.id) {
+                    <option [ngValue]="a.id">{{ a.fullName }}</option>
+                  }
+                </select></label
+              ><button (click)="assign(r.id)" [disabled]="!assignments[r.id] || busy()">
+                Assign
+              </button>
+            }
+            <button class="primary" (click)="convert(r.id)" [disabled]="!r.agent_id || busy()">
+              Convert to pending order</button
+            ><label class="field"
+              >Reason if declining<input [(ngModel)]="reasons[r.id]" maxlength="500" /></label
+            ><button class="danger" (click)="decline(r.id)" [disabled]="!reasons[r.id] || busy()">
+              Decline request
+            </button>
+          } @else if (r.order_id) {
+            <button (click)="router.navigateByUrl('/orders/' + r.order_id)">View order</button>
+          }
+        </div>
+      </article>
+    } @empty {
+      <p>No customer requests.</p>
+    }
+  </section>
+  <section class="panel">
+    <h3>Open order follow-ups</h3>
+    @for (f of followups(); track f.id) {
+      <article class="row">
+        <div>
+          <strong>{{ f.customerName }} · {{ f.trackingNumber }}</strong
+          ><small>{{ f.createdAt | date: 'medium' }}</small>
+          <p>{{ f.message }}</p>
+          <button (click)="router.navigateByUrl('/orders/' + f.orderId)">View order</button>
+        </div>
+        <div>
+          <label class="field"
+            >Reply to customer<textarea
+              [(ngModel)]="replies[f.id]"
+              rows="3"
+              maxlength="2000"
+            ></textarea></label
+          ><button class="primary" (click)="reply(f.id)" [disabled]="!replies[f.id] || busy()">
+            Send reply
+          </button>
+        </div>
+      </article>
+    } @empty {
+      <p>No open follow-ups.</p>
+    }
+  </section>
+  <form class="panel" (ngSubmit)="invite()">
+    <h3>Invite an existing customer</h3>
+    <p>
+      Use the customer record ID. Agents can invite their assigned customers; admins can invite any
+      customer.
+    </p>
+    <div class="fields">
+      <label
+        >Customer ID<input type="number" min="1" name="inviteId" [(ngModel)]="inviteId" required
+      /></label>
+    </div>
+    <button [disabled]="inviteId < 1 || busy()">Queue account invitation</button>
+  </form>
+</div>

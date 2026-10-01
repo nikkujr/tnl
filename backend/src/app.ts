@@ -5,6 +5,7 @@ import { config } from "./config.js";
 import authRoutes from "./features/auth/route.js";
 import categoryRoutes from "./features/categories/route.js";
 import agentRoutes from "./features/agents/route.js";
+import performanceRoutes from "./features/performance/route.js";
 import campaignRoutes from "./features/campaigns/route.js";
 import commissionRoutes from "./features/commissions/route.js";
 import leadRoutes from "./features/leads/route.js";
@@ -15,6 +16,17 @@ import orderRoutes from "./features/orders/route.js";
 import productRoutes from "./features/products/route.js";
 import trackingRoutes from "./features/tracking/route.js";
 import { errorHandler, notFound } from "./shared/http.js";
+import packageRoutes from "./features/packages/route.js";
+import catalogRoutes from "./features/catalog/route.js";
+import customerAuthRoutes from "./features/customer-auth/route.js";
+import {
+  customerRouter,
+  staffRouter,
+} from "./features/customer-portal/route.js";
+import {
+  automationRouter,
+  notificationRouter,
+} from "./features/automations/route.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -23,8 +35,16 @@ app.use(cors({ origin: config.corsOrigins, credentials: false }));
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.use("/api/v1/packages", packageRoutes);
+app.use("/api/v1/catalog", catalogRoutes);
+app.use("/api/v1/customer-auth", customerAuthRoutes);
+app.use("/api/v1/customer", customerRouter);
+app.use("/api/v1/requests", staffRouter);
+app.use("/api/v1/automations", automationRouter);
+app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/agents", agentRoutes);
+app.use("/api/v1/performance", performanceRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
 app.use("/api/v1/commissions", commissionRoutes);
 app.use("/api/v1/leads", leadRoutes);

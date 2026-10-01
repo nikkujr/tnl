@@ -2,7 +2,7 @@ import { Component, Input, inject } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
   AlertCircle, AlertTriangle, BadgeDollarSign, Bell, Boxes, Check, CheckCircle2, ChevronDown, ChevronRight, CircleUserRound, ClipboardList, Gauge,
-  Info, LayoutDashboard, Mail, MapPinned, Megaphone, Menu, Monitor, Moon, Package, PackageSearch,
+  Info, LayoutDashboard, LogOut, Mail, MapPinned, Megaphone, Menu, Monitor, Moon, Package, PackageSearch,
   Pencil, Plus, RotateCcw, Search, Sun, Tags, Trash2, UserCog, UserRoundSearch,
   UsersRound, Warehouse, X, type IconNode
 } from 'lucide';
@@ -13,7 +13,7 @@ const ICONS = {
   leads: UserRoundSearch, campaigns: Megaphone, agents: UserCog,
   commissions: BadgeDollarSign, bell: Bell, plus: Plus, menu: Menu, close: X,
   check: Check, edit: Pencil, delete: Trash2, email: Mail, search: Search,
-  restore: RotateCcw, account: CircleUserRound, catalog: Boxes,
+  restore: RotateCcw, account: CircleUserRound, logout: LogOut, catalog: Boxes,
   packageSearch: PackageSearch, gauge: Gauge, chevronDown: ChevronDown, chevronRight: ChevronRight,
   alert: AlertTriangle, sun: Sun, moon: Moon, monitor: Monitor,
   checkCircle: CheckCircle2, alertCircle: AlertCircle, info: Info

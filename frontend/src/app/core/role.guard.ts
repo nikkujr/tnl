@@ -8,7 +8,8 @@ export function roleGuard(allowed: Role[]): CanMatchFn {
     const session = inject(SessionService).session();
     const router = inject(Router);
     if (!session) return router.parseUrl('/');
-    if (!allowed.includes(session.role)) return router.parseUrl('/dashboard');
+    if (!allowed.includes(session.role))
+      return router.parseUrl(session.role === 'CUSTOMER' ? '/portal' : '/dashboard');
     return true;
   };
 }
