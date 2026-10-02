@@ -47,6 +47,7 @@
           <button class="row-action" (click)="viewAgent(item)">View</button>
           <button class="row-action" (click)="openForm(item)">Edit</button>
           @if (item.active) {
+            <button class="row-action" (click)="resetPassword(item)">Reset password</button>
             <button class="row-action reject" (click)="deactivate(item)">Deactivate</button>
           } @else {
             <button class="row-action approve" (click)="activate(item)">Activate</button>
@@ -94,15 +95,18 @@
               [(ngModel)]="form.commissionRate"
               readonly
           /></label>
-          <label class="wide"
-            >Password {{ editingId ? '(leave blank to keep current password)' : ''
-            }}<input
-              name="agentPassword"
-              type="password"
-              minlength="8"
-              [(ngModel)]="form.password"
-              [required]="!editingId"
-          /></label>
+          @if (!editingId) {
+            <label class="wide"
+              >Password<input
+                name="agentPassword"
+                type="password"
+                minlength="8"
+                maxlength="72"
+                autocomplete="new-password"
+                [(ngModel)]="form.password"
+                [required]="!editingId"
+            /></label>
+          }
         </div>
         <footer>
           <button type="button" class="secondary-button" (click)="showForm.set(false)">
@@ -120,4 +124,8 @@
     (cancelled)="confirmDialog.cancel()"
     (confirmed)="confirmDialog.confirm($event)"
   />
+}
+
+@if (resetTarget(); as target) {
+  <app-password-reset-dialog [target]="target" (closed)="resetTarget.set(null)" />
 }

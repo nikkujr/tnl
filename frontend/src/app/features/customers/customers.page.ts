@@ -9,10 +9,20 @@ import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
 import { ActionDialogComponent } from '../../shared/action-dialog.component';
 import { AppIconComponent } from '../../shared/app-icon.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import {
+  PasswordResetDialogComponent,
+  PasswordResetTarget,
+} from '../../shared/password-reset-dialog.component';
 
 @Component({
   selector: 'app-customers-page',
-  imports: [FormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent],
+  imports: [
+    FormsModule,
+    ActionDialogComponent,
+    AppIconComponent,
+    BreadcrumbComponent,
+    PasswordResetDialogComponent,
+  ],
   templateUrl: './customers.page.html',
   styleUrl: './customers.page.scss',
 })
@@ -30,6 +40,16 @@ export class CustomersPage implements OnInit, OnDestroy {
   readonly activeAgents = computed(() => this.agents().filter((agent) => agent.active));
   readonly loading = signal(true);
   readonly showForm = signal(false);
+  readonly resetTarget = signal<PasswordResetTarget | null>(null);
+
+  resetPassword(customer: Customer): void {
+    this.resetTarget.set({
+      id: customer.id,
+      fullName: customer.fullName,
+      email: customer.email,
+      kind: 'customers',
+    });
+  }
 
   search = '';
   agentFilter: number | null = null;
@@ -147,12 +167,10 @@ export class CustomersPage implements OnInit, OnDestroy {
   }
 
   invite(customer: Customer) {
-    this.business
-      .post('customer-auth/invite', { customerId: customer.id })
-      .subscribe({
-        next: () => this.toast.success('Invitation queued.'),
-        error: (e) => this.toast.fail(e.error?.error?.message ?? 'Unable to invite customer.'),
-      });
+    this.business.post('customer-auth/invite', { customerId: customer.id }).subscribe({
+      next: () => this.toast.success('Invitation queued.'),
+      error: (e) => this.toast.fail(e.error?.error?.message ?? 'Unable to invite customer.'),
+    });
   }
 
   async remove(customer: Customer): Promise<void> {

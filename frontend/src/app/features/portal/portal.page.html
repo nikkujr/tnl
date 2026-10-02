@@ -5,6 +5,7 @@
     >
     <div class="actions">
       @if (session()?.role === 'CUSTOMER') {
+        <a class="portal-link" routerLink="/account"><app-icon name="account" />My account</a>
         <button class="sign-out" (click)="logout()"><app-icon name="logout" />Sign out</button>
       } @else {
         <a class="portal-link" href="#offers">Browse offers</a>

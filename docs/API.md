@@ -27,6 +27,16 @@ errors use `{ "error": { "message": "...", "details": {} } }`.
 
 Returns an access token and the authenticated user.
 
+## My account
+
+Account endpoints accept active Admin/Agent sessions or verified Customer sessions and always derive identity from the authenticated account. No submitted user/customer ID selects a profile.
+
+- `GET /account` — own `{id,role,fullName,email,phone,address}`. Staff addresses are null; customer `id` is the login account ID, not an editable CRM ID. Password hashes and session versions are not profile fields.
+- `PATCH /account/profile` — `{fullName,phone,address?}`. A normalized PH mobile number is required for agents/customers; admins may submit null. Customers require an address; staff must omit it. Returns `{profile,user,token}` to refresh the current browser. Unknown fields, including email, role, assignment, consent, or another account ID, are rejected. Sign-in email remains read-only; saved order/request addresses are preserved.
+- `PATCH /account/password` — `{currentPassword,newPassword}`. Requires the correct current password, a different password of 8–72 characters and at most 72 UTF-8 bytes. Returns `{profile,user,token}` with the new session version. Old tokens are rejected, including from other browsers; outstanding customer reset links are invalidated. The endpoint limits repeated attempts.
+
+Run migrations before using these endpoints. Staff tokens without a version are treated as version zero until a password change. Admin replacement of an agent password also increments its session version. See [My account behavior and acceptance](ACCOUNTS.md).
+
 ## Dashboard
 
 ### `GET /dashboard`
@@ -35,6 +45,9 @@ Returns the role-scoped order counts, recognized paid revenue, total customers,
 product count, and low-stock count.
 
 ## Customers
+
+- `POST /customers/:id/reset-password` — Admin only; `id` is the CRM customer ID. Strict body `{newPassword}`; requires an active verified portal account. Sets a different password (8+ characters, at most 72 UTF-8 bytes), revokes existing customer sessions and unused recovery links, and records a credential-free admin audit event in the same transaction. Returns `{id,reset:true}` without a session token. Missing customer: 404; no active verified account: 409. Does not create, verify, or reactivate an account or send email.
+- Customer list rows include `portalAccountExists` and `portalAccountActive` for portal invitation/reset controls.
 
 ### `GET /customers?search=&page=1&limit=20`
 
@@ -189,6 +202,7 @@ Consent is rechecked before each recipient send. SMTP configuration is checked b
 - `POST /agents` — create with name, email, phone, password, and optional legacy commission rate
 - `PUT /agents/:id` — update contact/legacy rate and optionally replace the password
 - `POST /agents/:id/activate` — restores an inactive agent's access
+- `POST /agents/:id/reset-password` — Admin only; strict body `{newPassword}`. Requires an active agent; sets a different password (8+ characters, at most 72 UTF-8 bytes), revokes previous agent sessions, and records a credential-free admin audit event in the same transaction. Returns `{id,reset:true}` without a session token. Missing/wrong-role target: 404; inactive agent: 409. Does not change profile details or send email. Reset routes are rate-limited to 20 attempts per IP per 15 minutes.
 - `DELETE /agents/:id` — deactivates only after active-order checks
 
 Admin performance endpoints:

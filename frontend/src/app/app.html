@@ -184,7 +184,7 @@
           <span class="eyebrow">{{ session()!.role }} workspace</span>
           <h1>
             {{
-              isNewOrderPage()
+              routedPath() === 'account' ? 'My account' : isNewOrderPage()
                 ? 'New Order'
                 : isOrderDetailPage()
                   ? 'Order details'
@@ -352,6 +352,7 @@
                   <strong>{{ session()!.fullName }}</strong>
                   <small>{{ session()!.role }} · {{ session()!.email }}</small>
                 </div>
+                <button type="button" (click)="openMyAccount()"><app-icon name="account" />My account</button>
                 <button type="button" (click)="logout()"><app-icon name="logout" />Sign out</button>
               </section>
             }

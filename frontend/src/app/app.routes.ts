@@ -4,6 +4,11 @@ import { roleGuard } from './core/role.guard';
 
 export const routes: Routes = [
   {
+    path: 'account',
+    canMatch: [roleGuard(['ADMIN', 'AGENT', 'CUSTOMER'])],
+    loadComponent: () => import('./features/account/account.page').then((m) => m.AccountPage),
+  },
+  {
     path: 'portal',
     loadComponent: () => import('./features/portal/portal.page').then((m) => m.PortalPage),
   },

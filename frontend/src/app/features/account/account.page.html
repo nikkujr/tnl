@@ -1,0 +1,221 @@
+<div class="account-page" [class.customer-account]="session()?.role === 'CUSTOMER'">
+  @if (session()?.role === 'CUSTOMER') {
+    <header class="customer-account-header">
+      <a class="brand" routerLink="/portal"
+        ><span class="brand-mark">T</span><strong>TNL TRACK</strong></a
+      ><a class="back-link" routerLink="/portal"
+        >Back to customer portal <app-icon name="chevronRight"
+      /></a>
+    </header>
+  }
+  <div class="account-content">
+    <app-breadcrumb
+      [items]="[
+        {
+          label: session()?.role === 'CUSTOMER' ? 'Customer portal' : 'Dashboard',
+          link: session()?.role === 'CUSTOMER' ? '/portal' : '/dashboard',
+        },
+        { label: 'My account' },
+      ]"
+    />
+    <div class="page-intro">
+      <span class="eyebrow">Account settings</span>
+      <h2>My account</h2>
+      <p>Keep your details up to date and manage your password.</p>
+    </div>
+    @if (loading()) {
+      <div class="panel empty" role="status">Loading your account…</div>
+    }
+    @if (loadError()) {
+      <div class="alert error" role="alert">
+        {{ loadError() }} <button class="secondary" (click)="load()">Try again</button>
+      </div>
+    }
+    @if (profile(); as data) {
+      <div class="account-grid">
+        <aside class="panel identity-card">
+          <span class="profile-avatar">{{ initials() }}</span>
+          <h3>{{ data.fullName }}</h3>
+          <p>{{ data.email }}</p>
+          <span class="role-badge">{{
+            data.role === 'CUSTOMER'
+              ? 'Customer'
+              : data.role === 'AGENT'
+                ? 'Field agent'
+                : 'Administrator'
+          }}</span
+          ><a
+            class="back-link"
+            [routerLink]="data.role === 'CUSTOMER' ? '/portal' : '/dashboard'"
+            >{{
+              data.role === 'CUSTOMER' ? 'Back to my customer space' : 'Back to my workspace'
+            }}</a
+          >
+        </aside>
+        <div class="account-forms">
+          <section class="panel">
+            <div class="section-head">
+              <span class="section-icon"><app-icon name="account" /></span>
+              <div>
+                <h3>Profile details</h3>
+                <p>Your name and contact information.</p>
+              </div>
+            </div>
+            <form #profileForm="ngForm" (ngSubmit)="profileForm.valid && saveProfile()">
+              @if (profileError()) {
+                <div class="alert error" role="alert">{{ profileError() }}</div>
+              }
+              @if (profileNotice()) {
+                <div class="alert success" role="status">{{ profileNotice() }}</div>
+              }
+              <div class="fields">
+                <label class="wide"
+                  >Full name<input
+                    name="fullName"
+                    [(ngModel)]="fullName"
+                    autocomplete="name"
+                    minlength="2"
+                    maxlength="160"
+                    required
+                    [disabled]="saving() !== null"
+                /></label>
+                <label
+                  >Sign-in email<input
+                    type="email"
+                    [value]="data.email"
+                    readonly
+                    aria-describedby="account-email-help"
+                  /><small id="account-email-help"
+                    >Your sign-in email stays linked to your account.</small
+                  ></label
+                >
+                <label
+                  >Phone number {{ data.role === 'ADMIN' ? '(optional)' : ''
+                  }}<input
+                    name="phone"
+                    type="tel"
+                    [(ngModel)]="phone"
+                    autocomplete="tel"
+                    maxlength="40"
+                    [required]="data.role !== 'ADMIN'"
+                    [disabled]="saving() !== null"
+                    placeholder="09171234567"
+                  /><small>Use a Philippine mobile number.</small></label
+                >
+                @if (data.role === 'CUSTOMER') {
+                  <label class="wide"
+                    >Address<textarea
+                      name="address"
+                      [(ngModel)]="address"
+                      autocomplete="street-address"
+                      minlength="5"
+                      maxlength="500"
+                      required
+                      [disabled]="saving() !== null"
+                    ></textarea
+                    ><small
+                      >Used as the starting address for future requests. Existing order addresses
+                      stay as submitted.</small
+                    ></label
+                  >
+                }
+              </div>
+              <div class="form-footer">
+                <button
+                  class="primary"
+                  type="submit"
+                  [disabled]="saving() !== null || profileForm.invalid"
+                >
+                  {{ saving() === 'profile' ? 'Saving…' : 'Save profile' }}
+                </button>
+              </div>
+            </form>
+          </section>
+          <section class="panel">
+            <div class="section-head">
+              <span class="section-icon"><app-icon name="checkCircle" /></span>
+              <div>
+                <h3>Change password</h3>
+                <p>Confirm your current password to choose a new one.</p>
+              </div>
+            </div>
+            <form #passwordForm="ngForm" (ngSubmit)="passwordForm.valid && changePassword()">
+              @if (passwordError()) {
+                <div class="alert error" role="alert">{{ passwordError() }}</div>
+              }
+              @if (passwordNotice()) {
+                <div class="alert success" role="status">{{ passwordNotice() }}</div>
+              }
+              <div class="fields">
+                <label class="wide"
+                  >Current password<input
+                    name="currentPassword"
+                    type="password"
+                    [(ngModel)]="currentPassword"
+                    autocomplete="current-password"
+                    required
+                    maxlength="1024"
+                    [disabled]="saving() !== null"
+                /></label>
+                <label
+                  >New password<input
+                    name="newPassword"
+                    aria-label="New password"
+                    aria-describedby="account-password-help"
+                    [type]="showPassword() ? 'text' : 'password'"
+                    [(ngModel)]="newPassword"
+                    autocomplete="new-password"
+                    required
+                    minlength="8"
+                    maxlength="72"
+                    [disabled]="saving() !== null"
+                  /><small id="account-password-help">Use at least 8 characters.</small></label
+                >
+                <label
+                  >Confirm new password<input
+                    name="confirmPassword"
+                    aria-label="Confirm new password"
+                    [attr.aria-invalid]="
+                      confirmPassword && confirmPassword !== newPassword ? true : null
+                    "
+                    [type]="showPassword() ? 'text' : 'password'"
+                    [(ngModel)]="confirmPassword"
+                    autocomplete="new-password"
+                    required
+                    minlength="8"
+                    maxlength="72"
+                    [disabled]="saving() !== null"
+                  />
+                  @if (confirmPassword && confirmPassword !== newPassword) {
+                    <small class="field-error">New passwords do not match.</small>
+                  }
+                </label>
+              </div>
+              <div class="password-options">
+                <button
+                  class="text-button"
+                  type="button"
+                  [attr.aria-pressed]="showPassword()"
+                  (click)="showPassword.set(!showPassword())"
+                >
+                  {{ showPassword() ? 'Hide new password' : 'Show new password' }}</button
+                ><small>Changing your password signs out other sessions.</small>
+              </div>
+              <div class="form-footer">
+                <button
+                  class="primary"
+                  type="submit"
+                  [disabled]="
+                    saving() !== null || passwordForm.invalid || newPassword !== confirmPassword
+                  "
+                >
+                  {{ saving() === 'password' ? 'Changing…' : 'Change password' }}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </div>
+    }
+  </div>
+</div>

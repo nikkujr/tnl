@@ -51,6 +51,8 @@ export interface Customer {
   assignedAgentId: number | null;
   assignedAgentName: string | null;
   marketingOptIn?: boolean;
+  portalAccountActive?: boolean;
+  portalAccountExists?: boolean;
 }
 export interface Product {
   id: number;

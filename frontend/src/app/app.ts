@@ -326,6 +326,10 @@ export class App implements OnInit, OnDestroy {
     this.notificationPanelOpen.set(false);
     this.accountMenuOpen.update((open) => !open);
   }
+  openMyAccount(): void {
+    this.accountMenuOpen.set(false);
+    this.router.navigateByUrl('/account');
+  }
   @HostListener('document:keydown.escape')
   closeAccountMenu(): void {
     if (!this.accountMenuOpen()) return;

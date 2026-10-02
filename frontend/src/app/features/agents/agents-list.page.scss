@@ -14,3 +14,22 @@
   align-items: center;
   flex-wrap: wrap;
 }
+.agents-table .management-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 0.75fr 0.6fr minmax(150px, 1.1fr);
+}
+.management-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .agents-table .management-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  .agents-table .management-row.header {
+    display: none;
+  }
+  .agents-table .table-actions {
+    grid-column: 1 / -1;
+  }
+}

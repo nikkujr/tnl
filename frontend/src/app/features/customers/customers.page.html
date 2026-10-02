@@ -37,7 +37,14 @@
         <span class="customer-avatar">{{ customer.fullName.slice(0, 2).toUpperCase() }}</span>
         <span class="customer-name"
           ><strong>{{ customer.fullName }}</strong
-          ><small>{{ customer.email }}</small></span
+          ><small>{{ customer.email }}</small
+          ><small>{{
+            customer.portalAccountActive
+              ? 'Portal account active'
+              : customer.portalAccountExists
+                ? 'Portal account inactive'
+                : 'No portal account'
+          }}</small></span
         >
         <span
           ><small>Phone</small><strong>{{ customer.phone }}</strong></span
@@ -50,9 +57,14 @@
           ><strong>{{ customer.assignedAgentName || 'Unassigned' }}</strong></span
         >
         <span class="table-actions">
-          <button class="row-action" (click)="openForm(customer)">Edit</button
-          ><button class="row-action" (click)="invite(customer)">Invite to portal</button>
+          <button class="row-action" (click)="openForm(customer)">Edit</button>
+          @if (!customer.portalAccountActive && !customer.portalAccountExists) {
+            <button class="row-action" (click)="invite(customer)">Invite to portal</button>
+          }
           @if (session()!.role === 'ADMIN') {
+            @if (customer.portalAccountActive) {
+              <button class="row-action" (click)="resetPassword(customer)">Reset password</button>
+            }
             <button class="row-action reject" (click)="remove(customer)">Delete</button>
           }
         </span>
@@ -146,4 +158,8 @@
     (cancelled)="confirmDialog.cancel()"
     (confirmed)="confirmDialog.confirm($event)"
   />
+}
+
+@if (resetTarget(); as target) {
+  <app-password-reset-dialog [target]="target" (closed)="resetTarget.set(null)" />
 }

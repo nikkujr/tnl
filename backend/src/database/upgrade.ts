@@ -4,6 +4,7 @@ import { db } from "./connection.js";
 export async function upgrade() {
   // Existing records are deliberately legacy; new sales explicitly opt into PACKAGE.
   const columns: Record<string, Record<string, string>> = {
+    users: { token_version: "INT UNSIGNED NOT NULL DEFAULT 0" },
     orders: {
       sales_version: "ENUM('LEGACY','PACKAGE') NOT NULL DEFAULT 'LEGACY'",
       approved_at: "DATETIME NULL",

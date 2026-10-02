@@ -5,6 +5,9 @@ import { authenticate, authorize } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
 import { normalizePhPhone } from "../../shared/phone.js";
 import { transaction } from "../../shared/transaction.js";
+import { newPassword } from "../../shared/password.js";
+import { resetAccountPassword } from "../../shared/admin-password-reset.js";
+import { rateLimit } from "../../shared/rate-limit.js";
 import {
   welcome,
   event,
@@ -26,6 +29,32 @@ const phoneField = z.string().transform((value, ctx) => {
 
 const router = Router();
 router.use(authenticate);
+router.post(
+  "/:id/reset-password",
+  authorize("ADMIN"),
+  rateLimit(),
+  validate(
+    z.object({
+      body: z.object({ newPassword }).strict(),
+      query: z.any(),
+      params: z.object({ id: z.coerce.number().int().positive() }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      res.json({
+        data: await resetAccountPassword(
+          "CUSTOMER",
+          Number(req.params.id),
+          req.body.newPassword,
+          req.user!.id,
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.get("/", async (req, res, next) => {
   try {
@@ -49,7 +78,8 @@ router.get("/", async (req, res, next) => {
     args.push(limit, offset);
     const [rows] = await db.query(
       `SELECT c.id,c.full_name fullName,c.email,c.phone,c.address,c.marketing_opt_in marketingOptIn,c.assigned_agent_id assignedAgentId,
-       u.full_name assignedAgentName FROM customers c LEFT JOIN users u ON u.id=c.assigned_agent_id
+       u.full_name assignedAgentName,EXISTS(SELECT 1 FROM customer_accounts ca WHERE ca.customer_id=c.id) portalAccountExists,
+       EXISTS(SELECT 1 FROM customer_accounts ca WHERE ca.customer_id=c.id AND ca.active=TRUE AND ca.verified_at IS NOT NULL) portalAccountActive FROM customers c LEFT JOIN users u ON u.id=c.assigned_agent_id
        WHERE (c.full_name LIKE ? OR c.email LIKE ? OR c.phone LIKE ? OR c.address LIKE ? OR u.full_name LIKE ?)${scope}
        ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
       args,

@@ -6,6 +6,9 @@ import { authenticate, authorize } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
 import { normalizePhPhone } from "../../shared/phone.js";
 import { saleTotalSql } from "../orders/queries.js";
+import { newPassword } from "../../shared/password.js";
+import { resetAccountPassword } from "../../shared/admin-password-reset.js";
+import { rateLimit } from "../../shared/rate-limit.js";
 
 const phoneField = z.string().transform((value, ctx) => {
   const normalized = normalizePhPhone(value);
@@ -21,6 +24,31 @@ const phoneField = z.string().transform((value, ctx) => {
 
 const router = Router();
 router.use(authenticate, authorize("ADMIN"));
+router.post(
+  "/:id/reset-password",
+  rateLimit(),
+  validate(
+    z.object({
+      body: z.object({ newPassword }).strict(),
+      query: z.any(),
+      params: z.object({ id: z.coerce.number().int().positive() }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      res.json({
+        data: await resetAccountPassword(
+          "AGENT",
+          Number(req.params.id),
+          req.body.newPassword,
+          req.user!.id,
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 router.get("/", async (req, res, next) => {
   try {
     const search = `%${String(req.query.search ?? "")}%`;
@@ -104,14 +132,14 @@ const body = z.object({
   fullName: z.string().min(2).max(160),
   email: z.email(),
   phone: phoneField,
-  password: z.string().min(8).optional(),
+  password: newPassword.optional(),
   commissionRate: z.number().min(0).max(100).default(0),
 });
 router.post(
   "/",
   validate(
     z.object({
-      body: body.extend({ password: z.string().min(8) }),
+      body: body.extend({ password: newPassword }),
       query: z.any(),
       params: z.any(),
     }),
@@ -161,7 +189,7 @@ router.put(
       if (req.body.password) {
         const hash = await bcrypt.hash(req.body.password, 12);
         const [result] = await db.execute<any>(
-          "UPDATE users SET email=?,phone=?,full_name=?,commission_rate=?,password_hash=? WHERE id=? AND role='AGENT'",
+          "UPDATE users SET email=?,phone=?,full_name=?,commission_rate=?,password_hash=?,token_version=token_version+1 WHERE id=? AND role='AGENT'",
           [
             req.body.email.toLowerCase(),
             req.body.phone,

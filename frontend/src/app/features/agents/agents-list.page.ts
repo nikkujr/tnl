@@ -8,6 +8,10 @@ import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
 import { ActionDialogComponent } from '../../shared/action-dialog.component';
 import { AppIconComponent } from '../../shared/app-icon.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import {
+  PasswordResetDialogComponent,
+  PasswordResetTarget,
+} from '../../shared/password-reset-dialog.component';
 
 @Component({
   selector: 'app-agents-list-page',
@@ -18,6 +22,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
     ActionDialogComponent,
     AppIconComponent,
     BreadcrumbComponent,
+    PasswordResetDialogComponent,
   ],
   templateUrl: './agents-list.page.html',
   styleUrl: './agents-list.page.scss',
@@ -31,6 +36,16 @@ export class AgentsListPage implements OnInit, OnDestroy {
   readonly agents = signal<Agent[]>([]);
   readonly loading = signal(true);
   readonly showForm = signal(false);
+  readonly resetTarget = signal<PasswordResetTarget | null>(null);
+
+  resetPassword(agent: Agent): void {
+    this.resetTarget.set({
+      id: agent.id,
+      fullName: agent.fullName,
+      email: agent.email,
+      kind: 'agents',
+    });
+  }
 
   search = '';
   status = 'ALL';

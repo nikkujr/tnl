@@ -13,7 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BusinessApi, CatalogOffer } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
 import { GuidedChatComponent } from '../../shared/guided-chat.component';
@@ -21,7 +21,7 @@ import { AppIconComponent } from '../../shared/app-icon.component';
 type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'reset';
 @Component({
   selector: 'app-customer-portal',
-  imports: [FormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent],
+  imports: [FormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
   templateUrl: './portal.page.html',
   styleUrls: ['../../shared/business.scss', './portal.page.scss'],
 })

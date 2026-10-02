@@ -10,6 +10,7 @@ export interface SessionUser {
   email: string;
   fullName: string;
   role: Role;
+  tokenVersion?: number;
 }
 
 declare global {
@@ -37,15 +38,18 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
     if (claims.role !== "ADMIN" && claims.role !== "AGENT")
       return next(new HttpError(403, "Staff access required"));
     const [rows] = await db.query<any[]>(
-      "SELECT id,email,full_name,role FROM users WHERE id=? AND active=TRUE AND role=?",
+      "SELECT id,email,full_name,role,token_version tokenVersion FROM users WHERE id=? AND active=TRUE AND role=?",
       [claims.id, claims.role],
     );
     if (!rows[0]) return next(new HttpError(401, "Staff account is inactive"));
+    if (Number(rows[0].tokenVersion) !== (claims.tokenVersion ?? 0))
+      return next(new HttpError(401, "Staff session expired. Sign in again."));
     req.user = {
       id: rows[0].id,
       email: rows[0].email,
       fullName: rows[0].full_name,
       role: rows[0].role,
+      tokenVersion: Number(rows[0].tokenVersion),
     };
     next();
   } catch {
