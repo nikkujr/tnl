@@ -59,6 +59,8 @@ async function issue(
       kind: "EMAIL",
       authTokenHash: tokenHash,
       to: address,
+      actionUrl: `${config.PUBLIC_APP_URL}/portal?${mode}=${raw}`,
+      actionLabel: purpose === "RESET" ? "Reset password" : "Activate account",
       subject:
         purpose === "RESET"
           ? "Reset your TNL Track password"

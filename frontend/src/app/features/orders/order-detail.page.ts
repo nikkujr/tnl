@@ -6,7 +6,8 @@ import { ApiService, OrderDetail, SessionUser } from '../../core/api.service';
 import { AppIconComponent, AppIconName } from '../../shared/app-icon.component';
 import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-dialog.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
-import { DELIVERY_STEPS, DeliveryStatus, nextDeliveryStep } from '../../shared/delivery-steps';
+import { DeliveryPanelComponent } from '../delivery/delivery-panel.component';
+import { DELIVERY_STEPS } from '../../shared/delivery-steps';
 import {
   buildPaymentDialogFields,
   PaymentStatus,
@@ -24,7 +25,7 @@ const HISTORY_ICONS: Record<string, AppIconName> = {
 
 @Component({
   selector: 'app-order-detail-page',
-  imports: [CurrencyPipe, DatePipe, AppIconComponent, ActionDialogComponent, BreadcrumbComponent],
+  imports: [CurrencyPipe, DatePipe, AppIconComponent, ActionDialogComponent, BreadcrumbComponent, DeliveryPanelComponent],
   templateUrl: './order-detail.page.html',
   styleUrls: ['./order-detail.page.scss'],
 })
@@ -70,7 +71,7 @@ export class OrderDetailPage implements OnInit {
     });
   }
 
-  private load(id: number): void {
+  load(id: number): void {
     this.order.set(null);
     this.closeActionDialog();
     this.loading.set(true);
@@ -137,44 +138,6 @@ export class OrderDetailPage implements OnInit {
             this.load(order.id);
           },
           error: (e) => this.handleError(e, 'Unable to update payment details.'),
-        });
-      },
-    );
-  }
-
-  advanceDelivery(): void {
-    const order = this.order();
-    if (!order) return;
-    const currentValue = (order.deliveryStatus ?? 'PREPARING') as DeliveryStatus;
-    const suggested = nextDeliveryStep(order.deliveryStatus as DeliveryStatus | null);
-    this.openDialog(
-      {
-        title: 'Update delivery progress',
-        message: `Record the next delivery event for ${order.trackingNumber}.`,
-        confirmLabel: 'Update delivery',
-        fields: [
-          {
-            key: 'status',
-            label: 'Delivery status',
-            type: 'steps',
-            value: suggested,
-            currentValue,
-            steps: DELIVERY_STEPS,
-            required: true,
-          },
-          { key: 'notes', label: 'Event note (optional)', type: 'text', value: '' },
-        ],
-      },
-      (values) => {
-        const value = String(values['status']) as DeliveryStatus;
-        const notes = String(values['notes'] || '') || undefined;
-        this.loading.set(true);
-        this.api.updateDeliveryStatus(order.id, value, notes).subscribe({
-          next: () => {
-            this.showSuccess('Delivery progress updated.');
-            this.load(order.id);
-          },
-          error: (e) => this.handleError(e, 'Unable to update delivery status.'),
         });
       },
     );

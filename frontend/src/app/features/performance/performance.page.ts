@@ -12,6 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { BusinessApi } from '../../core/business-api.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { downloadCsv, printReport } from '../../shared/report-output';
 
 interface PerformanceAgent {
   id: number;
@@ -74,6 +75,8 @@ export class PerformancePage implements OnInit {
     .format(new Date())
     .slice(0, 7);
   readonly report = signal<PerformanceReport | null>(null);
+  readonly loadedAt = signal('');
+  readonly print = printReport;
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
@@ -128,6 +131,7 @@ export class PerformancePage implements OnInit {
       next: ({ data }) => {
         if (request === this.requestNumber) {
           this.report.set(data);
+          this.loadedAt.set(new Date().toISOString());
           this.loading.set(false);
         }
       },
@@ -221,6 +225,26 @@ export class PerformancePage implements OnInit {
   }
   progressWidth(agent: PerformanceAgent) {
     return Math.min(Number(agent.progress ?? 0), 100);
+  }
+  exportCsv() {
+    const data = this.report();
+    if (!data || this.loading() || this.saving()) return;
+    const rows = [
+      { section: 'Performance summary', ...data.totals },
+      ...data.agents.map((row) => ({ section: 'Agents and targets', ...row })),
+      ...data.trend.map((row) => ({ section: 'Daily completed sales', ...row })),
+      ...data.rewards.map((row) => ({ section: 'Approved rewards (not payouts)', ...row })),
+    ];
+    downloadCsv(
+      `tnl-performance-${data.period}.csv`,
+      rows.map((row) => ({
+        period: data.period,
+        timeZone: data.timeZone,
+        currency: 'PHP',
+        loadedAt: this.loadedAt(),
+        ...row,
+      })),
+    );
   }
   incentiveLabel(agent: PerformanceAgent) {
     return {

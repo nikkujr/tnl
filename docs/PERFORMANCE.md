@@ -1,6 +1,6 @@
 # Admin agent performance
 
-Open **Manage → Performance**, or **Agents → View team performance**. The month picker uses Asia/Manila business dates. Overview shows completed sales, deals, posted package commissions, targets reached, approved rewards, a top-five sales ranking, a daily sales graph with accessible daily figures, and the full team leaderboard.
+Open **Reports → Performance**, or **Agents → View team performance**. The month picker uses Asia/Manila business dates. Overview shows completed sales, deals, posted package commissions, targets reached, approved rewards, a top-five sales ranking, a daily sales graph with accessible daily figures, and the full team leaderboard.
 
 ## Sales and rankings
 
@@ -23,6 +23,8 @@ Choose an agent, enter a positive peso amount and a reason, and select **Approve
 Rewards are approved award records, separate from package commissions. Payment, payroll, refunds, and reward reversals are not implemented here.
 
 ## Deployment and verification
+
+**Print / Save PDF** prints the selected performance view (Overview, Targets & incentives, or Bonuses & history) with the loaded month/timezone, load time and summary. Editing controls and notifications are hidden; daily figures expand for printing and restore afterward. **Export CSV** always includes the whole loaded month's summary, agents/targets, daily sales and approved rewards, across all views. The UTF-8 download is `tnl-performance-YYYY-MM.csv`, with `section`, period, timezone, currency and load-time columns. Amounts are raw PHP values; rewards remain awards, not payouts. See [report output conventions](REPORTS.md#print-and-csv).
 
 Run the normal backend migration before starting the updated API. It creates `agent_targets` and `agent_rewards` without creating goals, awards, or commission postings. Team performance and reward management are admin-only. Agents can read their own monthly rewards from the **Incentives & bonuses** panel on their dashboard. The same panel appears on the admin agent detail page, with a link to reward management.
 

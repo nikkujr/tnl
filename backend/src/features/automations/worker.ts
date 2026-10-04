@@ -1,8 +1,11 @@
+import { cleanupPhotos } from "../delivery/photos.js";
+import { expireLocationSessions } from "../delivery/service.js";
 import { randomUUID, randomBytes } from "node:crypto";
 import { db } from "../../database/connection.js";
 import { config } from "../../config.js";
 import { transaction, jsonValue } from "../../shared/transaction.js";
-import { sendEmail, htmlToText, containsHtml } from "../../shared/email.js";
+import { sendEmail } from "../../shared/email.js";
+import { renderWorkflowEmail } from "../../shared/email-template.js";
 import { enqueue, notify, staffRecipients } from "./events.js";
 import { queueCampaign } from "./campaigns.js";
 import { paymentEpisode } from "./payment-episode.js";
@@ -43,20 +46,6 @@ async function finish(
     [state, JSON.stringify(result), error, state, retryMinutes, id, workerId],
   );
 }
-function render(template: string, vars: Record<string, unknown>) {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) =>
-    String(vars[key] ?? ""),
-  );
-}
-function escapeHtml(text: string) {
-  return text.replace(
-    /[&<>"']/g,
-    (char) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        char
-      ]!,
-  );
-}
 export async function execute(run: any) {
   const p = run.payload;
   let sendStarted = false;
@@ -78,6 +67,7 @@ export async function execute(run: any) {
     if (p.kind === "STAFF") {
       const result = await transaction(async (c) => {
         let agentId = p.agentId;
+        let deliveryEmployeeId: number | null = null;
         if (p.orderId) {
           const [orders] = await c.query<any[]>(
             "SELECT * FROM orders WHERE id=? FOR UPDATE",
@@ -100,6 +90,7 @@ export async function execute(run: any) {
               return { reason: "Payment episode resolved" };
           }
           agentId = run.workflow === "PENDING_APPROVAL" ? null : o.agent_id;
+          if (run.workflow === "STALLED_DELIVERY") deliveryEmployeeId = o.delivery_employee_id;
         }
         if (p.productId) {
           const [products] = await c.query<any[]>(
@@ -127,6 +118,7 @@ export async function execute(run: any) {
           p.message,
           p.link,
         );
+        if (deliveryEmployeeId) await notify(c,[deliveryEmployeeId],run.dedupe_key,run.workflow,p.title,p.message,`/delivery/${p.orderId}`);
         return {};
       });
       await finish(
@@ -190,21 +182,11 @@ export async function execute(run: any) {
         return;
       }
     }
-    let subject =
-      p.subject ??
-      render(p.config?.subject ?? "TNL Track update", p.vars ?? {});
-    let text = p.text ?? render(p.config?.template ?? "", p.vars ?? {});
-    let html: string | undefined;
-    if (p.content) {
-      text = htmlToText(p.content);
-      if (containsHtml(p.content))
-        html = p.content.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
-    }
-    if (p.unsubscribe) {
-      text += `\n\nUnsubscribe: ${p.unsubscribe}`;
-      if (html)
-        html += `<p><a href="${escapeHtml(p.unsubscribe)}">Unsubscribe</a></p>`;
-    }
+    const { subject, text, html } = renderWorkflowEmail(
+      p,
+      run.workflow,
+      config.PUBLIC_APP_URL,
+    );
     if (!config.SMTP_HOST || !config.SMTP_FROM) {
       await finish(run.id, "FAILED", {}, "SMTP is not configured");
       return;
@@ -263,6 +245,8 @@ function qualifies(workflow: string, o: any, hours: number) {
   );
 }
 export async function scan() {
+  await transaction(expireLocationSessions);
+  await cleanupPhotos();
   await transaction(async (c) => {
     await c.execute(
       "INSERT IGNORE INTO worker_heartbeats(id,last_seen_at) VALUES('scheduler',UTC_TIMESTAMP())",

@@ -17,3 +17,47 @@ button, input, select, textarea { font: inherit; }
 // Global so it reaches every lazy-loaded feature page regardless of Angular's
 // per-component style encapsulation — placeholder color must track the active theme.
 input::placeholder, textarea::placeholder { color: var(--color-text-faint, #98a2b3); opacity: 1; }
+
+.print-only { display: none; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.report-actions button:disabled { opacity: .5; cursor: default; }
+.report-context { margin-bottom: 16px; font-size: 12px; color: var(--muted); }
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  body:has(.print-report) {
+    --ink: #111; --muted: #444; --paper: #fff; --line: #ccc; --green: #333;
+    --color-surface: #fff; --color-surface-alt: #f5f5f5; --color-accent-bg: #eee;
+    color: #111;
+    background: #fff;
+    .app-shell { display: block; padding: 0; background: #fff !important; }
+    .sidebar, .topbar, .loading-bar, .modal-backdrop { display: none !important; }
+    .content { padding: 0; max-width: none; }
+    .print-report {
+      padding: 0;
+      max-width: none;
+      font-size: 10pt;
+      .print-only { display: block; font-weight: 700; margin: 0 0 6px; }
+      app-breadcrumb, button, form, .tabs, .month-picker, .editor, .target-actions,
+      .trend-scroll, .bars, .notice, .error, .section-heading > a, details > summary { display: none !important; }
+      .page-heading { display: block; margin: 0 0 14px; }
+      .report-actions { display: none; }
+      .report-grid, .charts, .target-list { display: block; }
+      .metrics, .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+      .metrics article, .stat { padding: 12px; border-radius: 0; box-shadow: none; break-inside: avoid; }
+      .metrics strong, .stat strong { font-size: 15pt; }
+      .card, .panel, .ranking, .target-card { padding: 12px; margin-bottom: 14px; border-radius: 0; box-shadow: none; overflow: visible; }
+      .section-heading { padding: 0 0 10px; }
+      .table-scroll, .daily-table { overflow: visible; max-height: none; }
+      table { width: 100%; table-layout: fixed; font-size: 9pt; }
+      th, td { padding: 7px 5px; min-width: 0; max-width: none; white-space: normal; overflow-wrap: anywhere; }
+      thead { display: table-header-group; }
+      tr, .target-card, .report-grid .card, .daily-table > div { break-inside: avoid; }
+      .progress-track { min-width: 0 !important; }
+      h2, h3, h4, caption { break-after: avoid; }
+      h2 { font-size: 20pt; }
+      h3 { font-size: 13pt; }
+      a { color: #111; text-decoration: none; }
+    }
+  }
+}

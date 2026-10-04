@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:3000/api/v1`
 
-All staff APIs explicitly accept active ADMIN/AGENT identities. Customer APIs require a verified CUSTOMER token and derive ownership from its account; customerId inputs never select customer ownership. Public catalog and tracking require no token.
+Management/sales APIs explicitly accept active ADMIN/AGENT identities as documented. DELIVERY uses separate fulfillment endpoints and shared personal account/notifications only. Customer APIs require a verified CUSTOMER token and derive ownership from its account; customerId inputs never select customer ownership. Public catalog and tracking require no token.
 
 Authenticated requests use:
 
@@ -27,9 +27,11 @@ errors use `{ "error": { "message": "...", "details": {} } }`.
 
 Returns an access token and the authenticated user.
 
+Delivery employees use this same login with role DELIVERY. `POST /auth/logout` invalidates the active staff session version and stops delivery location sharing. The delivery dashboard, dispatch, assignment, issue, GPS and private photo endpoints are specified in the [delivery HTTP contract](DELIVERY.md#http-contract).
+
 ## My account
 
-Account endpoints accept active Admin/Agent sessions or verified Customer sessions and always derive identity from the authenticated account. No submitted user/customer ID selects a profile.
+Account endpoints accept active Admin/Agent/Delivery sessions or verified Customer sessions and always derive identity from the authenticated account. No submitted user/customer ID selects a profile.
 
 - `GET /account` — own `{id,role,fullName,email,phone,address}`. Staff addresses are null; customer `id` is the login account ID, not an editable CRM ID. Password hashes and session versions are not profile fields.
 - `PATCH /account/profile` — `{fullName,phone,address?}`. A normalized PH mobile number is required for agents/customers; admins may submit null. Customers require an address; staff must omit it. Returns `{profile,user,token}` to refresh the current browser. Unknown fields, including email, role, assignment, consent, or another account ID, are rejected. Sign-in email remains read-only; saved order/request addresses are preserved.
@@ -43,6 +45,21 @@ Run migrations before using these endpoints. Staff tokens without a version are 
 
 Returns the role-scoped order counts, recognized paid revenue, total customers,
 product count, and low-stock count.
+
+## Reports
+
+### `GET /reports?period=daily&date=YYYY-MM-DD`
+
+Admin only. Also accepts `period=monthly&month=YYYY-MM` or `period=overall`.
+Calendar selections must be valid dates/months between 2000 and 2100. Returns
+`data: { period, selection, timeZone, totals, trend, fastProducts, slowProducts,
+customers, packages, statuses, payments, stockAlerts, stock }`.
+
+Totals contain completed sales count/revenue, average sale value, distinct buying
+customers, and the count of sales using historical order dates. Product rankings
+include saved package component quantities and current on-hand/reserved/available
+stock. Status/payment tables use order creation dates; stock health is always
+current. See [report definitions](REPORTS.md) for date, ranking, and value semantics.
 
 ## Customers
 
@@ -155,7 +172,7 @@ Approval locks the order and product rows, reserves inventory, initializes
 delivery, and records both the inventory movement and delivery event.
 
 - `PATCH /orders/:id/payment-status` — Admin payment-state update
-- `PATCH /orders/:id/delivery-status` — role-scoped delivery event and status update
+- `PATCH /orders/:id/delivery-status` — Admin only; requires assignmentVersion and deliveryStatus; forward event/status update; DELIVERED additionally requires recipientName and a staged photoId, or recipientName and exceptionReason. Agents have read-only delivery access.
 - `DELETE /orders/:id` — delete Pending or Rejected orders that are not linked to a customer request
 
 Delivery completion deducts reserved component stock once. Commission posts once only when the whole order is DELIVERED and PAID, evaluated in payment and delivery transactions. A repeated stage is a no-op; backward stages fail with 409. New package commission uses saved fixed/percentage rules and per-line centavo rounding; standalone products earn no commission. Earned sales cannot downgrade payment. Outputs include packages, saved terms/components, total, and commission breakdown.
@@ -308,6 +325,7 @@ Staff `/requests` routes:
 ## Automation and durable notifications
 
 - GET /automations: admin settings, worker heartbeats, backlog grouped by state.
+- POST /automations/email-preview: admin-only `{workflow,subject,template}` for ORDER_UPDATES, WELCOME, or PURCHASE_FOLLOWUP. Returns `{subject,text,html}` using the outgoing branded renderer and sample customer values; preview links are inert. Does not send, enqueue, or change settings. Subject/body limits are 180/10000 characters; empty drafts use preview placeholders.
 - PUT /automations/:workflow: `{enabled,config}` updates a supported workflow. config supports hours (1..8760), delayDays (0..365), subject, template; unspecified fields retain values. Workflow names: ORDER_UPDATES, PENDING_APPROVAL, OUTSTANDING_PAYMENT, STALLED_DELIVERY, LOW_STOCK, SCHEDULED_CAMPAIGN, WELCOME, PURCHASE_FOLLOWUP. Product thresholds use inventory-settings.
 - GET /automations/runs?state=UNKNOWN: latest 200 records with state/attempts/dedupe key/result/error.
 - POST /automations/runs/:id/retry: `{acknowledgeDuplicateRisk:false}` retries FAILED; UNKNOWN requires true. Other states fail 409.

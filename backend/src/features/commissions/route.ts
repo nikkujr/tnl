@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db } from "../../database/connection.js";
-import { authenticate } from "../../shared/auth.js";
+import { authenticate, authorize } from "../../shared/auth.js";
 
 const router = Router();
-router.get("/", authenticate, async (req, res, next) => {
+router.get("/", authenticate, authorize("ADMIN", "AGENT"), async (req, res, next) => {
   try {
     const search = `%${String(req.query.search ?? "")}%`;
     const from = String(req.query.from ?? "1900-01-01");

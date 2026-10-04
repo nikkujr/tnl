@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { BusinessApi } from '../../core/business-api.service';
+import { EmailPreviewComponent } from './email-preview.component';
 import { AppIconComponent, AppIconName } from '../../shared/app-icon.component';
 
 interface WorkflowSetting {
@@ -116,7 +117,7 @@ const STATES: Record<string, string> = {
 };
 @Component({
   selector: 'app-automations',
-  imports: [FormsModule, DatePipe, RouterLink, AppIconComponent],
+  imports: [FormsModule, DatePipe, RouterLink, AppIconComponent, EmailPreviewComponent],
   templateUrl: './automations.page.html',
   styleUrls: ['../../shared/business.scss', './automations.page.scss'],
 })

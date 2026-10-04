@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-export type Role = 'ADMIN' | 'AGENT' | 'CUSTOMER';
+export type Role = 'ADMIN' | 'AGENT' | 'CUSTOMER' | 'DELIVERY';
 export interface SessionUser {
   id: number;
   email: string;
@@ -68,6 +68,7 @@ export interface Product {
   category: string;
 }
 export interface Order {
+  origin?: "LIVE" | "IMPORTED";
   id: number;
   trackingNumber: string;
   customerId: number;
@@ -321,6 +322,9 @@ export class ApiService {
 
   getDashboard(): Observable<ApiResponse<DashboardSummary>> {
     return this.http.get<ApiResponse<DashboardSummary>>(`${this.baseUrl}/dashboard`);
+  }
+  logout(): Observable<unknown> {
+    return this.http.post(`${this.baseUrl}/auth/logout`, {});
   }
 
   getCustomers(

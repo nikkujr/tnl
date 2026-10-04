@@ -1,0 +1,249 @@
+<section class="delivery-panel">
+  <header class="section-title">
+    <div>
+      <span class="eyebrow">Delivery workspace</span>
+      <h3>Delivery and live location</h3>
+    </div>
+    <button type="button" (click)="refresh()" [disabled]="busy()">Refresh</button>
+  </header>
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="notice" role="status">{{ notice() }}</p>
+  }
+  @if (detail(); as d) {
+    <div class="delivery-context">
+      <strong>{{ d.deliveryStatus || 'Not started' }}</strong
+      ><span>Employee: {{ d.employeeName || 'Awaiting assignment' }}</span>
+    </div>
+    @if (isEmployee()) {
+      <p>{{ d.address }}</p>
+      <p>
+        {{ d.recipientName }} · <a [href]="'tel:' + d.recipientPhone">{{ d.recipientPhone }}</a>
+      </p>
+      <div class="items">
+        @for (item of d.items; track $index) {
+          <p>{{ item.name }} × {{ item.quantity }}</p>
+        }
+        @for (pack of d.packages; track $index) {
+          <p>
+            <strong>{{ pack.name }} × {{ pack.quantity }}</strong>
+          </p>
+          @for (c of pack.components; track $index) {
+            <small>{{ c.productName || c.productId }} × {{ c.quantity * pack.quantity }}</small>
+          }
+        }
+      </div>
+    }
+    <div class="location-status" [class.live]="state() === 'LIVE'">
+      <strong>{{ state() }}</strong
+      ><span>{{
+        state() === 'LIVE'
+          ? 'Latest reported position'
+          : state() === 'STALE'
+            ? 'Last known position · updates have stopped'
+            : state() === 'STOPPED'
+              ? 'Location sharing is stopped'
+              : 'No usable position available'
+      }}</span>
+    </div>
+    @if (track()?.position && state() !== 'UNAVAILABLE') {
+      <p class="muted">
+        GPS fix: {{ track()!.position!.observedAt | date: 'medium' }} · Accuracy ±{{
+          track()!.position!.accuracy.toFixed(0)
+        }}
+        m · Received: {{ track()!.position!.receivedAt | date: 'medium' }}
+      </p>
+    }
+    <app-delivery-map
+      [points]="points()"
+      [editable]="isAdmin() && d.deliveryStatus !== 'DELIVERED'"
+      (pin)="pin($event)"
+    />
+    <p class="muted">
+      Live location works while the employee keeps this page open. Switching apps or locking the
+      phone can pause updates.
+    </p>
+    @if (isAdmin() && d.deliveryStatus !== 'DELIVERED') {
+      <div class="form-grid">
+        <label
+          >Delivery employee<select [(ngModel)]="employeeId">
+            <option [ngValue]="null">Unassigned</option>
+            @for (e of employees(); track e.id) {
+              <option [ngValue]="e.id">{{ e.fullName }}</option>
+            }
+          </select></label
+        ><button type="button" [disabled]="busy()" (click)="assign()">Save assignment</button
+        ><label
+          >Destination latitude<input
+            type="number"
+            [(ngModel)]="latitude"
+            min="-90"
+            max="90"
+            step="0.0000001" /></label
+        ><label
+          >Destination longitude<input
+            type="number"
+            [(ngModel)]="longitude"
+            min="-180"
+            max="180"
+            step="0.0000001"
+        /></label>
+      </div>
+      <div class="actions">
+        <button [disabled]="busy() || latitude === null || longitude === null" (click)="savePin()">
+          Save pin</button
+        ><button [disabled]="busy()" (click)="savePin(true)">Clear pin</button>
+      </div>
+    }
+    @if (isAdmin() && d.deliveryStatus !== 'DELIVERED') {
+      <div class="actions">
+        @if (d.deliveryStatus === 'PREPARING') {
+          <button [disabled]="busy()" (click)="advance('DISPATCHED')">Mark dispatched</button>
+        }
+        @if (d.deliveryStatus === 'DISPATCHED') {
+          <button [disabled]="busy()" (click)="advance('IN_TRANSIT')">Mark in transit</button>
+        }
+        @if (d.deliveryStatus === 'IN_TRANSIT') {
+          <button [disabled]="busy()" (click)="advance('OUT_FOR_DELIVERY')">
+            Mark out for delivery
+          </button>
+        }
+      </div>
+    }
+    @if (isEmployee() && d.deliveryStatus !== 'DELIVERED') {
+      @if (!d.attemptId) {
+        <button class="primary" [disabled]="busy() || d.issues.some(unresolved)" (click)="start()">
+          Start delivery
+        </button>
+      } @else {
+        <div class="actions">
+          <button [disabled]="busy()" (click)="pause()">Pause delivery</button>
+          @if (d.deliveryStatus === 'DISPATCHED') {
+            <button class="primary" [disabled]="busy()" (click)="advance('IN_TRANSIT')">
+              Mark in transit
+            </button>
+          }
+          @if (d.deliveryStatus === 'IN_TRANSIT') {
+            <button class="primary" [disabled]="busy()" (click)="advance('OUT_FOR_DELIVERY')">
+              Mark out for delivery
+            </button>
+          }
+          <button [disabled]="busy()" (click)="sharing() ? disableSharing() : enableSharing()">
+            {{ sharing() ? 'Stop location sharing' : 'Share live location' }}
+          </button>
+        </div>
+        @if (gpsError()) {
+          <p class="error" role="status">{{ gpsError() }}</p>
+        }
+        <label
+          >Unable to hand over this order?<textarea
+            [(ngModel)]="issueText"
+            maxlength="500"
+            placeholder="Explain the issue for the admin"
+          ></textarea></label
+        ><button [disabled]="busy() || issueText.trim().length < 5" (click)="report()">
+          Report issue and stop attempt
+        </button>
+      }
+    }
+    @for (i of d.issues; track i.id) {
+      <article class="issue">
+        <strong>{{ i.resolvedAt ? 'Resolved delivery issue' : 'Delivery issue' }}</strong>
+        <p>{{ i.explanation }}</p>
+        <small>{{ i.createdAt | date: 'medium' }}</small>
+        @if (i.resolvedAt) {
+          <p>{{ i.resolution }}</p>
+        } @else if (isAdmin()) {
+          <label>Resolution<textarea [(ngModel)]="resolution" maxlength="500"></textarea></label
+          ><button [disabled]="busy() || resolution.trim().length < 5" (click)="resolve(i.id)">
+            Resolve for retry
+          </button>
+        }
+      </article>
+    }
+    @if ((isAdmin() || (isEmployee() && d.attemptId)) && d.deliveryStatus !== 'DELIVERED') {
+      <form class="completion-form" (ngSubmit)="complete()">
+        <h4>Complete delivery</h4>
+        <label
+          >Received by<input
+            name="recipient"
+            [(ngModel)]="recipientName"
+            minlength="2"
+            maxlength="160"
+            required /></label
+        ><label
+          >Proof photo<input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            (change)="choosePhoto($event)" /></label
+        ><small
+          >JPEG, PNG or WebP · up to 10 MiB. Photograph the delivered package; avoid identity
+          documents and unrelated people.</small
+        >
+        @if (preview()) {
+          <img class="proof-photo" [src]="preview()" alt="Selected delivery proof preview" />
+        }
+        @if (isAdmin() && !file) {
+          <label
+            >Reason for completing without a photo<textarea
+              name="exception"
+              [(ngModel)]="exceptionReason"
+              minlength="5"
+              maxlength="500"
+              required
+            ></textarea>
+          </label>
+        }
+        <button
+          class="primary"
+          [disabled]="
+            busy() ||
+            recipientName.trim().length < 2 ||
+            (!file && (!isAdmin() || exceptionReason.trim().length < 5))
+          "
+        >
+          {{ busy() ? 'Saving…' : 'Confirm delivered' }}
+        </button>
+        <p class="muted">Completion is saved only after the server confirms it.</p>
+      </form>
+    }
+    @if (d.completion; as proof) {
+      <div class="completion-proof">
+        <h4>Delivery completed</h4>
+        <p>Received by {{ proof.recipientName }} · {{ proof.completedAt | date: 'medium' }}</p>
+        <p>Recorded by {{ proof.employeeName }}</p>
+        @if (proof.exceptionReason) {
+          <p>Admin exception: {{ proof.exceptionReason }}</p>
+        }
+        @if (proof.photoState === 'EXPIRED') {
+          <p>Photo expired. Delivery evidence remains recorded.</p>
+        } @else if (proof.photoState === 'EXCEPTION') {
+          <p>No photo was recorded; an admin exception is on file.</p>
+        } @else {
+          @if (photoUrl()) {
+            <img class="proof-photo" [src]="photoUrl()" alt="Proof of delivery" />
+          } @else {
+            <button (click)="loadPhoto()">Load proof photo</button>
+          }
+        }
+      </div>
+    }
+    @if (isEmployee()) {
+      <h4>Delivery history</h4>
+      @for (h of d.history; track $index) {
+        <p class="muted">{{ h.status }} · {{ h.occurredAt | date: 'medium' }}</p>
+      }
+    }
+  } @else {
+    <p class="muted">
+      {{
+        error()
+          ? 'Delivery details are unavailable. Refresh or sign in again.'
+          : 'Loading delivery details…'
+      }}
+    </p>
+  }
+</section>

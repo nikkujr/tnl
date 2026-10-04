@@ -61,6 +61,8 @@ test(
         smtp.listen(0, "127.0.0.1", resolve),
       );
       process.env.DB_NAME = schema;
+      process.env.DELIVERY_PHOTO_DIR = new URL(`../../.tmp/${schema}-photos`, import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1");
+      process.env.DELIVERY_PHOTO_DIR = new URL(`../../.tmp/${schema}-photos`, import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1");
       process.env.SMTP_HOST = "127.0.0.1";
       process.env.SMTP_PORT = String((smtp.address() as any).port);
       process.env.SMTP_SECURE = "false";
@@ -122,6 +124,40 @@ test(
         assert.equal(response.status, expected, JSON.stringify(value));
         return value.data;
       }
+      await t.test(
+        "email preview uses the sending layout without changing data or sending",
+        async () => {
+          const [before] = await db.query<any[]>(
+            "SELECT COUNT(*) count FROM automation_runs",
+          );
+          const body = {
+            workflow: "ORDER_UPDATES",
+            subject: "Order {{trackingNumber}}",
+            template: "Hello {{customerName}}, your order is {{status}}.",
+          };
+          const preview = await call("automations/email-preview", "POST", body);
+          assert.match(preview.html, /TNL TRACK/);
+          assert.match(preview.html, /Maria Santos/);
+          assert.match(preview.html, /In transit/);
+          assert.match(preview.html, /data-preview-href=/);
+          assert(!preview.html.includes(" href="));
+          assert.equal(preview.subject, "Order TNL-1042");
+          assert.equal(messages.length, 0);
+          const [after] = await db.query<any[]>(
+            "SELECT COUNT(*) count FROM automation_runs",
+          );
+          assert.equal(after[0].count, before[0].count);
+          await call("automations/email-preview", "POST", body, agent, 403);
+          await call("automations/email-preview", "POST", body, "", 401);
+          await call(
+            "automations/email-preview",
+            "POST",
+            { ...body, workflow: "ACCOUNT_EMAIL" },
+            a,
+            400,
+          );
+        },
+      );
       const packageBody = {
         name: "Fixed bundle",
         sellingPrice: 100.01,
@@ -178,11 +214,14 @@ test(
           "PATCH",
           {
             deliveryStatus: status,
+            assignmentVersion: 0,
             notes: "Internal notes",
+            recipientName: "Test recipient",
+            exceptionReason: "Integration test admin completion",
             latitude: 14,
             longitude: 120,
           },
-          agent,
+          a,
         );
       const { claim, execute, scan, heartbeat } =
         await import("../src/features/automations/worker.js");
@@ -281,8 +320,8 @@ test(
           await call(
             `orders/${o.id}/delivery-status`,
             "PATCH",
-            { deliveryStatus: "IN_TRANSIT" },
-            agent,
+            { assignmentVersion: 0, deliveryStatus: "IN_TRANSIT" },
+            a,
             409,
           );
           const publicOrder = await call(
@@ -300,7 +339,19 @@ test(
         "delivery before payment and standalone completion",
         async () => {
           const o = await create([{ packageId: p, quantity: 1 }]);
-          await call(`orders/${o.id}`, "PUT", { customerId: 1, deliveryAddress: "Delivery address", paymentMethod: "Cash on delivery", packages: [{ packageId: p, quantity: 1 }], items: [{ productId: 1, quantity: 1 }] }, agent, 403);
+          await call(
+            `orders/${o.id}`,
+            "PUT",
+            {
+              customerId: 1,
+              deliveryAddress: "Delivery address",
+              paymentMethod: "Cash on delivery",
+              packages: [{ packageId: p, quantity: 1 }],
+              items: [{ productId: 1, quantity: 1 }],
+            },
+            agent,
+            403,
+          );
           await approve(o.id);
           await deliver(o.id);
           let [rows] = await db.query(
@@ -688,6 +739,11 @@ test(
           assert.equal(delivered.length, 1);
           assert.equal(delivered[0].state, "ACCEPTED");
           assert(messages.length > 0);
+          const lastEmail = messages.at(-1)!;
+          assert.match(lastEmail, /multipart\/alternative/);
+          assert.match(lastEmail, /text\/plain/);
+          assert.match(lastEmail, /text\/html/);
+          assert.match(lastEmail, /TNL TRACK/);
         },
       );
       await t.test(

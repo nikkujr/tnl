@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { db } from "../../database/connection.js";
-import { authenticate } from "../../shared/auth.js";
+import { authenticate, authorize } from "../../shared/auth.js";
 import { saleTotalSql } from "../orders/queries.js";
 
 const router = Router();
-router.get("/", authenticate, async (req, res, next) => {
+router.get("/", authenticate, authorize("ADMIN", "AGENT"), async (req, res, next) => {
   try {
     const agentFilter = req.user!.role === "AGENT" ? " WHERE agent_id=?" : "";
     const args = req.user!.role === "AGENT" ? [req.user!.id] : [];

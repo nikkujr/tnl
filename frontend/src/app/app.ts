@@ -154,35 +154,25 @@ export class App implements OnInit, OnDestroy {
   };
   editingPackageNames: Record<number, string> = {};
 
-  readonly visibleNavigation = computed<
-    Array<
-      | 'Overview'
-      | 'Packages'
-      | 'Requests'
-      | 'Automations'
-      | 'Orders'
-      | 'Customers'
-      | 'Tracking'
-      | 'Categories'
-      | 'Products'
-      | 'Inventory'
-      | 'Commissions'
-    >
-  >(() =>
+  readonly navigationGroups = computed(() =>
     this.session()?.role === 'ADMIN'
       ? [
-          'Overview',
-          'Packages',
-          'Requests',
-          'Automations',
-          'Orders',
-          'Customers',
-          'Categories',
-          'Products',
-          'Inventory',
-          'Tracking',
+          { label: 'Workspace', items: ['Overview'] },
+          { label: 'Sales', items: ['Orders', 'Requests', 'Tracking', 'Dispatch'] },
+          { label: 'Catalog & stock', items: ['Products', 'Packages', 'Categories', 'Inventory'] },
+          { label: 'Relationships', items: ['Customers', 'Leads', 'Campaigns'] },
+          {
+            label: 'Reports',
+            items: ['Daily reports', 'Monthly reports', 'Overall reports', 'Performance'],
+          },
+          { label: 'Administration', items: ['Automations', 'Imports', 'Agents', 'Delivery employees'] },
         ]
-      : ['Overview', 'Packages', 'Requests', 'Orders', 'Customers', 'Commissions', 'Tracking'],
+      : this.session()?.role === 'DELIVERY' ? [{label:'Delivery',items:['My deliveries']}] : [
+          { label: 'Workspace', items: ['Overview'] },
+          { label: 'Sales', items: ['Orders', 'Requests', 'Packages', 'Tracking'] },
+          { label: 'Relationships', items: ['Customers'] },
+          { label: 'Earnings', items: ['Commissions'] },
+        ],
   );
   readonly initials = computed(
     () =>
@@ -251,6 +241,14 @@ export class App implements OnInit, OnDestroy {
 
   loadWorkspace(): void {
     if (this.session()?.role === 'CUSTOMER') return;
+    if (this.session()?.role === 'DELIVERY') {
+      this.loading.set(false);
+      this.business.get<DashboardNotification[]>('notifications').subscribe({
+        next: (r) => this.summary.update((s) => ({ ...s, notifications: r.data })),
+        error: (e) => { if (e.status === 401) this.logout(); },
+      });
+      return;
+    }
     this.loading.set(true);
     this.toast.dismissError();
     const requests: {
@@ -283,14 +281,25 @@ export class App implements OnInit, OnDestroy {
   }
 
   isNavActive(item: string): boolean {
-    const path = item === 'Overview' ? 'dashboard' : item.toLowerCase();
-    return this.routedPath() === path;
+    const path = this.navigationPath(item);
+    return this.routedPath() === path || this.routedPath().startsWith(`${path}/`);
+  }
+  private navigationPath(item: string): string {
+    const paths: Record<string, string> = {
+      Overview: 'dashboard',
+      'Daily reports': 'reports/daily',
+      'Monthly reports': 'reports/monthly',
+      'Overall reports': 'reports/overall',
+      'My deliveries': 'delivery',
+      'Delivery employees': 'delivery-employees',
+    };
+    return paths[item] ?? item.toLowerCase();
   }
   selectView(view: string): void {
     this.mobileNavOpen.set(false);
     this.notificationPanelOpen.set(false);
     this.toast.dismissError();
-    const path = view === 'Overview' ? 'dashboard' : view.toLowerCase();
+    const path = this.navigationPath(view);
     this.router.navigateByUrl(`/${path}`);
   }
   private static cleanPath(url: string): string {
@@ -302,9 +311,10 @@ export class App implements OnInit, OnDestroy {
     const [rawPath, rawQuery] = url.split(/[?#]/);
     const path = rawPath.replace(/^\/+|\/+$/g, '');
     if (path === '') {
-      this.router.navigateByUrl('/dashboard');
+      this.router.navigateByUrl(this.session()?.role === 'DELIVERY' ? '/delivery' : '/dashboard');
       return;
     }
+    if (this.session()?.role === 'DELIVERY') return;
     if (path === 'orders' && rawQuery) {
       const editId = Number(new URLSearchParams(rawQuery).get('edit'));
       if (editId) {
@@ -374,6 +384,13 @@ export class App implements OnInit, OnDestroy {
     if (this.notificationRefreshTimer) clearInterval(this.notificationRefreshTimer);
     this.notificationRefreshTimer = setInterval(() => {
       if (!this.session() || this.session()?.role === 'CUSTOMER') return;
+      if (this.session()?.role === 'DELIVERY') {
+        this.business.get<DashboardNotification[]>('notifications').subscribe({
+          next: (r) => this.summary.update((s) => ({ ...s, notifications: r.data })),
+          error: (e) => { if (e.status === 401) this.logout(); },
+        });
+        return;
+      }
       this.api.getDashboard().subscribe({ next: ({ data }) => this.summary.set(data) });
     }, 30_000);
   }

@@ -1,4 +1,35 @@
-# Packages, Customer Access, and Automation Acceptance
+# Sales, Customer Access, Automation and Delivery Acceptance
+
+## Report output verification on 2026-10-03
+
+Daily, Monthly, Overall and Performance now provide browser printing/Save PDF and UTF-8 CSV downloads from the loaded authorized data. The report and performance browser scripts passed: current-period filenames, no export refetch, all sections, raw numeric values, empty periods, leap-year zero rows, quote/comma/newline/non-ASCII handling, formula prefixes, disabled output on failed reports, detailed print tables/restoration, hidden navigation/editors, Manila date-only labels and 320/390px layouts. Sample A4 print PDFs were reviewed. Angular production build passed with the existing 500 kB warning budget exceeded (520.26 kB). No backend or database changes were needed for report output.
+
+| ID | Manual scenario | Expected result |
+|---|---|---|
+| REPORT-OUT-01 | Load Daily/Monthly/Overall, change an input without applying, then export | File uses the loaded selection, matching summary and sections; empty periods retain zero figures |
+| REPORT-OUT-02 | Print or save PDF; cancel once and finish once | Readable A4 tables with all trend values, repeated headers, no navigation/controls or clipped progress bars; collapsed details restore afterward |
+| REPORT-OUT-03 | Print each Performance view and export its month | Print reflects the selected view; CSV contains summary, all agents/targets, daily sales and approved rewards, including reasons and timestamps |
+| REPORT-OUT-04 | Open CSV in the intended spreadsheet app | UTF-8 names, quoted multiline fields and numeric PHP values read correctly; formula-looking text stays text. Import SKU fields as text when leading zeros matter |
+
+## Delivery verification on 2026-10-03
+
+Backend compilation and Angular production build passed. All 58 backend checks passed against disposable MySQL schemas, including the new delivery scenarios; no configured application data was migrated. Additional delivery checks cover old/fresh schema upgrades twice, one active job, owned reads, reassignment fences, GPS fix/receipt age, unchanged milestone timestamps, recipient/photo requirements, oversized/invalid/over-40MP uploads, metadata removal/resizing, unavailable storage rollback, stock/payment/commission races, logout/password/session expiry, proof expiry, and abandoned/orphan cleanup. A concurrent cleanup/completion check verifies that cleanup retains a photo whose completion extended its expiry.
+
+The actual Angular UI passed `frontend/scripts/check-delivery.cjs` in headless Chrome with API/GPS fixtures: Delivery home routing, no sales/customer prefetch (including edit links), restricted navigation, 320/390/1440px layouts, Leaflet rendering/provider failure, denied GPS, hidden-page stale display, resumed fresh fixes, failed upload/retry, completion and expired sessions. Admin employee create/edit/password-reset forms, phone-width dispatch with immediate visibility refresh, and the owned customer portal's private map/authenticated blob proof also passed. Customer order summaries refresh when the delivery stage changes. Screenshots were reviewed. Leaflet JavaScript and CSS load with map screens. The production initial bundle is 516.44 kB against the existing 500 kB warning budget; the build succeeds. These fixtures do not establish physical GPS accuracy or iOS/Android background behavior.
+
+| ID | Scenario | Expected result | Field result |
+|---|---|---|---|
+| DEL-01 | Create/edit/reset an employee; deactivate with unfinished assignments | Staff login opens My deliveries; unrelated APIs deny access; reassign before deactivation; reset stops sharing and old sessions | Pending business UI acceptance |
+| DEL-02 | Assign two orders and attempt simultaneous starts | One active attempt per employee/order; other job remains queued; missing destination pin is allowed | Automated passed; field pending |
+| DEL-03 | Deny GPS; pause/resume and report an issue | Milestones remain usable, stock stays reserved, admin resolves before retry | Automated passed; field pending |
+| DEL-04 | Reassign during sharing/upload and replay old commands | Old employee cannot read new tracking or consume old proof; no coordinates from ended session | Automated passed; field pending |
+| DEL-05 | View admin/own-agent/own-customer maps and proof; try other ownership/public tracking | Private audiences only; no public coordinates or proof; private responses no-store | Automated passed; field pending |
+| DEL-06 | Capture/select photo, retry failed storage, complete twice and race payment | One immutable recipient/photo record, one stock deduction, one commission after full payment; admin no-photo exception has required reason | Automated passed; field pending |
+| DEL-07 | Android Chrome on trusted HTTPS: stationary/moving, hidden/locked phone, reconnect, expired login | Time/accuracy visible, old fix becomes stale after 60 seconds, disappears after ten minutes, foreground resumes with new fix, completion clears location | **Pending actual Android device** |
+| DEL-08 | iPhone Safari: repeat DEL-07, camera capture and permission denial | Same foreground guarantees; record actual suspension and update latency | **Pending actual iPhone device** |
+| DEL-09 | Age staged/committed proof, stop worker, then restore coordinated backup | Unused files removed after 24 hours, private access expires at 90 days, metadata remains; cleanup before restored access; backups rotate after 30 days | Automated cleanup passed; deployment/restore pending |
+
+Record tester, date, device/browser version, trusted HTTPS origin, measured acquisition-to-view latency, release revision, outcome and evidence for DEL-07/08. The [delivery guide](DELIVERY.md) contains the rollout and defense sequence. Foreground sharing is the release claim; locked-phone tracking is not guaranteed.
 
 ## Verification record
 

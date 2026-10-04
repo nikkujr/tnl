@@ -1,0 +1,11 @@
+# Branded customer emails
+
+All customer emails sent by the automation worker use the shared renderer in `backend/src/shared/email-template.ts`: order updates, welcome messages, purchase follow-ups, account activation/reset, agent replies, and campaigns.
+
+The layout uses the app's plum header and purple accent, a TNL Track monogram, a centered white card, readable paragraphs, contextual order details, action buttons, and a footer. Table-based markup, inline styles, system fonts, mobile spacing, and an Outlook width fallback keep the design independent of external fonts, images, or app stylesheets. Actual inbox rendering can vary by email client.
+
+Subjects, templates, personalization, and campaign rich text stay editable. Plain template text is escaped into paragraphs; line breaks are retained. Order statuses display readable labels. Campaign rich text remains inside the shared frame, with script/style blocks removed as before. Every send includes HTML and plain-text alternatives. Account buttons use the exact issued token URL, with expiry and ignore-if-unrequested text retained; older queued account messages can supply the link through their original plain text. Other buttons open the configured customer portal. Marketing emails retain their unsubscribe link and execution-time consent checks.
+
+In **Automations → Settings**, previews call the same renderer with sample customer details. The endpoint is admin-only, does not enqueue anything, and disables links. The iframe is sandboxed, with no script or same-origin permissions. Editing a draft does not save settings or send an email. Existing custom templates are not overwritten and workflows are not enabled by this change. No migration is needed.
+
+Run backend tests with `TNL_INTEGRATION=1`: renderer checks cover escaping, status labels, account tokens/expiry, campaign HTML and unsubscribe. Disposable MySQL/local SMTP checks verify preview permissions, no side effects, and multipart HTML/plain-text delivery. Run `frontend/scripts/check-email-templates.cjs` with Playwright on `NODE_PATH` and `ng serve` running for preview edits, narrow-screen layout, dark theme, inert links, and failure/retry checks. `LAYOUT_SCREENSHOT_DIR` optionally captures previews and standalone email samples.

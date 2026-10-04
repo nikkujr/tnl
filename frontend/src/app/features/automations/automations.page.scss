@@ -443,6 +443,7 @@ summary:focus-visible {
   display: block;
   font-size: 13px;
   overflow-wrap: anywhere;
+  margin-bottom: 16px;
 }
 .email-preview p {
   white-space: pre-wrap;
@@ -451,6 +452,7 @@ summary:focus-visible {
   margin: 16px 0 22px;
 }
 .preview-note {
+  margin-top: 16px;
   border-top: 1px solid var(--color-border-subtle);
   padding-top: 12px;
   color: var(--muted);

@@ -2,8 +2,10 @@ import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../database/connection.js";
-import { signToken } from "../../shared/auth.js";
+import { signToken, authenticate } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
+import { transaction } from "../../shared/transaction.js";
+import { stopEmployeeLocations } from "../delivery/service.js";
 
 const router = Router();
 const schema = z.object({
@@ -37,4 +39,21 @@ router.post("/login", validate(schema), async (req, res, next) => {
   }
 });
 
+router.post("/logout", authenticate, async (req, res) => {
+  await transaction(async (c) => {
+    const [rows] = await c.query<any[]>(
+      "SELECT id FROM users WHERE id=? AND token_version=? FOR UPDATE",
+      [req.user!.id, req.user!.tokenVersion ?? 0],
+    );
+    if (rows.length) {
+      await c.execute(
+        "UPDATE users SET token_version=token_version+1 WHERE id=?",
+        [req.user!.id],
+      );
+      if (req.user!.role === "DELIVERY")
+        await stopEmployeeLocations(c, req.user!.id);
+    }
+  });
+  res.json({ data: { loggedOut: true } });
+});
 export default router;

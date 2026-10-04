@@ -150,19 +150,20 @@
       </button>
 
       <nav aria-label="Primary navigation">
-        <span class="nav-label">Workspace</span>
-        @for (item of visibleNavigation(); track item) {
-          <button [class.active]="isNavActive(item)" (click)="selectView(item)">
-            <app-icon class="icon" [name]="iconFor(item)" />{{
-              item === 'Requests' ? 'Customer requests' : item
-            }}
-          </button>
-        }
-        @if (session()!.role === 'ADMIN') {
-          <span class="nav-label secondary">Manage</span>
-          @for (item of ['Leads', 'Campaigns', 'Agents', 'Performance']; track item) {
-            <button [class.active]="isNavActive(item)" (click)="selectView(item)">
-              <app-icon class="icon" [name]="iconFor(item)" />{{ item }}
+        @for (group of navigationGroups(); track group.label; let first = $first) {
+          <span class="nav-label" [class.secondary]="!first">{{ group.label }}</span>
+          @for (item of group.items; track item) {
+            <button
+              type="button"
+              [class.active]="isNavActive(item)"
+              [attr.aria-current]="isNavActive(item) ? 'page' : null"
+              [attr.aria-label]="item === 'Requests' ? 'Customer requests' : item"
+              [title]="item === 'Requests' ? 'Customer requests' : item"
+              (click)="selectView(item)"
+            >
+              <app-icon class="icon" [name]="iconFor(item)" />{{
+                item === 'Requests' ? 'Customer requests' : item
+              }}
             </button>
           }
         }
@@ -184,43 +185,51 @@
           <span class="eyebrow">{{ session()!.role }} workspace</span>
           <h1>
             {{
-              routedPath() === 'account' ? 'My account' : isNewOrderPage()
-                ? 'New Order'
-                : isOrderDetailPage()
-                  ? 'Order details'
-                  : isAgentDetailPage()
-                    ? 'Agent details'
-                    : isImportsPage()
-                      ? 'Import sales data'
-                      : isOrdersListPage()
-                        ? 'Orders'
-                        : isTrackingPage()
-                          ? 'Tracking'
-                          : isCategoriesPage()
-                            ? 'Categories'
-                            : isLeadsPage()
-                              ? 'Leads'
-                              : isCampaignsPage()
-                                ? 'Campaigns'
-                                : isAgentsPage()
-                                  ? 'Agents'
-                                  : isCommissionsPage()
-                                    ? 'Commissions'
-                                    : isProductsPage()
-                                      ? 'Products'
-                                      : isInventoryPage()
-                                        ? 'Inventory'
-                                        : isCustomersPage()
-                                          ? 'Customers'
-                                          : routedPath() === 'packages'
-                                            ? 'Packages'
-                                            : routedPath() === 'requests'
-                                              ? 'Customer requests'
-                                              : routedPath() === 'performance'
-                                                ? 'Agent performance'
-                                                : routedPath() === 'automations'
-                                                  ? 'Automations'
-                                                  : 'Overview'
+              routedPath().startsWith('delivery') ? 'Delivery workspace' : routedPath() === 'dispatch' ? 'Dispatch' : routedPath() === 'account'
+                ? 'My account'
+                : routedPath().startsWith('reports/')
+                  ? routedPath() === 'reports/monthly'
+                    ? 'Monthly reports'
+                    : routedPath() === 'reports/overall'
+                      ? 'Overall reports'
+                      : 'Daily reports'
+                  : isNewOrderPage()
+                    ? 'New Order'
+                    : isOrderDetailPage()
+                      ? 'Order details'
+                      : isAgentDetailPage()
+                        ? 'Agent details'
+                        : isImportsPage()
+                          ? 'Import sales data'
+                          : isOrdersListPage()
+                            ? 'Orders'
+                            : isTrackingPage()
+                              ? 'Tracking'
+                              : isCategoriesPage()
+                                ? 'Categories'
+                                : isLeadsPage()
+                                  ? 'Leads'
+                                  : isCampaignsPage()
+                                    ? 'Campaigns'
+                                    : isAgentsPage()
+                                      ? 'Agents'
+                                      : isCommissionsPage()
+                                        ? 'Commissions'
+                                        : isProductsPage()
+                                          ? 'Products'
+                                          : isInventoryPage()
+                                            ? 'Inventory'
+                                            : isCustomersPage()
+                                              ? 'Customers'
+                                              : routedPath() === 'packages'
+                                                ? 'Packages'
+                                                : routedPath() === 'requests'
+                                                  ? 'Customer requests'
+                                                  : routedPath() === 'performance'
+                                                    ? 'Agent performance'
+                                                    : routedPath() === 'automations'
+                                                      ? 'Automations'
+                                                      : 'Overview'
             }}
           </h1>
         </div>
@@ -324,7 +333,7 @@
             }
           </div>
           @if (
-            !isNewOrderPage() && !isOrderDetailPage() && !isAgentDetailPage() && !isImportsPage()
+            session()?.role !== 'DELIVERY' && !isNewOrderPage() && !isOrderDetailPage() && !isAgentDetailPage() && !isImportsPage()
           ) {
             <button class="primary icon-button" aria-label="New order" (click)="openNewOrder()">
               <app-icon name="plus" /><span>New order</span>
@@ -352,7 +361,9 @@
                   <strong>{{ session()!.fullName }}</strong>
                   <small>{{ session()!.role }} · {{ session()!.email }}</small>
                 </div>
-                <button type="button" (click)="openMyAccount()"><app-icon name="account" />My account</button>
+                <button type="button" (click)="openMyAccount()">
+                  <app-icon name="account" />My account
+                </button>
                 <button type="button" (click)="logout()"><app-icon name="logout" />Sign out</button>
               </section>
             }

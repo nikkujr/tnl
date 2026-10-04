@@ -1,0 +1,362 @@
+<div class="reports-page print-report">
+  <p class="print-only">TNL Track</p>
+  <app-breadcrumb
+    [items]="[
+      { label: 'Home', link: '/dashboard' },
+      { label: 'Reports' },
+      { label: label(period()) },
+    ]"
+  />
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Business insights</span>
+      <h2>{{ label(period()) }} reports</h2>
+      <p>Understand sales, product movement, customers, and stock.</p>
+    </div>
+    @if (period() !== 'overall') {
+      <form class="period-picker" (ngSubmit)="apply()">
+        @if (period() === 'daily') {
+          <label
+            >Report date<input
+              type="date"
+              name="date"
+              [(ngModel)]="date"
+              min="2000-01-01"
+              max="2100-12-31"
+              required
+          /></label>
+        } @else {
+          <label
+            >Report month<input
+              type="month"
+              name="month"
+              [(ngModel)]="month"
+              min="2000-01"
+              max="2100-12"
+              required
+          /></label>
+        }
+        <button type="submit">Apply</button>
+      </form>
+    }
+  </header>
+  <div class="report-actions">
+    <button type="button" [disabled]="!report() || loading()" (click)="print()">
+      Print / Save PDF
+    </button>
+    <button type="button" [disabled]="!report() || loading()" (click)="exportCsv()">
+      Export CSV
+    </button>
+  </div>
+  <nav class="tabs" aria-label="Report period">
+    @for (option of periods; track option) {
+      <a
+        [routerLink]="'/reports/' + option"
+        [class.active]="period() === option"
+        [attr.aria-current]="period() === option ? 'page' : null"
+        >{{ label(option) }}</a
+      >
+    }
+  </nav>
+  <p class="scope-note">
+    Sales are delivered and fully paid orders, dated by financial completion. Historical orders
+    without that timestamp use their recorded order date. All dates use Asia/Manila (UTC+8). Product
+    quantities include saved package components. Stock figures show current inventory.
+  </p>
+  @if (error()) {
+    <div class="error" role="alert">
+      {{ error() }} <button type="button" (click)="load()">Retry</button>
+    </div>
+  }
+  @if (loading()) {
+    <div class="empty" role="status">Loading reports…</div>
+  }
+  @if (report(); as data) {
+    <div class="report-context">
+      {{ data.selection }} · {{ data.timeZone }} · Loaded
+      {{ loadedAt() | date: 'medium' : '+0800' }} (UTC+8)
+      @if (data.totals.historicalDateSales) {
+        <span
+          >· {{ data.totals.historicalDateSales | number }} sales use the historical order
+          date</span
+        >
+      }
+    </div>
+    <section class="metrics" aria-label="Sales summary">
+      <article>
+        <small>Completed sales revenue</small
+        ><strong>{{ data.totals.revenue | currency: 'PHP' : 'symbol' : '1.2-2' }}</strong>
+      </article>
+      <article>
+        <small>Completed sales</small><strong>{{ data.totals.completedSales | number }}</strong>
+      </article>
+      <article>
+        <small>Average sale value</small
+        ><strong>{{ data.totals.averageSale | currency: 'PHP' : 'symbol' : '1.2-2' }}</strong>
+      </article>
+      <article>
+        <small>Buying customers</small><strong>{{ data.totals.buyingCustomers | number }}</strong>
+      </article>
+    </section>
+    <section class="card trend">
+      <h3>Sales trend</h3>
+      <p>
+        {{ period() === 'daily' ? 'Hourly' : period() === 'monthly' ? 'Daily' : 'Monthly' }}
+        completed sales revenue
+      </p>
+      @if (data.totals.completedSales) {
+        <div class="trend-scroll" tabindex="0" aria-label="Sales revenue chart">
+          <div
+            class="trend-chart"
+            role="img"
+            aria-label="Completed sales revenue by period. Exact values in the table below."
+          >
+            @for (point of trend(); track point.label) {
+              <div class="trend-column" [title]="point.label + ': PHP ' + point.revenue">
+                <div class="trend-track">
+                  <i [style.height.%]="(100 * point.revenue) / maximumRevenue()"></i>
+                </div>
+                <small>{{ trendLabel(point.label) }}</small>
+              </div>
+            }
+          </div>
+        </div>
+        <details>
+          <summary>View sales trend table</summary>
+          <div class="table-scroll" tabindex="0" aria-label="Sales trend table">
+            <table>
+              <caption>
+                Sales trend —
+                {{
+                  data.selection
+                }}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Period</th>
+                  <th scope="col">Completed sales</th>
+                  <th scope="col">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (point of trend(); track point.label) {
+                  <tr>
+                    <th scope="row">{{ point.label }}</th>
+                    <td>{{ point.orders | number }}</td>
+                    <td>{{ point.revenue | currency: 'PHP' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </details>
+      } @else {
+        <div class="empty">
+          No completed sales in this period. Product movement and operational reports are shown
+          below.
+        </div>
+      }
+    </section>
+    <div class="report-grid rankings">
+      <app-product-ranking
+        title="Top 10 fast-selling products"
+        description="Most units sold in completed sales. Ties use product ID."
+        [products]="data.fastProducts"
+      />
+      <app-product-ranking
+        title="Top 10 slow-moving products"
+        description="Active products with stock on hand, ranked by fewest units sold, including zero sales. Ties show the most stock first."
+        [products]="data.slowProducts"
+        [slow]="true"
+      />
+    </div>
+    <div class="report-grid">
+      <section class="card">
+        <h3>Top 10 customers</h3>
+        <p>Ranked by completed sales revenue.</p>
+        <div class="table-scroll" tabindex="0" aria-label="Top customers">
+          <table>
+            <caption>
+              Customers —
+              {{
+                data.selection
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Customer</th>
+                <th scope="col">Sales</th>
+                <th scope="col">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (customer of data.customers; track customer.id) {
+                <tr>
+                  <th scope="row">{{ customer.name }}</th>
+                  <td>{{ customer.orders | number }}</td>
+                  <td>{{ customer.revenue | currency: 'PHP' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="3" class="empty">No buying customers in this period.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="card">
+        <h3>Top 10 packages</h3>
+        <p>Ranked by completed sales revenue using saved selling prices.</p>
+        <div class="table-scroll" tabindex="0" aria-label="Package sales">
+          <table>
+            <caption>
+              Packages —
+              {{
+                data.selection
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Package</th>
+                <th scope="col">Units sold</th>
+                <th scope="col">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (pack of data.packages; track pack.id) {
+                <tr>
+                  <th scope="row">{{ pack.name }}</th>
+                  <td>{{ pack.unitsSold | number }}</td>
+                  <td>{{ pack.revenue | currency: 'PHP' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="3" class="empty">No completed package sales in this period.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="card">
+        <h3>Order status</h3>
+        <p>Current status of orders created in the selected period.</p>
+        <div class="table-scroll" tabindex="0" aria-label="Order status">
+          <table>
+            <caption>
+              Orders by status —
+              {{
+                data.selection
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Status</th>
+                <th scope="col">Orders</th>
+                <th scope="col">Order value</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of data.statuses; track row.status) {
+                <tr>
+                  <th scope="row">{{ label(row.status) }}</th>
+                  <td>{{ row.orders | number }}</td>
+                  <td>{{ row.value | currency: 'PHP' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="3" class="empty">No orders created in this period.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="card">
+        <h3>Payment status</h3>
+        <p>
+          Orders created in the selected period, excluding cancelled and rejected orders. Values are
+          full order totals, not outstanding balances.
+        </p>
+        <div class="table-scroll" tabindex="0" aria-label="Payment status">
+          <table>
+            <caption>
+              Orders by payment status —
+              {{
+                data.selection
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Status</th>
+                <th scope="col">Orders</th>
+                <th scope="col">Order value</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of data.payments; track row.status) {
+                <tr>
+                  <th scope="row">{{ label(row.status) }}</th>
+                  <td>{{ row.orders | number }}</td>
+                  <td>{{ row.value | currency: 'PHP' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="3" class="empty">No eligible orders created in this period.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <h3>Stock health · current inventory</h3>
+          <p>
+            {{ data.stock.activeProducts | number }} active products ·
+            {{ data.stock.availableUnits | number }} available units ·
+            {{ data.stock.lowStockProducts | number }} products at or below their low-stock
+            threshold
+          </p>
+        </div>
+        <a routerLink="/inventory">Manage inventory →</a>
+      </div>
+      <div class="table-scroll" tabindex="0" aria-label="Low stock products">
+        <table>
+          <caption>
+            Current low-stock products, across all periods
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col">SKU</th>
+              <th scope="col">On hand</th>
+              <th scope="col">Reserved</th>
+              <th scope="col">Available</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (product of data.stockAlerts; track product.id) {
+              <tr>
+                <th scope="row">{{ product.name }}</th>
+                <td>{{ product.sku }}</td>
+                <td>{{ product.stockOnHand | number }}</td>
+                <td>{{ product.stockReserved | number }}</td>
+                <td>{{ product.available | number }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="empty">
+                  No active products at or below their low-stock threshold.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>

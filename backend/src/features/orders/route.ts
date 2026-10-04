@@ -18,13 +18,17 @@ import {
 } from "./sales.js";
 import { orderBody } from "./validation.js";
 import { assertAgentPackageSelections, enforceAgentPackageCreation } from "./creation-policy.js";
-import { deliveryStages, deliveryTransition, saleTotalSql } from "./queries.js";
+import { deliveryStages, saleTotalSql } from "./queries.js";
 import { paymentEpisode } from "../automations/payment-episode.js";
 import { stockEpisode } from "../automations/stock.js";
 import { event, orderChanged } from "../automations/events.js";
+import { completionFields } from "../delivery/model.js";
+import { advanceDelivery, lockOrder } from "../delivery/service.js";
+import { deliveryManagementRouter } from "../delivery/route.js";
 
 const router = Router();
 router.use(authenticate, authorize("ADMIN", "AGENT"));
+router.use(deliveryManagementRouter);
 
 async function logOrderEvent(
   connection: any,
@@ -83,7 +87,7 @@ router.get("/", async (req, res, next) => {
       args,
     );
     const [orders] = await db.query<any[]>(
-      `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,
+      `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,o.origin origin,
        c.full_name customerName,o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
        o.cash_change cashChange,o.delivery_address deliveryAddress,
@@ -191,7 +195,7 @@ router.get(
       const scope = req.user!.role === "AGENT" ? " AND o.agent_id=?" : "";
       const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
       const [orders] = await db.query<any[]>(
-        `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,
+        `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,o.origin origin,
        c.full_name customerName,c.email customerEmail,c.phone customerPhone,
        o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
@@ -549,6 +553,8 @@ router.patch(
   },
 );
 const deliveryBody = z.object({
+  assignmentVersion: z.number().int().nonnegative(),
+  ...completionFields,
   deliveryStatus: z.enum(deliveryStages),
   notes: z.string().max(500).optional(),
   latitude: z.number().min(-90).max(90).nullable().optional(),
@@ -556,6 +562,7 @@ const deliveryBody = z.object({
 });
 router.patch(
   "/:id/delivery-status",
+  authorize("ADMIN"),
   validate(
     z.object({
       body: deliveryBody,
@@ -566,85 +573,7 @@ router.patch(
   async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      await transaction(async (c) => {
-        const scope = req.user!.role === "AGENT" ? " AND agent_id=?" : "";
-        const args = req.user!.role === "AGENT" ? [id, req.user!.id] : [id];
-        const [rows] = await c.query<any[]>(
-          `SELECT * FROM orders WHERE id=?${scope} FOR UPDATE`,
-          args,
-        );
-        const o = rows[0];
-        if (!o) throw new HttpError(404, "Order not found");
-        if (o.origin === "IMPORTED")
-          throw new HttpError(409, "Imported delivery history is read-only");
-        if (!["APPROVED", "COMPLETED"].includes(o.order_status))
-          throw new HttpError(
-            409,
-            "Only approved orders can progress through delivery",
-          );
-        const transition = deliveryTransition(
-          o.delivery_status,
-          req.body.deliveryStatus,
-        );
-        if (transition === "INVALID")
-          throw new HttpError(409, "Delivery stages can only move forward");
-        if (transition === "NOOP") return;
-        if (req.body.deliveryStatus === "DELIVERED") {
-          for (const i of requirements(await readSale(c, id))) {
-            const [p] = await c.query<any[]>(
-              "SELECT stock_on_hand,stock_reserved FROM products WHERE id=? FOR UPDATE",
-              [i.productId],
-            );
-            if (
-              !p[0] ||
-              p[0].stock_reserved < i.quantity ||
-              p[0].stock_on_hand < i.quantity
-            )
-              throw new HttpError(
-                409,
-                "Reserved stock is inconsistent; contact admin",
-              );
-            await c.execute(
-              "UPDATE products SET stock_on_hand=stock_on_hand-?,stock_reserved=stock_reserved-? WHERE id=?",
-              [i.quantity, i.quantity, i.productId],
-            );
-            await c.execute(
-              "INSERT INTO inventory_movements(product_id,actor_id,type,quantity,order_id) VALUES(?,?,'DEDUCT',?,?)",
-              [i.productId, req.user!.id, i.quantity, id],
-            );
-            await stockEpisode(c, i.productId, req.user!.id);
-          }
-        }
-        await c.execute(
-          "UPDATE orders SET delivery_status=?,order_status=IF(?='DELIVERED','COMPLETED',order_status),delivery_changed_at=UTC_TIMESTAMP() WHERE id=?",
-          [req.body.deliveryStatus, req.body.deliveryStatus, id],
-        );
-        await c.execute(
-          "INSERT INTO delivery_events(order_id,status,notes,latitude,longitude) VALUES(?,?,?,?,?)",
-          [
-            id,
-            req.body.deliveryStatus,
-            req.body.notes ?? null,
-            req.body.latitude ?? null,
-            req.body.longitude ?? null,
-          ],
-        );
-        await logOrderEvent(
-          c,
-          id,
-          req.user!.id,
-          "DELIVERY_UPDATED",
-          `Delivery advanced to ${req.body.deliveryStatus}.`,
-        );
-        await orderChanged(
-          c,
-          id,
-          "order.delivery_changed",
-          req.body.deliveryStatus,
-          req.user!.id,
-        );
-        await completeSale(c, id, req.user!.id);
-      });
+      await transaction(async c => advanceDelivery(c, await lockOrder(c, id, req.user!, req.body.assignmentVersion), req.user!, req.body));
       res.json({ data: { id, deliveryStatus: req.body.deliveryStatus } });
     } catch (e) {
       next(e);

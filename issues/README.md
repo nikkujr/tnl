@@ -2,7 +2,7 @@
 
 ## Business flow
 
-Field agent offers a package → customer submits a request or agent enters an order → agent handles the request → admin approves the order → whole-order delivery and full payment complete → package commission is earned once.
+Field agent offers a package → customer submits a request or agent enters an order → agent handles the request → admin approves and assigns delivery → delivery employee records handoff → whole-order delivery and full payment complete → package commission is earned once.
 
 Chapter I of paper.docx is the research baseline, expanded by the verified customer portal and guided chatbot. Chapter III must use agent management, package orders, manual payment recording, Angular/Express/TypeScript/MySQL, and a separate automation worker. Employee payroll, POS, payment gateways, PHP/CodeIgniter, PostgreSQL, and general live chat are outside this release.
 
@@ -21,7 +21,7 @@ Chapter I of paper.docx is the research baseline, expanded by the verified custo
 
 - Separate verified customer accounts link one-to-one to CRM contacts. Registration, staff invitation, login, expiring single-use activation/reset tokens, and session revocation after password reset are supported.
 - Link existing contacts only after email verification; registration never overwrites their names, phone, address, or agent assignment. Changing the email of an account-linked contact requires a future verified email-change flow.
-- Customer ownership comes exclusively from the verified session. Customers are denied every staff API. Staff APIs accept active Admin/Agent identities and retain role/ownership scopes.
+- Customer ownership comes exclusively from the verified session. Customers are denied every staff API. Management/sales APIs accept active Admin/Agent identities and retain role/ownership scopes; Delivery uses a separate fulfillment DTO plus personal account/notifications.
 - The portal provides catalog, requests, own orders with safe delivery/payment details, marketing preferences, and follow-up replies.
 - Route requests to the active assigned agent, else the admin assignment queue. Conversion is idempotent and creates one pending order; admin approval remains necessary. Durable notices cover requests, orders, assignments, and follow-ups.
 - Follow-up displays the latest status, then opens one tracked request for the responsible agent. Repeated submissions reuse an open request. Agent replies persist in the portal and enqueue transactional email. This is not a general messaging inbox.
@@ -68,6 +68,8 @@ Campaign date windows are independent of scheduledAt. Show eligible recipient pr
 The complete endpoint contract is in ../docs/API.md. Deployment requires both API and worker; see ../docs/DEPLOYMENT.md. CONTEXT.md defines project terms.
 
 ## Implementation sequence and verification
+
+The [delivery release specification](../docs/DELIVERY.md) adds Delivery staff accounts, independent dispatch assignment, one active attempt per employee/order, optional destination pins, issues/admin resolutions, private foreground location and immutable recipient/photo proof. Sales agents view their own delivery progress; payments remain admin-managed. Pause/issues preserve reserved stock. Reassignment and session invalidation stop sharing; assignment/attempt/session fences reject old clients. GPS never refreshes the delivery milestone timestamp. Employee completion needs a photo; an admin exception needs recipient and explanation. Uploads expire after 24 hours when unused, committed proof after 90 days. Real Android Chrome and iPhone Safari GPS acceptance on trusted HTTPS remains a release gate.
 
 1. Sales snapshots and package calculations, stock reservation/deduction, transactional completion.
 2. Durable events/actions, worker recovery, staff notices, reminders, and marketing.

@@ -8,7 +8,7 @@ The agreed specification is [issues/README.md](issues/README.md). It is the auth
 
 Angular 22 and TypeScript frontend; Express 5/Node TypeScript API; MySQL 8/InnoDB persistence; independent MySQL-backed worker; SMTP email. Frontend and backend communicate through the documented HTTP API with environment-based CORS. Business transactions share sales validation across staff creation, request conversion, and chatbot-selected requests.
 
-Admins manage CRM, packages, products, stock, order approvals/payment recording, agents, campaigns, automation configuration, history, and discrepancies. Field agents manage assigned customers, requests, orders, forward delivery updates, follow-up replies, and their earned commissions. Customers verify email before accessing owned records; guests access public catalog, recommendations, and privacy-limited tracking.
+Admins manage CRM, packages, products, stock, order approvals/payment recording, agents, delivery employees and dispatch, campaigns, automation configuration, history, and discrepancies. Field agents manage assigned customers, requests, orders, follow-up replies, and their earned commissions; delivery progress is read-only. Delivery employees use the existing staff login, work on one active assigned order, update milestones, report issues, and record recipient/photo evidence. Customers verify email before accessing owned records; guests access public catalog, recommendations, and privacy-limited tracking.
 
 ## Required screens
 
@@ -19,6 +19,7 @@ Admins manage CRM, packages, products, stock, order approvals/payment recording,
 - Automation settings, heartbeat/backlog, execution failures/retries, and legacy review.
 - Campaign editor with real all/selected audiences, Manila send time, recipient preview, and per-recipient results.
 - Customer portal with verified account registration/invitation/recovery, catalog/request review, request history, owned orders/timelines/replies, and marketing preferences.
+- Mobile delivery queue/details, admin delivery employee management and dispatch overview, private Leaflet maps, manual destination pins, issue resolution, and immutable handoff evidence.
 
 ## Business constraints
 
@@ -28,6 +29,6 @@ Account and order messages are transactional. Marketing is explicitly opt-in, st
 
 ## Scope and verification
 
-No POS, payment gateway, external banking/logistics integration, employee payroll, refunds/payouts, arbitrary rule builder, LLM dependency, or general live-chat inbox. Payments are recorded by authorized staff. Delivery stages represent staff updates, not continuous GPS telemetry.
+No POS, payment gateway, external banking/logistics integration, employee payroll, refunds/payouts, arbitrary rule builder, LLM dependency, or general live-chat inbox. Payments remain admin-managed. Location is shared only for an active delivery while its employee page is open; no dependable background tracking, road routing, ETA or offline synchronization is included. See [delivery behavior and release gates](docs/DELIVERY.md).
 
 Focused backend automated checks are required for financial calculations, concurrent inventory/commission operations, authorization, token expiry, and worker recovery. Manual UI and deployment acceptance remains required; see [docs/MANUAL_ACCEPTANCE.md](docs/MANUAL_ACCEPTANCE.md). Workflows remain disabled until deliberate business review.

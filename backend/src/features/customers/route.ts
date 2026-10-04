@@ -28,7 +28,7 @@ const phoneField = z.string().transform((value, ctx) => {
 });
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, authorize("ADMIN", "AGENT"));
 router.post(
   "/:id/reset-password",
   authorize("ADMIN"),

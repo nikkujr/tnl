@@ -9,7 +9,7 @@ export function roleGuard(allowed: Role[]): CanMatchFn {
     const router = inject(Router);
     if (!session) return router.parseUrl('/');
     if (!allowed.includes(session.role))
-      return router.parseUrl(session.role === 'CUSTOMER' ? '/portal' : '/dashboard');
+      return router.parseUrl(session.role === 'CUSTOMER' ? '/portal' : session.role === 'DELIVERY' ? '/delivery' : '/dashboard');
     return true;
   };
 }

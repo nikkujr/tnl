@@ -3,12 +3,16 @@ const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const base = process.env.LAYOUT_URL || 'http://127.0.0.1:4200';
 const path = require('node:path');
+const fs = require('node:fs');
 const output = process.env.LAYOUT_OUTPUT || path.resolve(__dirname, '../../.tmp');
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const page = await browser.newPage({
+      viewport: { width: 1440, height: 1000 },
+      timezoneId: 'Asia/Manila',
+    });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => {
@@ -192,7 +196,34 @@ const output = process.env.LAYOUT_OUTPUT || path.resolve(__dirname, '../../.tmp'
     assert((await page.locator('.ranking-line').count()) === 3);
     await page.locator('.daily-details summary').click();
     assert.equal(await page.locator('.daily-table>div').count(), 31);
+    assert.equal(
+      await page.locator('.daily-table>div').first().locator('span').first().innerText(),
+      'Oct 1',
+    );
     await page.locator('.daily-details summary').click();
+    await page.evaluate(() => {
+      window.print = () => {
+        window.fixturePrinted = true;
+      };
+    });
+    await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+    assert(await page.evaluate(() => window.fixturePrinted));
+    assert(await page.locator('.daily-details').evaluate((e) => e.open));
+    await page.emulateMedia({ media: 'print' });
+    assert.equal(await page.locator('.topbar').isVisible(), false);
+    assert.equal(await page.locator('.report-actions').isVisible(), false);
+    assert.equal(
+      await page.locator('.daily-table').evaluate((e) => getComputedStyle(e).maxHeight),
+      'none',
+    );
+    await page.pdf({
+      path: path.join(output, 'performance-overview-print.pdf'),
+      preferCSSPageSize: true,
+      printBackground: true,
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    assert.equal(await page.locator('.daily-details').evaluate((e) => e.open), false);
+    await page.emulateMedia({ media: 'screen' });
     await page.screenshot({
       path: path.join(output, 'performance-desktop.png'),
       animations: 'disabled',
@@ -225,6 +256,20 @@ const output = process.env.LAYOUT_OUTPUT || path.resolve(__dirname, '../../.tmp'
       path: path.join(output, 'performance-targets.png'),
       animations: 'disabled',
     });
+    await sam.getByRole('button', { name: 'Edit target', exact: true }).click();
+    await page.locator('.editor').waitFor();
+    await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+    await page.emulateMedia({ media: 'print' });
+    assert.equal(await page.locator('.editor').isVisible(), false);
+    assert.equal(await sam.locator('.target-actions').isVisible(), false);
+    await page.pdf({
+      path: path.join(output, 'performance-targets-print.pdf'),
+      preferCSSPageSize: true,
+      printBackground: true,
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    await page.emulateMedia({ media: 'screen' });
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await page.getByRole('button', { name: 'Bonuses & history', exact: true }).click();
     await page.getByRole('button', { name: 'Add bonus', exact: true }).click();
     await page.getByLabel('Bonus amount (₱)', { exact: true }).fill('1500');
@@ -238,6 +283,31 @@ const output = process.env.LAYOUT_OUTPUT || path.resolve(__dirname, '../../.tmp'
     assert.equal(bonusCalls, 2);
     assert.equal(new Set(submittedKeys).size, 1);
     await page.getByText('Excellent customer service', { exact: true }).waitFor();
+    const downloadEvent = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV', exact: true }).click();
+    const csvFile = await downloadEvent;
+    assert.equal(csvFile.suggestedFilename(), 'tnl-performance-2026-10.csv');
+    const csv = fs.readFileSync(await csvFile.path(), 'utf8');
+    assert(csv.startsWith('\uFEFF"period","timeZone","currency","loadedAt","section"'));
+    for (const section of [
+      'Performance summary',
+      'Agents and targets',
+      'Daily completed sales',
+      'Approved rewards (not payouts)',
+    ])
+      assert(csv.includes('"' + section + '"'), section);
+    assert.equal((csv.match(/"Agents and targets"/g) || []).length, 3);
+    assert(csv.includes('"Excellent customer service"'));
+    assert(csv.includes('"258000"'));
+    await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+    await page.emulateMedia({ media: 'print' });
+    await page.pdf({
+      path: path.join(output, 'performance-rewards-print.pdf'),
+      preferCSSPageSize: true,
+      printBackground: true,
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    await page.emulateMedia({ media: 'screen' });
     await page.screenshot({
       path: path.join(output, 'performance-rewards.png'),
       animations: 'disabled',
@@ -271,7 +341,7 @@ const output = process.env.LAYOUT_OUTPUT || path.resolve(__dirname, '../../.tmp'
     assert.equal(month, '2026-09');
     assert.deepEqual(errors, []);
     console.log(
-      'PASS: admin navigation, rankings, charts/daily figures, targets, incentive approval, bonus retry key/history, empty month, 390/320px layouts; no browser errors. Fixture API only.',
+      'PASS: admin navigation, monthly CSV export, printable overview/rewards, targets, incentive approval, bonus retry key/history, empty month, 390/320px layouts; no browser errors. Fixture API only.',
     );
   } finally {
     await browser.close();

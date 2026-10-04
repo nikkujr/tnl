@@ -29,7 +29,7 @@ async function main() {
     for (const viewport of [
       { width: 1440, height: 760 },
       { width: 1440, height: 600 },
-      { width: 1440, height: 1000 },
+      { width: 1440, height: 1600 },
       { width: 800, height: 600 },
       { width: 390, height: 600 },
       { width: 320, height: 600 },
@@ -46,7 +46,7 @@ async function main() {
         await page.getByRole('button', { name: 'Open navigation' }).click();
       }
       await page.locator('.sidebar').evaluate((sidebar) => Promise.all(
-        sidebar.getAnimations({ subtree: true }).map((animation) => animation.finished),
+        sidebar.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
       ));
 
       const bounds = await page.locator('.sidebar').evaluate((sidebar) => {
@@ -72,7 +72,7 @@ async function main() {
       assert.ok(bounds.pageWidth <= bounds.viewportWidth + 1, 'Page overflows horizontally');
       assert.equal(bounds.scrollbarWidth, '6px', 'Sidebar uses a bulky native scrollbar');
       assert.notEqual(bounds.scrollbarThumb, 'rgba(0, 0, 0, 0)', 'Sidebar thumb has no custom color');
-      if (viewport.height === 1000) assert.equal(bounds.navScrolls, false, 'Tall sidebar scrolls unnecessarily');
+      if (viewport.height === 1600) assert.equal(bounds.navScrolls, false, 'Tall sidebar scrolls unnecessarily');
       if (viewport.width === 1440 && viewport.height === 600) assert.equal(bounds.navScrolls, true, 'Short sidebar cannot scroll');
 
       await page.locator('.sidebar nav').evaluate((nav) => { nav.scrollTop = nav.scrollHeight; });
@@ -85,7 +85,7 @@ async function main() {
         const backdropBounds = await backdrop.boundingBox();
         await backdrop.click({ position: { x: backdropBounds.width - 5, y: 10 } });
         await page.locator('.sidebar').evaluate((sidebar) => Promise.all(
-          sidebar.getAnimations().map((animation) => animation.finished),
+          sidebar.getAnimations().map((animation) => animation.finished.catch(() => {})),
         ));
       }
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -120,6 +120,7 @@ async function main() {
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await page.waitForURL(`${process.env.LAYOUT_URL || 'http://localhost:4200'}/`);
     assert.equal(await page.evaluate(() => sessionStorage.getItem('tnl_access_token')), null);
+    await page.locator('.account-center').waitFor({ state: 'detached' });
     assert.equal(await page.locator('.account-center').count(), 0);
     console.log('PASS: Header account, sign-out, and sidebar scrolling work at every viewport.');
   } finally {

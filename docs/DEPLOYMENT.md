@@ -6,6 +6,8 @@ Build backend with `npm run build` and frontend with `npm run build`. Serve fron
 
 Set `PUBLIC_APP_URL` to the external HTTPS portal origin, `CORS_ORIGINS` to frontend origins, and a long random `JWT_SECRET`. Customer verification and recovery require working SMTP. Existing staff seed credentials are for development only. Use the API/worker application's restricted database identity in production; disposable integration schema privileges belong to a separate test identity.
 
+Delivery photos require an absolute `DELIVERY_PHOTO_DIR` pointing to a persistent private volume outside static roots, mounted identically by API and worker. Production startup rejects relative paths. Keep `DELIVERY_PHOTO_RETENTION_DAYS=90`; unused uploads expire after 24 hours. Coordinate database/file backups, rotate backups after 30 days, and purge expired proof after restoration before opening access. Maintain synchronized clocks and monitor disk capacity/cleanup errors. Map provider/attribution/view are configured in the frontend environment. See [delivery storage, tracking and field verification](DELIVERY.md).
+
 ## Rollout
 
 1. Review the admin Automations legacy queue. Retain historical commissions and resolve discrepancies outside this release; no automatic backfill occurs.
@@ -14,6 +16,7 @@ Set `PUBLIC_APP_URL` to the external HTTPS portal origin, `CORS_ORIGINS` to fron
 4. Start the worker. Confirm a recent heartbeat, then inspect backlog, FAILED, and UNKNOWN outcomes in Automations.
 5. Enable supported workflows individually. Review reminder delays and templates, then enable scheduled campaigns and consent-based marketing when ready.
 6. Complete the manual acceptance matrix, including phone-width screens, account recovery, recipient preview, and agent reply visibility.
+7. Create delivery employee accounts and assign existing unfinished LIVE orders manually; no delivery assignments or historical proof are inferred. Agent delivery controls are now read-only. Check Android Chrome and iPhone Safari GPS over a phone-accessible trusted HTTPS origin, measure latency, and demonstrate hidden-page staleness before field release.
 
 ## Operations
 

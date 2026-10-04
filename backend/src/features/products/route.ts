@@ -7,7 +7,7 @@ import { transaction } from "../../shared/transaction.js";
 import { HttpError, validate } from "../../shared/http.js";
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, authorize("ADMIN", "AGENT"));
 
 router.get("/", async (req, res, next) => {
   try {

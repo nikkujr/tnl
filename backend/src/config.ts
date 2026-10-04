@@ -6,6 +6,8 @@ const schema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
+  DELIVERY_PHOTO_DIR: z.string().min(1).default("./private-delivery-photos"),
+  DELIVERY_PHOTO_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
   CORS_ORIGINS: z.string().default("http://localhost:4200"),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().positive().default(3306),

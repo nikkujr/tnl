@@ -5,10 +5,56 @@ import { authenticate, authorize } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
 import { transaction, jsonValue } from "../../shared/transaction.js";
 import { event } from "./events.js";
+import { config } from "../../config.js";
+import { renderWorkflowEmail } from "../../shared/email-template.js";
 export const automationRouter = Router(),
   notificationRouter = Router();
 automationRouter.use(authenticate, authorize("ADMIN"));
-notificationRouter.use(authenticate, authorize("ADMIN", "AGENT"));
+notificationRouter.use(authenticate, authorize("ADMIN", "AGENT", "DELIVERY"));
+automationRouter.post(
+  "/email-preview",
+  validate(
+    z.object({
+      body: z.object({
+        workflow: z.enum(["ORDER_UPDATES", "WELCOME", "PURCHASE_FOLLOWUP"]),
+        subject: z.string().max(180),
+        template: z.string().max(10000),
+      }),
+      params: z.any(),
+      query: z.any(),
+    }),
+  ),
+  (req, res) => {
+    const { workflow, subject, template } = req.body;
+    const rendered = renderWorkflowEmail(
+      {
+        config: {
+          subject: subject || "Your email subject",
+          template: template || "Your email message will appear here.",
+        },
+        vars: {
+          customerName: "Maria Santos",
+          trackingNumber: workflow === "WELCOME" ? undefined : "TNL-1042",
+          status: "IN_TRANSIT",
+        },
+        ...(workflow === "ORDER_UPDATES"
+          ? {}
+          : {
+              unsubscribe: `${config.PUBLIC_APP_URL}/portal?unsubscribe=sample-preview`,
+            }),
+      },
+      workflow,
+      config.PUBLIC_APP_URL,
+    );
+    // Keep the exact outgoing layout while making preview links inert.
+    res.json({
+      data: {
+        ...rendered,
+        html: rendered.html.replace(/ href=/g, " data-preview-href="),
+      },
+    });
+  },
+);
 automationRouter.get("/", async (_req, res, next) => {
   try {
     const [settings] = await db.query<any[]>(

@@ -25,6 +25,10 @@ export const validate = (schema: ZodType): RequestHandler => (req, _res, next) =
 export const notFound: RequestHandler = (_req, _res, next) => next(new HttpError(404, "Route not found"));
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  if (error?.code === "ER_DUP_ENTRY") {
+    res.status(409).json({ error: { message: "An account or active assignment with those details already exists. Refresh and try again." } });
+    return;
+  }
   if (error instanceof HttpError) {
     res.status(error.status).json({ error: { message: error.message, details: error.details } });
     return;

@@ -13,6 +13,7 @@ import { normalizePhPhone } from "../../shared/phone.js";
 import { transaction } from "../../shared/transaction.js";
 import { rateLimit } from "../../shared/rate-limit.js";
 import { newPassword } from "../../shared/password.js";
+import { stopEmployeeLocations } from "../delivery/service.js";
 
 const router = Router();
 const authenticateAccount: RequestHandler = (req, res, next) => {
@@ -189,6 +190,7 @@ router.patch(
         if (await bcrypt.compare(req.body.newPassword, account.passwordHash))
           throw new HttpError(400, "Choose a different new password");
         const hash = await bcrypt.hash(req.body.newPassword, 12);
+        if (account.role === "DELIVERY") await stopEmployeeLocations(c, account.id);
         await c.execute(
           account.role === "CUSTOMER"
             ? "UPDATE customer_accounts SET password_hash=?,token_version=token_version+1 WHERE id=?"

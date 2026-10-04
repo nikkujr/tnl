@@ -14,7 +14,7 @@ import {
 } from "./model.js";
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, authorize("ADMIN", "AGENT"));
 router.use(agentRewardsRouter);
 router.use(authorize("ADMIN"));
 const bodyValidation = (body: z.ZodType, params: z.ZodType = z.any()) =>

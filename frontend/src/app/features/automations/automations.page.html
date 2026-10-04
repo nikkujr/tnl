@@ -214,12 +214,17 @@
                               <label
                                 >Email message<textarea
                                   name="template"
+                                  aria-describedby="email-message-help"
                                   [(ngModel)]="d.config.template"
                                   rows="5"
                                   maxlength="10000"
                                   required
                                 ></textarea>
                               </label>
+                              <small id="email-message-help"
+                                >Your message is automatically styled with the TNL Track header,
+                                colors, and action button.</small
+                              >
                               <div class="personalization">
                                 <span>Personalize your message</span>
                                 <div>
@@ -253,14 +258,14 @@
                               ><strong>{{
                                 preview(d.config.subject) || 'Your email subject'
                               }}</strong>
-                              <p>
-                                {{
-                                  preview(d.config.template) ||
-                                    'Your email message will appear here.'
-                                }}
-                              </p>
+                              <app-email-preview
+                                [workflow]="s.workflow"
+                                [subject]="d.config.subject ?? ''"
+                                [template]="d.config.template ?? ''"
+                              />
                               <div class="preview-note">
-                                Preview uses sample details. No email is sent.
+                                Preview uses the outgoing email design with sample details. No email
+                                is sent. Links are disabled here.
                               </div>
                             </aside>
                           }

@@ -18,10 +18,11 @@ import { BusinessApi, CatalogOffer } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
 import { GuidedChatComponent } from '../../shared/guided-chat.component';
 import { AppIconComponent } from '../../shared/app-icon.component';
+import { DeliveryPanelComponent } from '../delivery/delivery-panel.component';
 type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'reset';
 @Component({
   selector: 'app-customer-portal',
-  imports: [FormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
+  imports: [FormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink, DeliveryPanelComponent],
   templateUrl: './portal.page.html',
   styleUrls: ['../../shared/business.scss', './portal.page.scss'],
 })
@@ -290,6 +291,13 @@ export class PortalPage {
         this.detail.set(r.data);
         this.tab = 'orders';
       },
+      error: (e) => this.fail(e),
+    });
+  }
+  deliveryChanged(id: number) {
+    this.view(id);
+    this.api.get<any[]>('customer/orders').subscribe({
+      next: (r) => this.orders.set(r.data),
       error: (e) => this.fail(e),
     });
   }

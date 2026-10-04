@@ -2,6 +2,8 @@
 
 TNL Track is a CRM, package sales, inventory, delivery, customer portal, and field-agent management system. Angular, the Express API, and a durable MySQL-backed automation worker deploy independently.
 
+Delivery staff use the existing sign-in and a mobile `/delivery` workspace. Admins manage `/delivery-employees` and `/dispatch`; private Leaflet maps share location while the active delivery page is open. Recipient/photo proof is required for employee completion. Configure durable private photo storage and migrate before rollout; see [delivery setup and acceptance](docs/DELIVERY.md).
+
 ## Projects
 
 - `frontend/` — Angular 22 standalone application
@@ -57,4 +59,10 @@ Run `npm test` in backend for focused calculations and recovery checks. To inclu
 
 See [the implementation specification](issues/README.md), [API contract](docs/API.md), [deployment and rollout](docs/DEPLOYMENT.md), and [acceptance record](docs/MANUAL_ACCEPTANCE.md). Workflows start disabled. Review legacy discrepancies, configure SMTP/templates, and enable each deliberately in the admin Automations screen.
 
-Admins can use **Manage → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, and admin-approved bonuses. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets or rewards are created automatically.
+Customer emails use a shared TNL Track HTML layout with purple branding, action buttons, and a plain-text alternative. **Automations → Settings** previews the same design as you edit a message, without sending an email. See [email templates and verification](docs/EMAILS.md).
+
+Admins can use **Reports → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, and admin-approved bonuses. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets or rewards are created automatically.
+
+**Reports → Daily / Monthly / Overall reports** includes completed sales revenue and trends, top 10 fast-selling and slow-moving products with charts and tables, top customers and packages, order/payment status breakdowns, and current low-stock products. Product movement includes saved package components; slow movers include active stocked products with zero sales. See [report definitions and checks](docs/REPORTS.md).
+
+Daily, Monthly, Overall and Performance reports include **Print / Save PDF** and **Export CSV** for the loaded report. Printing hides navigation and editing controls; CSV includes the report period, timezone, load timestamp and unformatted numerical values. See [output conventions](docs/REPORTS.md#print-and-csv).

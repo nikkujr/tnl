@@ -4,6 +4,16 @@ TNL Track records sales offered by human field agents, customer communication, i
 
 ## Language
 
+**Delivery employee**: A staff member responsible for handing over assigned orders. Delivery responsibility is separate from the field agent credited for the sale.
+_Avoid_: Sales agent, courier integration
+
+**Delivery attempt**: One employee's active effort to hand over an order. Pausing or reporting an issue ends an attempt without undoing delivery milestones or releasing reserved stock.
+
+**Live delivery location**: The latest reported employee position for the current delivery while location sharing is active. Its time and accuracy describe how current and precise it is.
+_Avoid_: Continuous GPS, guaranteed real-time location
+
+**Delivery proof**: The recorded recipient, employee, handover time, and photo, or an admin's explained exception. It establishes delivery completion separately from payment completion.
+
 **Field agent**: A staff representative who offers catalog packages and handles assigned customers, requests, orders, and follow-ups.
 _Avoid_: AI agent, employee management, payroll
 

@@ -3,11 +3,22 @@ import { WorkspaceRouteComponent } from './shared/workspace-route.component';
 import { roleGuard } from './core/role.guard';
 
 export const routes: Routes = [
+  { path: 'delivery', canMatch: [roleGuard(['DELIVERY'])], loadComponent: () => import('./features/delivery/delivery.page').then(m => m.DeliveryPage) },
+  { path: 'delivery/:id', canMatch: [roleGuard(['DELIVERY'])], loadComponent: () => import('./features/delivery/delivery.page').then(m => m.DeliveryPage) },
+  { path: 'dispatch', data: {admin:true}, canMatch: [roleGuard(['ADMIN'])], loadComponent: () => import('./features/delivery/delivery.page').then(m => m.DeliveryPage) },
+  { path: 'delivery-employees', canMatch: [roleGuard(['ADMIN'])], loadComponent: () => import('./features/delivery/employees.page').then(m => m.DeliveryEmployeesPage) },
   {
     path: 'account',
-    canMatch: [roleGuard(['ADMIN', 'AGENT', 'CUSTOMER'])],
+    canMatch: [roleGuard(['ADMIN', 'AGENT', 'CUSTOMER', 'DELIVERY'])],
     loadComponent: () => import('./features/account/account.page').then((m) => m.AccountPage),
   },
+  ...(['daily', 'monthly', 'overall'] as const).map((period) => ({
+    path: `reports/${period}`,
+    data: { period },
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/reports/reports.page').then((m) => m.ReportsPage),
+  })),
+  { path: 'reports', pathMatch: 'full', redirectTo: 'reports/daily' },
   {
     path: 'portal',
     loadComponent: () => import('./features/portal/portal.page').then((m) => m.PortalPage),

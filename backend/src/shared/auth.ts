@@ -4,13 +4,14 @@ import { config } from "../config.js";
 import { HttpError } from "./http.js";
 import { db } from "../database/connection.js";
 
-export type Role = "ADMIN" | "AGENT";
+export type Role = "ADMIN" | "AGENT" | "DELIVERY";
 export interface SessionUser {
   id: number;
   email: string;
   fullName: string;
   role: Role;
   tokenVersion?: number;
+  expiresAt?: number;
 }
 
 declare global {
@@ -34,8 +35,8 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
   try {
     const claims = jwt.verify(token, config.JWT_SECRET, {
       algorithms: ["HS256"],
-    }) as SessionUser;
-    if (claims.role !== "ADMIN" && claims.role !== "AGENT")
+    }) as SessionUser & jwt.JwtPayload;
+    if (!["ADMIN", "AGENT", "DELIVERY"].includes(claims.role))
       return next(new HttpError(403, "Staff access required"));
     const [rows] = await db.query<any[]>(
       "SELECT id,email,full_name,role,token_version tokenVersion FROM users WHERE id=? AND active=TRUE AND role=?",
@@ -50,6 +51,7 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
       fullName: rows[0].full_name,
       role: rows[0].role,
       tokenVersion: Number(rows[0].tokenVersion),
+      expiresAt: typeof claims.exp === "number" ? claims.exp * 1000 : Date.now(),
     };
     next();
   } catch {

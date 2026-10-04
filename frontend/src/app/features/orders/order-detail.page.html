@@ -49,11 +49,6 @@
             <app-icon name="commissions" />Payment status
           </button>
         }
-        @if (data.orderStatus === 'APPROVED') {
-          <button type="button" class="secondary-button" (click)="advanceDelivery()">
-            <app-icon name="tracking" />Advance delivery
-          </button>
-        }
         @if (data.orderStatus !== 'APPROVED' && data.orderStatus !== 'COMPLETED') {
           <button type="button" class="danger-button" (click)="removeOrder()">
             <app-icon name="delete" />Delete order
@@ -74,6 +69,9 @@
   }
 
   @if (order(); as data) {
+    @if(data.origin === 'LIVE' && (data.orderStatus === 'APPROVED' || data.orderStatus === 'COMPLETED')) {
+      <app-delivery-panel [orderId]="data.id" (changed)="load(data.id)" />
+    }
     <div class="detail-layout">
       <div class="main-column">
         <section class="surface">

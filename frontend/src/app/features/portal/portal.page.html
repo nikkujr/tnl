@@ -470,6 +470,11 @@
           }
           <p>Total: {{ o.total | currency: 'PHP' : 'symbol-narrow' }}</p>
           <h3>Delivery timeline</h3>
+          <app-delivery-panel
+            [orderId]="o.id"
+            [customer]="true"
+            (changed)="deliveryChanged(o.id)"
+          />
           @for (e of o.deliveryEvents; track $index) {
             <p>{{ e.status }} · {{ e.occurredAt | date: 'medium' }}</p>
           }

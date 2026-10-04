@@ -37,6 +37,7 @@ export class SessionService {
     this.session.set(data.user);
   }
   logout(): void {
+    if (this.session()?.role === 'DELIVERY') this.api.logout().subscribe({ error: () => {} });
     sessionStorage.removeItem('tnl_access_token');
     sessionStorage.removeItem('tnl_user');
     this.session.set(null);

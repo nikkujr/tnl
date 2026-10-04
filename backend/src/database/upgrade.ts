@@ -6,6 +6,10 @@ export async function upgrade() {
   const columns: Record<string, Record<string, string>> = {
     users: { token_version: "INT UNSIGNED NOT NULL DEFAULT 0" },
     orders: {
+      delivery_employee_id: "BIGINT UNSIGNED NULL",
+      delivery_assignment_version: "INT UNSIGNED NOT NULL DEFAULT 0",
+      destination_latitude: "DECIMAL(10,7) NULL",
+      destination_longitude: "DECIMAL(10,7) NULL",
       sales_version: "ENUM('LEGACY','PACKAGE') NOT NULL DEFAULT 'LEGACY'",
       approved_at: "DATETIME NULL",
       delivery_changed_at: "DATETIME NULL",
@@ -38,6 +42,14 @@ export async function upgrade() {
         );
     }
   }
+  const [roleColumns] = await db.query<any[]>("SELECT COLUMN_TYPE type FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='users' AND column_name='role'");
+  if (!String(roleColumns[0]?.type).includes("DELIVERY")) await db.query("ALTER TABLE users MODIFY role ENUM('ADMIN','AGENT','DELIVERY') NOT NULL");
+  const [deliveryKeys] = await db.query<any[]>("SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='orders' AND constraint_name='fk_order_delivery_employee'");
+  if (!deliveryKeys.length) await db.query("ALTER TABLE orders ADD CONSTRAINT fk_order_delivery_employee FOREIGN KEY(delivery_employee_id) REFERENCES users(id)");
+  const deliverySql = await readFile(new URL("./delivery-schema.sql", import.meta.url), "utf8");
+  for (const statement of deliverySql.split(/;\s*(?:\r?\n|$)/).map(s=>s.trim()).filter(Boolean)) await db.query(statement);
+  const [sessionExpiry] = await db.query<any[]>("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='delivery_location_sessions' AND column_name='expires_at'");
+  if (!sessionExpiry.length) await db.query("ALTER TABLE delivery_location_sessions ADD expires_at DATETIME NULL");
   await db.query("ALTER TABLE commissions MODIFY rate DECIMAL(5,2) NULL");
   const performanceSql = await readFile(
     new URL("./performance-schema.sql", import.meta.url),

@@ -13,7 +13,7 @@
       [items]="[
         {
           label: session()?.role === 'CUSTOMER' ? 'Customer portal' : 'Dashboard',
-          link: session()?.role === 'CUSTOMER' ? '/portal' : '/dashboard',
+          link: session()?.role === 'CUSTOMER' ? '/portal' : session()?.role === 'DELIVERY' ? '/delivery' : '/dashboard',
         },
         { label: 'My account' },
       ]"
@@ -42,11 +42,11 @@
               ? 'Customer'
               : data.role === 'AGENT'
                 ? 'Field agent'
-                : 'Administrator'
+                : data.role === 'DELIVERY' ? 'Delivery employee' : 'Administrator'
           }}</span
           ><a
             class="back-link"
-            [routerLink]="data.role === 'CUSTOMER' ? '/portal' : '/dashboard'"
+            [routerLink]="data.role === 'CUSTOMER' ? '/portal' : data.role === 'DELIVERY' ? '/delivery' : '/dashboard'"
             >{{
               data.role === 'CUSTOMER' ? 'Back to my customer space' : 'Back to my workspace'
             }}</a

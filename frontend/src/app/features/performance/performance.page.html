@@ -1,4 +1,5 @@
-<div class="performance-page">
+<div class="performance-page print-report">
+  <p class="print-only">TNL Track</p>
   <app-breadcrumb
     [items]="[{ label: 'Dashboard', link: '/dashboard' }, { label: 'Agent performance' }]"
   />
@@ -19,6 +20,37 @@
         max="2100-12"
     /></label>
   </div>
+  <div class="report-actions">
+    <button
+      class="secondary"
+      type="button"
+      [disabled]="!report() || loading() || saving()"
+      (click)="print()"
+    >
+      Print / Save PDF
+    </button>
+    <button
+      class="secondary"
+      type="button"
+      [disabled]="!report() || loading() || saving()"
+      (click)="exportCsv()"
+    >
+      Export CSV
+    </button>
+  </div>
+  @if (report(); as data) {
+    <p class="report-context">
+      {{ data.period }} · {{ data.timeZone }} ·
+      {{
+        tab() === 'overview'
+          ? 'Overview'
+          : tab() === 'targets'
+            ? 'Targets & incentives'
+            : 'Bonuses & history'
+      }}
+      · Loaded {{ loadedAt() | date: 'medium' : '+0800' }} (UTC+8)
+    </p>
+  }
   <p class="scope-note">
     Asia/Manila · Sales count when an order is delivered and fully paid. Includes packages and
     standalone products. Historical imports and legacy sales are excluded.
@@ -154,7 +186,7 @@
             <div class="daily-table">
               @for (day of data.trend; track day.day) {
                 <div>
-                  <span>{{ day.day | date: 'MMM d' : 'UTC' }}</span
+                  <span>{{ day.day + 'T00:00:00Z' | date: 'MMM d' : 'UTC' }}</span
                   ><span>{{ day.deals }} deals</span
                   ><strong>{{ day.sales | currency: 'PHP' : 'symbol-narrow' }}</strong>
                 </div>
