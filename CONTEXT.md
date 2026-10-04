@@ -1,6 +1,6 @@
 # TNL sales and customer relationships
 
-TNL Track records sales offered by human field agents, customer communication, inventory, and package commissions.
+TNL Track records office and field-agent sales, customer communication, inventory, and package commissions.
 
 ## Language
 
@@ -25,12 +25,14 @@ _Avoid_: Discount, interchangeable bundle
 **Customer request**: A verified customer's confirmed selections awaiting agent handling; it reserves no inventory. Conversion creates one pending order with the submitted terms.
 _Avoid_: Approved order, stock reservation
 
-**Approval**: The admin decision that fixes the credited agent and reserves all required component stock.
+**Office order**: A customer order handled directly by the office, with no credited field agent and no agent commission.
+
+**Approval**: The admin decision that fixes any credited agent and reserves all required component stock. An office order needs no agent.
 
 **Completed sale**: A whole order that is delivered and fully paid, whichever occurs last. The legacy order status COMPLETED still denotes delivery completion; sale_completed_at records financial completion for new sales.
 _Avoid_: Delivery alone, paid order alone
 
-**Earned commission**: One immutable posting for an eligible package order, with rounded per-package amounts. Standalone items earn no commission.
+**Earned commission**: One immutable posting for an eligible package order, with rounded per-package amounts. Standalone items and office orders earn no agent commission.
 _Avoid_: Agent percentage on new sales, payout, payroll
 
 **Available stock**: On-hand quantity minus reserved quantity. Package requirements and standalone quantities aggregate by product.

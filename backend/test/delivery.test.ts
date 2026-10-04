@@ -68,6 +68,7 @@ test(
       await db.query(
         "ALTER TABLE users MODIFY role ENUM('ADMIN','AGENT') NOT NULL",
       );
+      await db.query("ALTER TABLE orders MODIFY agent_id BIGINT UNSIGNED NOT NULL");
       const { upgrade } = await import("../src/database/upgrade.js");
       await upgrade();
       await upgrade();
@@ -248,6 +249,16 @@ test(
         o2 = await create();
       await assign(o, 3);
       await assign(o2, 3);
+      await t.test("package components are decoded before calculating delivery quantities", async () => {
+        for (const auth of [a, agent, driver, owner]) {
+          const path = auth === owner ? `customer/orders/${o}/delivery` : `delivery/orders/${o}`;
+          const detail = await call(path, "GET", undefined, auth);
+          const pack = detail.packages[0];
+          assert.equal(pack.components[0].quantity * pack.quantity, 2, "Package component total must not be NaN");
+          assert(Array.isArray(pack.components));
+          assert.equal(pack.components[0].productName, "Phone");
+        }
+      });
       let attemptId: string, sessionId: string;
       await t.test(
         "one active job, idempotent start, foreign order and agent mutation denial",
@@ -894,6 +905,32 @@ test(
           assert.equal(remainingPositions.count, 0);
         },
       );
+      await t.test("office orders complete without an agent or commission", async () => {
+        const body = { customerId: 1, agentId: null, items: [], packages: [{ packageId, quantity: 1 }], deliveryAddress: "Office customer address", paymentMethod: "Cash on delivery", cashReceived: null };
+        const order = await call("orders", "POST", body, a, 201);
+        const { agentId: ignored, ...omitted } = body;
+        const omittedOrder = await call("orders", "POST", omitted, a, 201);
+        assert.equal((await call(`orders/${omittedOrder.id}`)).agentId, null);
+        const selfCredited = await call("orders", "POST", body, agent, 201);
+        assert.equal((await call(`orders/${selfCredited.id}`)).agentId, 2);
+        await call("orders", "POST", { ...body, agentId: 1 }, a, 400);
+        await call(`orders/${order.id}`, "PUT", body);
+        assert.equal((await call(`orders/${order.id}`)).agentId, null);
+        assert((await call("orders")).some((o: any) => o.id === order.id));
+        assert((await call("customer/orders", "GET", undefined, owner)).some((o: any) => o.id === order.id));
+        await call(`orders/${order.id}`, "GET", undefined, agent, 404);
+        await call(`orders/${order.id}/decision`, "POST", { decision: "APPROVE" });
+        const [[before]] = await db.query("SELECT stock_on_hand stock FROM products WHERE id=1");
+        await call(`orders/${order.id}/delivery-status`, "PATCH", { assignmentVersion: 0, deliveryStatus: "DELIVERED", recipientName: "Office customer", exceptionReason: "Office handoff without camera" });
+        await call(`orders/${order.id}/payment-status`, "PATCH", { paymentStatus: "PAID", paymentMethod: "Cash on delivery", cashReceived: null });
+        await call(`orders/${order.id}/delivery-status`, "PATCH", { assignmentVersion: 0, deliveryStatus: "DELIVERED", recipientName: "Office customer", exceptionReason: "Office handoff without camera" });
+        const [[after]] = await db.query("SELECT stock_on_hand stock FROM products WHERE id=1");
+        assert.equal(before.stock - after.stock, 2);
+        const [[completed]] = await db.query("SELECT sale_completed_at FROM orders WHERE id=?", [order.id]);
+        assert(completed.sale_completed_at);
+        const [[commissions]] = await db.query("SELECT COUNT(*) count FROM commissions WHERE order_id=?", [order.id]);
+        assert.equal(commissions.count, 0);
+      });
     } finally {
       if (server) await new Promise<void>((r) => server.close(() => r()));
       if (db) await db.end();

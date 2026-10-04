@@ -9,7 +9,7 @@ import {
   signal,
   computed,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, firstValueFrom, timeout } from 'rxjs';
 import { SessionService } from '../../core/session.service';
@@ -23,12 +23,13 @@ import {
 import { DeliveryMapComponent, MapPoint } from './delivery-map.component';
 @Component({
   selector: 'app-delivery-panel',
-  imports: [DatePipe, FormsModule, DeliveryMapComponent],
+  imports: [DatePipe, TitleCasePipe, FormsModule, DeliveryMapComponent],
   templateUrl: './delivery-panel.component.html',
   styleUrl: './delivery.scss',
 })
 export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   readonly unresolved = (issue: { resolvedAt: string | null }) => !issue.resolvedAt;
+  readonly isDestination = (point: MapPoint) => point.kind === 'destination';
   @Input({ required: true }) orderId = 0;
   @Input() customer = false;
   @Output() changed = new EventEmitter<void>();
@@ -44,6 +45,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   readonly photoUrl = signal('');
   readonly preview = signal('');
   readonly sharing = signal(false);
+  readonly draftDestination = signal<Coordinate | null>(null);
   readonly clock = signal(Date.now());
   readonly isEmployee = computed(() => this.session()?.role === 'DELIVERY');
   readonly isAdmin = computed(() => this.session()?.role === 'ADMIN');
@@ -91,8 +93,14 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   readonly points = computed(() => {
     const t = this.track(),
       points: MapPoint[] = [];
-    if (t?.destination)
-      points.push({ ...t.destination, label: 'Delivery destination', kind: 'destination' });
+    const destination =
+      this.draftDestination() ?? (t ? t.destination : this.detail()?.tracking.destination);
+    if (destination)
+      points.push({
+        ...destination,
+        label: this.draftDestination() ? 'Unsaved destination' : 'Delivery destination',
+        kind: 'destination',
+      });
     if (t?.position && ['LIVE', 'STALE'].includes(this.state()))
       points.push({
         ...t.position,
@@ -126,6 +134,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
     this.polling = false;
     this.detail.set(null);
     this.track.set(null);
+    this.draftDestination.set(null);
     this.error.set('');
     this.notice.set('');
     this.clearPhoto();
@@ -160,8 +169,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
             this.detail.set(r.data);
             this.setTracking(r.data.tracking);
             this.employeeId = r.data.employeeId ?? null;
-            this.latitude = r.data.tracking.destination?.latitude ?? null;
-            this.longitude = r.data.tracking.destination?.longitude ?? null;
+            if (!this.draftDestination()) this.resetPin();
             if (
               r.data.completion?.photoState === 'AVAILABLE' &&
               this.loadedPhotoOrder !== this.orderId
@@ -301,17 +309,51 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   pin(p: Coordinate) {
     this.latitude = p.latitude;
     this.longitude = p.longitude;
+    this.draftDestination.set(p);
+  }
+  pinValid() {
+    return (
+      this.latitude !== null &&
+      this.longitude !== null &&
+      Number.isFinite(this.latitude) &&
+      Number.isFinite(this.longitude) &&
+      Math.abs(this.latitude) <= 90 &&
+      Math.abs(this.longitude) <= 180
+    );
+  }
+  editCoordinates() {
+    if (this.pinValid()) this.pin({ latitude: this.latitude!, longitude: this.longitude! });
+  }
+  resetPin() {
+    this.draftDestination.set(null);
+    this.latitude = this.track()?.destination?.latitude ?? null;
+    this.longitude = this.track()?.destination?.longitude ?? null;
+  }
+  showCompletion() {
+    const form = document.getElementById(`delivery-completion-${this.orderId}`);
+    form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    form?.querySelector('input')?.focus({ preventScroll: true });
+  }
+  showProof() {
+    const proof = document.getElementById(`delivery-proof-${this.orderId}`);
+    proof?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    proof?.focus({ preventScroll: true });
   }
   savePin(clear = false) {
-    void this.act(async () => {
-      await firstValueFrom(
-        this.api.patch(`orders/${this.orderId}/delivery-destination`, {
-          latitude: clear ? null : this.latitude,
-          longitude: clear ? null : this.longitude,
-          assignmentVersion: this.detail()!.assignmentVersion,
-        }),
-      );
-    }, 'Destination pin saved.');
+    if (!clear && !this.pinValid()) return;
+    void this.act(
+      async () => {
+        await firstValueFrom(
+          this.api.patch(`orders/${this.orderId}/delivery-destination`, {
+            latitude: clear ? null : this.latitude,
+            longitude: clear ? null : this.longitude,
+            assignmentVersion: this.detail()!.assignmentVersion,
+          }),
+        );
+        this.draftDestination.set(null);
+      },
+      clear ? 'Destination pin cleared.' : 'Destination pin saved.',
+    );
   }
   resolve(issueId: number) {
     void this.act(async () => {

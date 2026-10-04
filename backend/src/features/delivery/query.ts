@@ -3,7 +3,8 @@ import type { SessionUser } from "../../shared/auth.js";
 import { HttpError } from "../../shared/http.js";
 import { positionState } from "./model.js";
 import type { PoolConnection } from "mysql2/promise";
-import { transaction } from "../../shared/transaction.js";
+import { transaction, jsonValue } from "../../shared/transaction.js";
+import type { Component } from "../orders/sales.js";
 type Viewer = SessionUser | { role: "CUSTOMER"; customerId: number };
 type Reader = typeof db | PoolConnection;
 export async function privateRead<T>(
@@ -103,7 +104,7 @@ export async function orderDetail(o: any, user: Viewer, c: Reader = db) {
     "SELECT product_name name,quantity FROM order_items WHERE order_id=?",
     [o.id],
   );
-  const [packages] = await c.query(
+  const [packages] = await c.query<any[]>(
     "SELECT name,quantity,components FROM order_packages WHERE order_id=?",
     [o.id],
   );
@@ -128,7 +129,7 @@ export async function orderDetail(o: any, user: Viewer, c: Reader = db) {
   const detail = {
     ...rows[0],
     items,
-    packages,
+    packages: packages.map((p) => ({ ...p, components: jsonValue<Component[]>(p.components) })),
     history,
     issues,
     completion: proof[0] ?? null,

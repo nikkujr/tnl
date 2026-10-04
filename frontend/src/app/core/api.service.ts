@@ -72,9 +72,9 @@ export interface Order {
   id: number;
   trackingNumber: string;
   customerId: number;
-  agentId: number;
+  agentId: number | null;
   customerName: string;
-  agentName: string;
+  agentName: string | null;
   items: OrderItem[];
   packages: OrderPackage[];
   total: number;
@@ -123,7 +123,7 @@ export interface OrderDetail extends Order {
   } | null;
   customerEmail: string;
   customerPhone: string;
-  agentEmail: string;
+  agentEmail: string | null;
   updatedAt: string;
   history: OrderHistoryEvent[];
   deliveryEvents: DeliveryEvent[];
@@ -230,7 +230,7 @@ export interface AgentDetail extends Agent {
 }
 export interface CreateOrderInput {
   customerId: number;
-  agentId?: number;
+  agentId?: number | null;
   items: Array<{ productId: number; quantity: number }>;
   packages?: Array<{ packageId: number; quantity: number }>;
   deliveryAddress: string;

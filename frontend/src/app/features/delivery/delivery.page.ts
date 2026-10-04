@@ -58,7 +58,11 @@ import { DeliveryMapComponent, MapPoint } from './delivery-map.component';
             }
             <p>
               <a [routerLink]="admin ? '/orders/' + j.id : '/delivery/' + j.id">{{
-                admin ? 'Open order and dispatch' : 'Open delivery'
+                admin
+                  ? j.deliveryStatus === 'DELIVERED'
+                    ? 'View proof of delivery'
+                    : 'Open order and dispatch'
+                  : 'Open delivery'
               }}</a>
             </p>
           </article>

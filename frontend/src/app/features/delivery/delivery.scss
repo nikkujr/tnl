@@ -54,6 +54,43 @@ small {
   background: #e8f6ef;
   color: #17643c;
 }
+.location-heading {
+  margin-top: 26px;
+  margin-bottom: 8px;
+}
+.delivery-action-card {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid var(--color-border, #d8deea);
+  border-radius: 14px;
+  background: var(--color-surface-alt, #f3f5fa);
+}
+.delivery-action-card h4 {
+  margin-bottom: 6px;
+}
+.assignment-row {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0;
+}
+.assignment-row label {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.status-actions {
+  border-top: 1px solid var(--color-border, #d8deea);
+  padding-top: 18px;
+}
+.status-actions p {
+  margin: 5px 0;
+}
+.destination-editor summary {
+  cursor: pointer;
+  color: var(--muted, #667085);
+  font-size: 13px;
+}
 button {
   padding: 10px 15px;
   border: 1px solid var(--color-border, #d8deea);
@@ -137,6 +174,13 @@ textarea {
   border-radius: 10px;
   margin: 14px 0;
 }
+.completion-proof {
+  scroll-margin-top: 100px;
+  border: 1px solid var(--color-border, #e2e7f0);
+  border-radius: 14px;
+  padding: 20px;
+  background: var(--color-surface-alt, #f3f5fa);
+}
 .items small {
   display: block;
 }
@@ -195,6 +239,12 @@ textarea {
   }
   .actions button {
     flex: 1 1 auto;
+  }
+  .delivery-action-card {
+    padding: 15px;
+  }
+  .assignment-row button {
+    width: 100%;
   }
   .location-status {
     align-items: flex-start;

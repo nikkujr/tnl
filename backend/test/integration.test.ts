@@ -558,11 +558,19 @@ test(
             customer2,
             201,
           );
-          await call(`requests/${queued.id}/convert`, "POST", {}, a, 409);
+          await call(`requests/${queued.id}/convert`, "POST", {}, other, 404);
           await call(`requests/${queued.id}/assignment`, "PATCH", {
             agentId: 2,
           });
           await call(`requests/${queued.id}/convert`, "POST", {}, agent);
+          const officeRequest = await call("customer/requests", "POST", {
+            ...body, packages: [], items: [{ productId: 1, quantity: 1 }],
+            reviewedTerms: [{ kind: "PRODUCT", id: 1, revision: product.revision }],
+          }, customer2, 201);
+          await call(`requests/${officeRequest.id}/convert`, "POST", {}, agent, 404);
+          const office = await call(`requests/${officeRequest.id}/convert`, "POST", {}, a);
+          assert.equal((await call(`orders/${office.id}`)).agentId, null);
+          assert.equal((await call(`customer/orders/${office.id}`, "GET", undefined, customer2)).agentName, null);
           const notifications = await call(
             "notifications",
             "GET",

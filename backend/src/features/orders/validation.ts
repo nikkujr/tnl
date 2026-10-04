@@ -33,7 +33,7 @@ export const paymentMethod = z.enum([
 ]);
 export const orderBody = selection.safeExtend({
   customerId: z.number().int().positive(),
-  agentId: z.number().int().positive().optional(),
+  agentId: z.number().int().positive().nullable().optional(),
   deliveryAddress: z.string().trim().min(5).max(500),
   paymentMethod,
   cashReceived: z.number().min(0).max(9999999999).nullable().optional(),

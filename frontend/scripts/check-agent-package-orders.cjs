@@ -91,6 +91,15 @@ async function main() {
         }
       } else {
         assert.equal(await page.locator('.commission-estimate').count(), 0, 'Admin sees commission as their own earnings');
+        await page.locator('.lookup-field').last().click();
+        const agentPicker = page.getByRole('dialog', { name: 'Assign an agent' });
+        await agentPicker.getByRole('button', { name: /Jamie Co/ }).click();
+        await agentPicker.getByRole('button', { name: 'Confirm selection' }).click();
+        await page.locator('.lookup-field').filter({ hasText: 'Jamie Co' }).click();
+        await agentPicker.getByRole('button', { name: /Office order — no agent/ }).click();
+        await agentPicker.getByRole('button', { name: 'Confirm selection' }).click();
+        await agentPicker.waitFor({ state: 'hidden' });
+        assert.match(await page.locator('.lookup-field').last().textContent(), /Office order.*no agent/);
         await page.getByRole('button', { name: 'Add item', exact: true }).click();
         const picker = page.getByRole('dialog', { name: 'Add an order item' });
         await picker.waitFor();
@@ -107,6 +116,7 @@ async function main() {
       assert.deepEqual(submitted.items, role === 'AGENT' ? [] : [{ productId: 1, quantity: 1 }]);
       assert.deepEqual(submitted.packages, [{ packageId: 1, quantity: role === 'AGENT' ? 4 : 1 }]);
       if (role === 'AGENT') assert.equal('agentId' in submitted, false, 'Agent sends a client-assigned owner');
+      else assert.equal(submitted.agentId, null, 'Office order retains a credited agent');
       console.log(`PASS: ${role} order creation at ${width}px`);
       await page.close();
     }

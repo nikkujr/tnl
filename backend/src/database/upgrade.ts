@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import { db } from "./connection.js";
 
 export async function upgrade() {
+  const [agentColumn] = await db.query<any[]>("SELECT IS_NULLABLE nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='orders' AND column_name='agent_id'");
+  if (agentColumn[0]?.nullable === "NO") await db.query("ALTER TABLE orders MODIFY agent_id BIGINT UNSIGNED NULL");
   // Existing records are deliberately legacy; new sales explicitly opt into PACKAGE.
   const columns: Record<string, Record<string, string>> = {
     users: { token_version: "INT UNSIGNED NOT NULL DEFAULT 0" },

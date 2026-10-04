@@ -2,7 +2,11 @@
 
 Delivery employees use the existing staff sign-in and land at `/delivery`. Admins create accounts at `/delivery-employees`, monitor `/dispatch`, and open an order to assign its employee or place a destination pin. Sales agent credit is independent of delivery responsibility. Sales agents can view delivery progress for their own orders but cannot change milestones. Verified customers can view their own location and proof in the portal. Public tracking retains its limited timeline.
 
+Order details group employee assignment and milestone buttons under **Dispatch & delivery status**. Employees have a separate **Update delivery status** section; **Record delivery completion** opens the recipient/proof form. Destination pins stay mounted through polling, saves and status refreshes. Admins tap the map, drag the marker or use **Place destination pin** to preview a change, then explicitly **Save destination** or **Cancel pin changes**. Coordinates are available under an expandable control. A missing pin is shown as missing rather than inventing a location for the saved address.
+
 ## Workflow and invariants
+
+Admins open **View proof of delivery** from completed dispatch cards or the completed order's action bar. Evidence appears above the map with recipient, completion time, employee and the authenticated photo. Expired photos, admin exceptions and older orders without recorded evidence have explicit messages.
 
 Only approved, unfinished LIVE orders can be assigned to active delivery employees. Existing orders start unassigned. Imported records stay read-only. Accounts cannot be deactivated while unfinished assignments remain; reassign or remove those assignments first.
 

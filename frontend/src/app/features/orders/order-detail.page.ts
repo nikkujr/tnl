@@ -1,5 +1,5 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, OnInit, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService, OrderDetail, SessionUser } from '../../core/api.service';
@@ -30,6 +30,7 @@ const HISTORY_ICONS: Record<string, AppIconName> = {
   styleUrls: ['./order-detail.page.scss'],
 })
 export class OrderDetailPage implements OnInit {
+  readonly deliveryPanel = viewChild(DeliveryPanelComponent);
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -72,7 +73,7 @@ export class OrderDetailPage implements OnInit {
   }
 
   load(id: number): void {
-    this.order.set(null);
+    if (this.order()?.id !== id) this.order.set(null);
     this.closeActionDialog();
     this.loading.set(true);
     this.error.set('');

@@ -20,6 +20,10 @@ async function main() {
       sessionExpired = false;
     let latest = null,
       posts = 0;
+    let destination = { latitude: 13.77, longitude: 122.98 };
+    let milestone = 'PREPARING';
+    let proofState = 'AVAILABLE',
+      hasEvidence = true;
     const now = () => new Date().toISOString();
     const job = () => ({
       id: 1,
@@ -27,7 +31,7 @@ async function main() {
       address: 'San Juan Avenue, Sipocot, Camarines Sur',
       recipientName: 'Sample Customer',
       recipientPhone: '09171234567',
-      deliveryStatus: completed ? 'DELIVERED' : active ? 'DISPATCHED' : 'PREPARING',
+      deliveryStatus: completed ? 'DELIVERED' : milestone,
       assignmentVersion: 1,
       employeeId: 3,
       employeeName: 'Delivery Employee',
@@ -39,7 +43,7 @@ async function main() {
       serverTime: now(),
       deliveryStatus: job().deliveryStatus,
       employeeName: 'Delivery Employee',
-      destination: null,
+      destination,
       position: shared ? latest : null,
     });
     const detail = () => ({
@@ -48,21 +52,25 @@ async function main() {
       packages: [
         {
           name: 'Phone package',
-          quantity: 1,
-          components: [{ productName: 'Charger', quantity: 1 }],
+          quantity: 3,
+          components: [{ productId: 2, productName: 'Charger', quantity: 2 }],
         },
       ],
       history: [{ status: 'PREPARING', occurredAt: now() }],
       issues: [],
       tracking: tracking(),
-      completion: completed
-        ? {
-            recipientName: 'Customer Receiver',
-            completedAt: now(),
-            employeeName: 'Delivery Employee',
-            photoState: 'AVAILABLE',
-          }
-        : null,
+      completion:
+        completed && hasEvidence
+          ? {
+              recipientName: 'Customer Receiver',
+              completedAt: now(),
+              employeeName: 'Delivery Employee',
+              photoState: proofState,
+              ...(proofState === 'EXCEPTION'
+                ? { exceptionReason: 'Camera unavailable at handoff' }
+                : {}),
+            }
+          : null,
     });
     await page.addInitScript(() => {
       if (!sessionStorage.getItem('tnl_user')) {
@@ -145,6 +153,35 @@ async function main() {
       if (p === 'delivery/orders' || p.startsWith('delivery/dispatch'))
         data = [{ ...job(), tracking: tracking() }];
       if (p === 'delivery/orders/1') data = detail();
+      if (p === 'orders/1')
+        data = {
+          id: 1,
+          trackingNumber: job().trackingNumber,
+          origin: 'LIVE',
+          orderStatus: completed ? 'COMPLETED' : 'APPROVED',
+          deliveryStatus: job().deliveryStatus,
+          paymentStatus: 'UNPAID',
+          paymentMethod: 'Cash',
+          customerName: job().recipientName,
+          customerEmail: 'customer@example.test',
+          customerPhone: job().recipientPhone,
+          agentName: 'Sales Agent',
+          agentEmail: 'agent@example.test',
+          deliveryAddress: job().address,
+          createdAt: now(),
+          updatedAt: now(),
+          items: [],
+          packages: [],
+          deliveryEvents: [],
+          history: [],
+          commission: null,
+          total: 100,
+        };
+      if (p === 'orders/1/delivery-destination') {
+        const body = request.postDataJSON();
+        destination =
+          body.latitude === null ? null : { latitude: body.latitude, longitude: body.longitude };
+      }
       if (p === 'customer/me')
         data = {
           id: 1,
@@ -180,6 +217,7 @@ async function main() {
       if (p === 'customer/orders/1/delivery-tracking') data = tracking();
       if (p.endsWith('/start') && !p.endsWith('/tracking/start')) {
         active = true;
+        if (milestone === 'PREPARING') milestone = 'DISPATCHED';
         data = { attemptId: job().attemptId };
       }
       if (p.endsWith('/tracking/start')) {
@@ -226,6 +264,7 @@ async function main() {
         shared = false;
         latest = null;
       }
+      if (p === 'orders/1/delivery-status') milestone = request.postDataJSON().deliveryStatus;
       if (p === 'delivery-employees')
         data = [
           {
@@ -269,6 +308,9 @@ async function main() {
       await page.setViewportSize(viewport);
       await page.goto(base + '/delivery/1');
       await page.getByRole('button', { name: 'Start delivery', exact: true }).waitFor();
+      await page.getByText('Phone package × 3', { exact: true }).waitFor();
+      await page.getByText('Charger × 6', { exact: true }).waitFor();
+      assert(!(await page.locator('app-delivery-panel .items').textContent()).includes('NaN'));
       await page.locator('.leaflet-container').waitFor();
       await page
         .getByText('Map tiles unavailable. Address and delivery status remain available.', {
@@ -400,6 +442,132 @@ async function main() {
       .waitFor();
     assert.equal(accountMutations.at(-1).path, 'delivery-employees/3/reset-password');
     assert.equal(await page.locator('input[type=password]').count(), 0);
+    completed = false;
+    active = false;
+    shared = false;
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+      { width: 320, height: 700 },
+    ]) {
+      milestone = 'PREPARING';
+      await page.setViewportSize(viewport);
+      await page.goto(base + '/orders/1');
+      const map = page.locator('app-delivery-panel .leaflet-container');
+      await map.waitFor();
+      await page.locator('.delivery-map-marker.destination').waitFor();
+      const before = await page.locator('.leaflet-marker-icon').first().getAttribute('style');
+      const box = await map.boundingBox();
+      await map.click({ position: { x: box.width * 0.7, y: box.height * 0.6 } });
+      await page.locator('.leaflet-marker-icon[title="Unsaved destination"]').waitFor();
+      const after = await page.locator('.leaflet-marker-icon').first().getAttribute('style');
+      assert.notEqual(
+        after,
+        before,
+        'Chosen destination must move the visible marker before saving',
+      );
+      const marker = page.locator('.leaflet-marker-icon[title="Unsaved destination"]');
+      const drag = await marker.boundingBox();
+      await page.evaluate(() => {
+        window.fixtureDraggedMarker = document.querySelector(
+          '.leaflet-marker-icon[title="Unsaved destination"]',
+        );
+      });
+      await page.mouse.move(drag.x + drag.width / 2, drag.y + drag.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(drag.x + 55, drag.y + 35, { steps: 5 });
+      await page.clock.runFor(11000);
+      assert(
+        await page.evaluate(() => window.fixtureDraggedMarker.isConnected),
+        'Polling must keep the marker being dragged',
+      );
+      await page.mouse.up();
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await marker.waitFor();
+      await page.getByRole('button', { name: 'Cancel pin changes', exact: true }).click();
+      await page.locator('.leaflet-marker-icon[title="Delivery destination"]').waitFor();
+      await map.click({ position: { x: box.width * 0.7, y: box.height * 0.6 } });
+      await marker.waitFor();
+      assert(
+        !requests.includes('orders/1/delivery-destination'),
+        'Picking a pin must not save automatically',
+      );
+      assert(await page.getByRole('button', { name: 'Save destination', exact: true }).isEnabled());
+      await page.evaluate(() => {
+        window.fixtureMap = document.querySelector('app-delivery-panel .leaflet-container');
+        window.fixtureMarker = document.querySelector('app-delivery-panel .leaflet-marker-icon');
+        window.fixtureMapRemoved = false;
+        window.fixtureObserver = new MutationObserver(() => {
+          if (!window.fixtureMap.isConnected || !window.fixtureMarker.isConnected)
+            window.fixtureMapRemoved = true;
+        });
+        window.fixtureObserver.observe(document.body, { childList: true, subtree: true });
+      });
+      const saved = page.waitForResponse((r) => r.url().endsWith('/delivery-destination'));
+      await page.getByRole('button', { name: 'Save destination', exact: true }).click();
+      await saved;
+      await page.getByText('Destination pin saved.', { exact: true }).waitFor();
+      await page.waitForFunction(() => window.fixtureMap.isConnected && !window.fixtureMapRemoved);
+      assert.equal(
+        await page.evaluate(() => window.fixtureMapRemoved),
+        false,
+        'Saving must keep the map mounted',
+      );
+      await page.evaluate(() => window.fixtureObserver.disconnect());
+      await page.getByText('Enter destination coordinates', { exact: true }).click();
+      await page.getByLabel('Destination latitude', { exact: true }).fill('91');
+      assert.equal(
+        await page.getByRole('button', { name: 'Save destination', exact: true }).isEnabled(),
+        false,
+      );
+      await page.getByLabel('Destination latitude', { exact: true }).fill('13.8');
+      await page.getByRole('button', { name: 'Cancel pin changes', exact: true }).click();
+      assert(
+        await page
+          .getByRole('heading', { name: 'Dispatch & delivery status', exact: true })
+          .isVisible(),
+      );
+      assert(await page.getByRole('button', { name: 'Mark dispatched', exact: true }).isVisible());
+      await page.getByRole('button', { name: 'Mark dispatched', exact: true }).click();
+      await page.getByRole('button', { name: 'Mark in transit', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Mark in transit', exact: true }).click();
+      await page.getByRole('button', { name: 'Mark out for delivery', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Mark out for delivery', exact: true }).click();
+      await page.getByText('Current: Out For Delivery', { exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Record delivery completion', exact: true }).click();
+      assert(
+        await page
+          .getByLabel('Received by', { exact: true })
+          .evaluate((e) => e === document.activeElement),
+      );
+      assert(
+        await page.evaluate(
+          () => window.fixtureMap.isConnected && window.fixtureMarker.isConnected,
+        ),
+        'Milestone updates must preserve the destination marker',
+      );
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        'Order delivery controls overflow',
+      );
+      if (process.env.LAYOUT_SCREENSHOT_DIR)
+        await page.screenshot({
+          path: path.join(
+            process.env.LAYOUT_SCREENSHOT_DIR,
+            `order-delivery-${viewport.width}.png`,
+          ),
+          fullPage: true,
+        });
+      // Revisit with no unsaved request from the previous viewport.
+      requests.splice(requests.indexOf('orders/1/delivery-destination'), 1);
+    }
+    await page.getByRole('button', { name: 'Clear destination pin', exact: true }).click();
+    await page.getByText('Destination pin cleared.', { exact: true }).waitFor();
+    await page.locator('.delivery-map-marker.destination').waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Place destination pin', exact: true }).click();
+    await page.locator('.leaflet-marker-icon[title="Unsaved destination"]').waitFor();
+    await page.getByRole('button', { name: 'Save destination', exact: true }).click();
+    await page.getByText('Destination pin saved.', { exact: true }).waitFor();
     assert(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       'Employee page overflows',
@@ -445,6 +613,61 @@ async function main() {
     });
     await resumedDispatch;
     assert(dispatchReads() > beforeVisibility, 'Visible dispatch did not refresh immediately');
+    completed = true;
+    shared = false;
+    latest = null;
+    await page.goto(base + '/dispatch');
+    await page.getByRole('button', { name: 'Completed', exact: true }).click();
+    await page.getByRole('heading', { name: 'TN-DELIVERY-001', exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole('link', { name: 'View proof of delivery', exact: true }).count(),
+      1,
+      'Completed admin deliveries need an explicit proof action',
+    );
+    await page.getByRole('link', { name: 'View proof of delivery', exact: true }).click();
+    await page.waitForURL('**/orders/1');
+    await page.getByRole('heading', { name: 'Delivery completed', exact: true }).waitFor();
+    await page.locator('img[alt="Proof of delivery"]').waitFor();
+    assert(
+      (await page.locator('img[alt="Proof of delivery"]').getAttribute('src')).startsWith('blob:'),
+    );
+    assert(requests.includes('delivery/orders/1/proof-photo'));
+    await page.getByRole('button', { name: 'View proof of delivery', exact: true }).click();
+    assert(await page.locator('.completion-proof').evaluate((e) => e === document.activeElement));
+    if (process.env.LAYOUT_SCREENSHOT_DIR)
+      await page.screenshot({
+        path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'admin-delivery-proof-320.png'),
+        fullPage: true,
+      });
+    for (const [state, evidence, message] of [
+      ['EXPIRED', true, 'Photo expired. Delivery evidence remains recorded.'],
+      ['EXCEPTION', true, 'No photo was recorded; an admin exception is on file.'],
+      ['AVAILABLE', false, 'No delivery evidence was recorded for this order.'],
+    ]) {
+      proofState = state;
+      hasEvidence = evidence;
+      const beforeProofReads = requests.filter((p) => p.endsWith('/proof-photo')).length;
+      await page.goto(base + '/orders/1');
+      await page.getByText(message, { exact: true }).waitFor();
+      await page.getByRole('button', { name: 'View proof of delivery', exact: true }).click();
+      assert.equal(await page.locator('img[alt="Proof of delivery"]').count(), 0);
+      assert.equal(requests.filter((p) => p.endsWith('/proof-photo')).length, beforeProofReads);
+      if (state === 'EXCEPTION')
+        await page
+          .getByText('Admin exception: Camera unavailable at handoff', { exact: true })
+          .waitFor();
+    }
+    proofState = 'AVAILABLE';
+    hasEvidence = true;
+    completed = false;
+    shared = true;
+    latest = {
+      latitude: 13.765,
+      longitude: 122.976,
+      accuracy: 8,
+      observedAt: now(),
+      receivedAt: now(),
+    };
     // The owned customer portal uses its private endpoints and has no delivery actions.
     await page.evaluate(() => {
       sessionStorage.setItem('tnl_access_token', 'customer-fixture');
@@ -463,6 +686,10 @@ async function main() {
     await page.getByRole('button', { name: 'Details and follow-up', exact: true }).click();
     await page.locator('.location-status.live').waitFor();
     await page.locator('.leaflet-container').waitFor();
+    assert.equal(
+      await page.getByRole('button', { name: 'Place destination pin', exact: true }).count(),
+      0,
+    );
     assert.equal(
       await page.getByRole('button', { name: 'Pause delivery', exact: true }).count(),
       0,

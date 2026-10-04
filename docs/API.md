@@ -334,3 +334,7 @@ Staff `/requests` routes:
 - POST /notifications/read: marks that identity's unread notices read.
 
 Run states: PENDING, PROCESSING, ACCEPTED, SUCCEEDED, FAILED, UNKNOWN, SKIPPED. Leases and retry state persist; known transient failures have bounded retries. UNKNOWN is never automatically resent. Account emails, replies, and explicitly queued campaigns execute as mandatory actions. Other workflows start disabled and check enablement before execution. Reminder and marketing state are checked again at execution.
+
+## Office orders
+
+Admin order creation and pending-order editing accept an omitted or null agentId. Assigned agents must still be active. Agent sign-ins always credit themselves. Approval, delivery and financial completion support orders without an agent; these orders generate no agent commission. Admins may convert unassigned customer requests directly. Office orders remain visible to admins and their owning customers; unrelated agents cannot access them. Run migrations before using this flow so orders.agent_id permits null in existing databases.

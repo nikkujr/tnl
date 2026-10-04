@@ -31,6 +31,11 @@
     </div>
     @if (order(); as data) {
       <div class="action-bar">
+        @if (session().role === 'ADMIN' && data.origin === 'LIVE' && data.deliveryStatus === 'DELIVERED') {
+          <button type="button" class="secondary-button" [disabled]="!deliveryPanel()?.detail()" (click)="deliveryPanel()?.showProof()">
+            View proof of delivery
+          </button>
+        }
         @if (data.orderStatus === 'PENDING') {
           <button type="button" class="secondary-button" (click)="editOrder()">
             <app-icon name="edit" />Edit order
@@ -85,7 +90,7 @@
               ><span>{{ data.customerEmail }} · {{ data.customerPhone }}</span>
             </div>
             <div>
-              <small>Assigned agent</small><strong>{{ data.agentName }}</strong
+              <small>Assigned agent</small><strong>{{ data.agentName || 'Office order — no agent' }}</strong
               ><span>{{ data.agentEmail }}</span>
             </div>
             <div>
@@ -172,7 +177,7 @@
               </div>
             } @else {
               <p class="section-head">
-                Package commission becomes earned after delivery and full payment.
+                {{ data.agentId ? 'Package commission becomes earned after delivery and full payment.' : 'Office order — no agent commission.' }}
               </p>
             }
           </div>

@@ -15,6 +15,23 @@ app-delivery-map {
     gap: 12px;
     margin: 8px 0;
     font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .map-tools > div {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .destination-key {
+    color: #df7837;
+  }
+  .employee-key {
+    color: #465fff;
+  }
+  .map-tools button.primary {
+    background: #465fff;
+    color: #fff;
+    border-color: #465fff;
   }
   .map-tools button {
     padding: 7px 12px;

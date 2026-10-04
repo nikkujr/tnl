@@ -118,7 +118,7 @@ export class NewOrderPage implements OnInit {
         if (result.agents) this.agents.set(result.agents.data);
         this.customerId = result.customers.data[0]?.id ?? 0;
         this.deliveryAddress = result.customers.data[0]?.address ?? '';
-        this.agentId = result.agents?.data[0]?.id ?? this.session().id;
+        this.agentId = this.session().role === 'AGENT' ? this.session().id : 0;
         this.loading.set(false);
       },
       error: (error) => {
@@ -182,7 +182,6 @@ export class NewOrderPage implements OnInit {
   }
 
   confirmAgent(): void {
-    if (!this.pendingAgentId) return;
     this.agentId = this.pendingAgentId;
     this.agentModalOpen.set(false);
   }
@@ -280,8 +279,8 @@ export class NewOrderPage implements OnInit {
       this.error.set('Agents can only add packages to new orders.');
       return;
     }
-    if (!this.customerId || (this.session().role === 'ADMIN' && !this.agentId)) {
-      this.error.set('Select a customer and assigned agent before creating the order.');
+    if (!this.customerId) {
+      this.error.set('Select a customer before creating the order.');
       return;
     }
     if (!this.items().length && !this.packageLines().length) {
@@ -306,7 +305,7 @@ export class NewOrderPage implements OnInit {
     this.api
       .createOrder({
         customerId: this.customerId,
-        agentId: this.session().role === 'ADMIN' ? this.agentId : undefined,
+        agentId: this.session().role === 'ADMIN' ? this.agentId || null : undefined,
         items: this.items().map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,

@@ -39,7 +39,11 @@ export interface DeliveryJob {
 }
 export interface DeliveryDetail extends DeliveryJob {
   items: Array<{ name: string; quantity: number }>;
-  packages: Array<{ name: string; quantity: number; components: any[] }>;
+  packages: Array<{
+    name: string;
+    quantity: number;
+    components: Array<{ productId: number; productName: string; quantity: number }>;
+  }>;
   history: Array<{ status: string; occurredAt: string }>;
   issues: Array<{
     id: number;

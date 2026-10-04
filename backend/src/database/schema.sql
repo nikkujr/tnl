@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   tracking_number VARCHAR(40) NOT NULL UNIQUE,
   customer_id BIGINT UNSIGNED NOT NULL,
-  agent_id BIGINT UNSIGNED NOT NULL,
+  agent_id BIGINT UNSIGNED NULL,
   delivery_employee_id BIGINT UNSIGNED NULL,
   delivery_assignment_version INT UNSIGNED NOT NULL DEFAULT 0,
   destination_latitude DECIMAL(10,7) NULL,

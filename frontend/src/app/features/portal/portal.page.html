@@ -437,7 +437,7 @@
               ><small
                 >{{ o.deliveryStatus || o.orderStatus }} · {{ o.paymentStatus }} ·
                 {{ o.createdAt | date: 'medium' }}</small
-              ><small>Agent: {{ o.agentName }}</small>
+              ><small>Agent: {{ o.agentName || 'Office — no agent' }}</small>
             </div>
             <div>
               <strong>{{ o.total | currency: 'PHP' : 'symbol-narrow' }}</strong
@@ -453,7 +453,7 @@
           <h3>{{ o.trackingNumber }}</h3>
           <p>
             {{ o.deliveryStatus || o.orderStatus }} · Payment: {{ o.paymentStatus }} · Agent:
-            {{ o.agentName }}
+            {{ o.agentName || 'Office — no agent' }}
           </p>
           <p>{{ o.deliveryAddress }}</p>
           @for (p of o.packages; track p.packageId) {

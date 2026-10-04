@@ -67,7 +67,7 @@ customerRouter.patch(
 customerRouter.get("/orders", async (req, res, next) => {
   try {
     const [rows] = await db.query<any[]>(
-      "SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName FROM orders o JOIN users u ON u.id=o.agent_id WHERE o.customer_id=? ORDER BY o.created_at DESC,o.id DESC LIMIT 200",
+      "SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.customer_id=? ORDER BY o.created_at DESC,o.id DESC LIMIT 200",
       [req.customer!.customerId],
     );
     res.json({
@@ -86,7 +86,7 @@ customerRouter.get("/orders/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const [rows] = await db.query<any[]>(
-      "SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName FROM orders o JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?",
+      "SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?",
       [id, req.customer!.customerId],
     );
     if (!rows[0]) throw new HttpError(404, "Order not found");
@@ -359,7 +359,6 @@ staffRouter.post(
         }
         if (r.status !== "SUBMITTED")
           throw new HttpError(409, "Only submitted requests can be converted");
-        if (!r.agent_id) throw new HttpError(409, "Assign a field agent first");
         const order = await createSale(
           c,
           {

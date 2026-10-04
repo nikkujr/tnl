@@ -14,7 +14,7 @@
   }
   @if (detail(); as d) {
     <div class="delivery-context">
-      <strong>{{ d.deliveryStatus || 'Not started' }}</strong
+      <strong>{{ (d.deliveryStatus || 'Not started').replaceAll('_', ' ') | titlecase }}</strong
       ><span>Employee: {{ d.employeeName || 'Awaiting assignment' }}</span>
     </div>
     @if (isEmployee()) {
@@ -36,6 +36,151 @@
         }
       </div>
     }
+    @if (d.completion; as proof) {
+      <section
+        class="completion-proof"
+        [id]="'delivery-proof-' + orderId"
+        tabindex="-1"
+        aria-label="Proof of delivery"
+      >
+        <h4>Delivery completed</h4>
+        <p>Received by {{ proof.recipientName }} · {{ proof.completedAt | date: 'medium' }}</p>
+        <p>Recorded by {{ proof.employeeName }}</p>
+        @if (proof.exceptionReason) {
+          <p>Admin exception: {{ proof.exceptionReason }}</p>
+        }
+        @if (proof.photoState === 'EXPIRED') {
+          <p>Photo expired. Delivery evidence remains recorded.</p>
+        } @else if (proof.photoState === 'EXCEPTION') {
+          <p>No photo was recorded; an admin exception is on file.</p>
+        } @else {
+          @if (photoUrl()) {
+            <img class="proof-photo" [src]="photoUrl()" alt="Proof of delivery" />
+          } @else {
+            <button (click)="loadPhoto()">Load proof photo</button>
+          }
+        }
+      </section>
+    } @else if (d.deliveryStatus === 'DELIVERED') {
+      <section
+        class="completion-proof"
+        [id]="'delivery-proof-' + orderId"
+        tabindex="-1"
+        aria-label="Proof of delivery"
+      >
+        <h4>Proof of delivery</h4>
+        <p>No delivery evidence was recorded for this order.</p>
+      </section>
+    }
+    @if (isAdmin() && d.deliveryStatus !== 'DELIVERED') {
+      <section class="delivery-action-card" aria-label="Dispatch controls">
+        <h4>Dispatch & delivery status</h4>
+        <p class="muted">
+          Assign the employee responsible for delivery, then update the status as the order moves.
+        </p>
+        <div class="assignment-row">
+          <label
+            >Delivery employee<select [(ngModel)]="employeeId">
+              <option [ngValue]="null">Unassigned</option>
+              @for (e of employees(); track e.id) {
+                <option [ngValue]="e.id">{{ e.fullName }}</option>
+              }
+            </select></label
+          >
+          <button
+            type="button"
+            class="primary"
+            [disabled]="busy() || employeeId === d.employeeId"
+            (click)="assign()"
+          >
+            Save assignment
+          </button>
+        </div>
+        <div class="status-actions">
+          <div>
+            <strong>Update delivery status</strong>
+            <p class="muted">Current: {{ d.deliveryStatus.replaceAll('_', ' ') | titlecase }}</p>
+          </div>
+          <div class="actions">
+            @if (d.deliveryStatus === 'PREPARING') {
+              <button class="primary" [disabled]="busy()" (click)="advance('DISPATCHED')">
+                Mark dispatched
+              </button>
+            }
+            @if (d.deliveryStatus === 'DISPATCHED') {
+              <button class="primary" [disabled]="busy()" (click)="advance('IN_TRANSIT')">
+                Mark in transit
+              </button>
+            }
+            @if (d.deliveryStatus === 'IN_TRANSIT') {
+              <button class="primary" [disabled]="busy()" (click)="advance('OUT_FOR_DELIVERY')">
+                Mark out for delivery
+              </button>
+            }
+            <button
+              [class.primary]="d.deliveryStatus === 'OUT_FOR_DELIVERY'"
+              (click)="showCompletion()"
+            >
+              Record delivery completion
+            </button>
+          </div>
+        </div>
+      </section>
+    }
+    @if (isEmployee() && d.deliveryStatus !== 'DELIVERED') {
+      <section class="delivery-action-card" aria-label="Delivery actions">
+        <h4>Update delivery status</h4>
+        <p class="muted">
+          Start your delivery, update each stage, then record the recipient and proof of handoff.
+        </p>
+        @if (!d.attemptId) {
+          <button
+            class="primary"
+            [disabled]="busy() || d.issues.some(unresolved)"
+            (click)="start()"
+          >
+            Start delivery
+          </button>
+        } @else {
+          <div class="actions">
+            <button [disabled]="busy()" (click)="pause()">Pause delivery</button>
+            @if (d.deliveryStatus === 'DISPATCHED') {
+              <button class="primary" [disabled]="busy()" (click)="advance('IN_TRANSIT')">
+                Mark in transit
+              </button>
+            }
+            @if (d.deliveryStatus === 'IN_TRANSIT') {
+              <button class="primary" [disabled]="busy()" (click)="advance('OUT_FOR_DELIVERY')">
+                Mark out for delivery
+              </button>
+            }
+            <button [disabled]="busy()" (click)="sharing() ? disableSharing() : enableSharing()">
+              {{ sharing() ? 'Stop location sharing' : 'Share live location' }}
+            </button>
+            <button
+              [class.primary]="d.deliveryStatus === 'OUT_FOR_DELIVERY'"
+              (click)="showCompletion()"
+            >
+              Record delivery completion
+            </button>
+          </div>
+          @if (gpsError()) {
+            <p class="error" role="status">{{ gpsError() }}</p>
+          }
+          <label
+            >Unable to hand over this order?<textarea
+              [(ngModel)]="issueText"
+              maxlength="500"
+              placeholder="Explain the issue for the admin"
+            ></textarea></label
+          ><button [disabled]="busy() || issueText.trim().length < 5" (click)="report()">
+            Report issue and stop attempt
+          </button>
+        }
+      </section>
+    }
+    <h4 class="location-heading">Delivery location</h4>
+    <p class="muted">Destination: {{ d.address }}</p>
     <div class="location-status" [class.live]="state() === 'LIVE'">
       <strong>{{ state() }}</strong
       ><span>{{
@@ -58,95 +203,60 @@
     }
     <app-delivery-map
       [points]="points()"
-      [editable]="isAdmin() && d.deliveryStatus !== 'DELIVERED'"
+      [editable]="isAdmin() && d.deliveryStatus !== 'DELIVERED' && !busy()"
+      [follow]="!draftDestination()"
       (pin)="pin($event)"
     />
+    @if (!points().some(isDestination)) {
+      <p class="muted">No destination pin has been set for this address yet.</p>
+    }
     <p class="muted">
       Live location works while the employee keeps this page open. Switching apps or locking the
       phone can pause updates.
     </p>
     @if (isAdmin() && d.deliveryStatus !== 'DELIVERED') {
-      <div class="form-grid">
-        <label
-          >Delivery employee<select [(ngModel)]="employeeId">
-            <option [ngValue]="null">Unassigned</option>
-            @for (e of employees(); track e.id) {
-              <option [ngValue]="e.id">{{ e.fullName }}</option>
-            }
-          </select></label
-        ><button type="button" [disabled]="busy()" (click)="assign()">Save assignment</button
-        ><label
-          >Destination latitude<input
-            type="number"
-            [(ngModel)]="latitude"
-            min="-90"
-            max="90"
-            step="0.0000001" /></label
-        ><label
-          >Destination longitude<input
-            type="number"
-            [(ngModel)]="longitude"
-            min="-180"
-            max="180"
-            step="0.0000001"
-        /></label>
-      </div>
-      <div class="actions">
-        <button [disabled]="busy() || latitude === null || longitude === null" (click)="savePin()">
-          Save pin</button
-        ><button [disabled]="busy()" (click)="savePin(true)">Clear pin</button>
-      </div>
-    }
-    @if (isAdmin() && d.deliveryStatus !== 'DELIVERED') {
-      <div class="actions">
-        @if (d.deliveryStatus === 'PREPARING') {
-          <button [disabled]="busy()" (click)="advance('DISPATCHED')">Mark dispatched</button>
+      <div class="destination-editor">
+        @if (draftDestination()) {
+          <p class="notice" role="status">Unsaved destination — save to update this order.</p>
         }
-        @if (d.deliveryStatus === 'DISPATCHED') {
-          <button [disabled]="busy()" (click)="advance('IN_TRANSIT')">Mark in transit</button>
-        }
-        @if (d.deliveryStatus === 'IN_TRANSIT') {
-          <button [disabled]="busy()" (click)="advance('OUT_FOR_DELIVERY')">
-            Mark out for delivery
-          </button>
-        }
-      </div>
-    }
-    @if (isEmployee() && d.deliveryStatus !== 'DELIVERED') {
-      @if (!d.attemptId) {
-        <button class="primary" [disabled]="busy() || d.issues.some(unresolved)" (click)="start()">
-          Start delivery
-        </button>
-      } @else {
         <div class="actions">
-          <button [disabled]="busy()" (click)="pause()">Pause delivery</button>
-          @if (d.deliveryStatus === 'DISPATCHED') {
-            <button class="primary" [disabled]="busy()" (click)="advance('IN_TRANSIT')">
-              Mark in transit
-            </button>
+          <button
+            class="primary"
+            [disabled]="busy() || !pinValid() || !draftDestination()"
+            (click)="savePin()"
+          >
+            Save destination
+          </button>
+          @if (draftDestination()) {
+            <button [disabled]="busy()" (click)="resetPin()">Cancel pin changes</button>
           }
-          @if (d.deliveryStatus === 'IN_TRANSIT') {
-            <button class="primary" [disabled]="busy()" (click)="advance('OUT_FOR_DELIVERY')">
-              Mark out for delivery
-            </button>
-          }
-          <button [disabled]="busy()" (click)="sharing() ? disableSharing() : enableSharing()">
-            {{ sharing() ? 'Stop location sharing' : 'Share live location' }}
+          <button [disabled]="busy() || !track()?.destination" (click)="savePin(true)">
+            Clear destination pin
           </button>
         </div>
-        @if (gpsError()) {
-          <p class="error" role="status">{{ gpsError() }}</p>
-        }
-        <label
-          >Unable to hand over this order?<textarea
-            [(ngModel)]="issueText"
-            maxlength="500"
-            placeholder="Explain the issue for the admin"
-          ></textarea></label
-        ><button [disabled]="busy() || issueText.trim().length < 5" (click)="report()">
-          Report issue and stop attempt
-        </button>
-      }
+        <details>
+          <summary>Enter destination coordinates</summary>
+          <div class="form-grid">
+            <label
+              >Destination latitude<input
+                type="number"
+                [(ngModel)]="latitude"
+                (ngModelChange)="editCoordinates()"
+                min="-90"
+                max="90"
+                step="0.0000001" /></label
+            ><label
+              >Destination longitude<input
+                type="number"
+                [(ngModel)]="longitude"
+                (ngModelChange)="editCoordinates()"
+                min="-180"
+                max="180"
+                step="0.0000001"
+            /></label>
+          </div>
+        </details>
+      </div>
     }
     @for (i of d.issues; track i.id) {
       <article class="issue">
@@ -164,7 +274,7 @@
       </article>
     }
     @if ((isAdmin() || (isEmployee() && d.attemptId)) && d.deliveryStatus !== 'DELIVERED') {
-      <form class="completion-form" (ngSubmit)="complete()">
+      <form class="completion-form" [id]="'delivery-completion-' + orderId" (ngSubmit)="complete()">
         <h4>Complete delivery</h4>
         <label
           >Received by<input
@@ -209,27 +319,6 @@
         </button>
         <p class="muted">Completion is saved only after the server confirms it.</p>
       </form>
-    }
-    @if (d.completion; as proof) {
-      <div class="completion-proof">
-        <h4>Delivery completed</h4>
-        <p>Received by {{ proof.recipientName }} · {{ proof.completedAt | date: 'medium' }}</p>
-        <p>Recorded by {{ proof.employeeName }}</p>
-        @if (proof.exceptionReason) {
-          <p>Admin exception: {{ proof.exceptionReason }}</p>
-        }
-        @if (proof.photoState === 'EXPIRED') {
-          <p>Photo expired. Delivery evidence remains recorded.</p>
-        } @else if (proof.photoState === 'EXCEPTION') {
-          <p>No photo was recorded; an admin exception is on file.</p>
-        } @else {
-          @if (photoUrl()) {
-            <img class="proof-photo" [src]="photoUrl()" alt="Proof of delivery" />
-          } @else {
-            <button (click)="loadPhoto()">Load proof photo</button>
-          }
-        }
-      </div>
     }
     @if (isEmployee()) {
       <h4>Delivery history</h4>

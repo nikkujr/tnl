@@ -19,7 +19,7 @@
         <div>
           <strong>#{{ r.id }} · {{ r.customerName }}</strong
           ><small
-            >{{ r.status }} · {{ r.agentName || 'Awaiting admin assignment' }} ·
+            >{{ r.status }} · {{ r.agentName || 'Office — no agent' }} ·
             {{ r.created_at | date: 'medium' }}</small
           >
           <p>{{ r.delivery_address }}</p>
@@ -48,7 +48,7 @@
                 Assign
               </button>
             }
-            <button class="primary" (click)="convert(r.id)" [disabled]="!r.agent_id || busy()">
+            <button class="primary" (click)="convert(r.id)" [disabled]="busy()">
               Convert to pending order</button
             ><label class="field"
               >Reason if declining<input [(ngModel)]="reasons[r.id]" maxlength="500" /></label

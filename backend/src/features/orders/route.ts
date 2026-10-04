@@ -92,7 +92,7 @@ router.get("/", async (req, res, next) => {
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
        o.cash_change cashChange,o.delivery_address deliveryAddress,
        o.created_at createdAt,u.full_name agentName
-       FROM orders o JOIN customers c ON c.id=o.customer_id JOIN users u ON u.id=o.agent_id${where}
+       FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id${where}
        ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
       [...args, limit, offset],
     );
@@ -201,7 +201,7 @@ router.get(
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
        o.cash_change cashChange,o.delivery_address deliveryAddress,
        o.created_at createdAt,o.updated_at updatedAt,u.full_name agentName,u.email agentEmail
-       FROM orders o JOIN customers c ON c.id=o.customer_id JOIN users u ON u.id=o.agent_id
+       FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id
        WHERE o.id=?${scope}`,
         args,
       );
@@ -297,13 +297,15 @@ router.put(
             "Customer-confirmed terms cannot be edited; submit a new confirmed request",
           );
         const agentId =
-          req.user!.role === "ADMIN" ? req.body.agentId : req.user!.id;
-        const [agents] = await c.query<any[]>(
-          "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE",
-          [agentId ?? 0],
-        );
-        if (!agents.length)
-          throw new HttpError(400, "Assigned agent must be active");
+          req.user!.role === "ADMIN" ? req.body.agentId ?? null : req.user!.id;
+        if (agentId != null) {
+          const [agents] = await c.query<any[]>(
+            "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE",
+            [agentId ?? 0],
+          );
+          if (!agents.length)
+            throw new HttpError(400, "Assigned agent must be active");
+        }
         const previous = await readSale(c, id);
         const addedItems = req.body.items.filter(
           (i: any) => !previous.items.some((p) => p.productId === i.productId),
@@ -405,15 +407,17 @@ router.post(
         if (!o || o.order_status !== "PENDING")
           throw new HttpError(409, "Only pending orders can be decided");
         if (approve) {
-          const [agents] = await c.query<any[]>(
-            "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE LOCK IN SHARE MODE",
-            [o.agent_id],
-          );
-          if (!agents.length)
-            throw new HttpError(
-              409,
-              "Assign an active field agent before approval",
+          if (o.agent_id != null) {
+            const [agents] = await c.query<any[]>(
+              "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE LOCK IN SHARE MODE",
+              [o.agent_id],
             );
+            if (!agents.length)
+              throw new HttpError(
+                409,
+                "Assign an active field agent before approval",
+              );
+          }
           const sale = await readSale(c, id);
           await checkStock(c, sale, true);
           for (const i of requirements(sale)) {

@@ -215,7 +215,7 @@ export async function createSale(
   c: PoolConnection,
   input: {
     customerId: number;
-    agentId: number;
+    agentId?: number | null;
     deliveryAddress: string;
     paymentMethod: string;
     cashReceived?: number | null;
@@ -223,11 +223,13 @@ export async function createSale(
   s: Sale,
   actorId: number,
 ) {
-  const [agents] = await c.query<any[]>(
-    "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE LOCK IN SHARE MODE",
-    [input.agentId],
-  );
-  if (!agents.length) throw new HttpError(400, "Assigned agent must be active");
+  if (input.agentId != null) {
+    const [agents] = await c.query<any[]>(
+      "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE LOCK IN SHARE MODE",
+      [input.agentId],
+    );
+    if (!agents.length) throw new HttpError(400, "Assigned agent must be active");
+  }
   const [customers] = await c.query<any[]>(
     "SELECT id FROM customers WHERE id=?",
     [input.customerId],
@@ -249,7 +251,7 @@ export async function createSale(
         [
           trackingNumber,
           input.customerId,
-          input.agentId,
+          input.agentId ?? null,
           input.deliveryAddress,
           input.paymentMethod,
           payment.paymentStatus,
@@ -313,7 +315,7 @@ export async function completeSale(
     commissionValue: p.commissionValue,
     amount: pesos(packageCommission(p)),
   }));
-  if (breakdown.length) {
+  if (o.agent_id != null && breakdown.length) {
     const amount = pesos(breakdown.reduce((s, p) => s + cents(p.amount), 0));
     await c.execute(
       "INSERT INTO commissions(order_id,agent_id,rate,amount,breakdown,source) VALUES(?,?,NULL,?,?,'PACKAGE')",
