@@ -1,0 +1,126 @@
+import "dotenv/config";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { randomBytes } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import mysql from "mysql2/promise";
+
+test("seed/reset persists report-ready data, rolls back failures and remains usable", { skip: process.env.TNL_INTEGRATION !== "1", timeout: 120000 }, async () => {
+  const schema = `tnl_test_seed_${randomBytes(8).toString("hex")}`;
+  assert.match(schema, /^tnl_test_seed_[a-f0-9]{16}$/);
+  const admin = await mysql.createConnection({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT ?? 3306), user: process.env.DB_USER, password: process.env.DB_PASSWORD });
+  let db: any, server: any;
+  try {
+    await admin.query(`CREATE DATABASE \`${schema}\``);
+    process.env.DB_NAME = schema;
+    process.env.SMTP_HOST = "";
+    const { buildDemoData, businessDate, demoPassword } = await import("../src/database/demo-data.js");
+    const { totalCents } = await import("../src/features/orders/sales.js");
+    const { packageCommission } = await import("../src/shared/money.js");
+    const seed = await import("../src/database/seed.js");
+    ({ db } = await import("../src/database/connection.js"));
+    const { migrate } = await import("../src/database/migrate.js");
+    const { getReport } = await import("../src/features/reports/query.js");
+    await migrate();
+    const data = buildDemoData();
+    const count = async (table: string) => Number((await db.query(`SELECT COUNT(*) count FROM ${table}`))[0][0].count);
+    await seed.seedDefenseData(data);
+    assert.equal(await count("orders"), 360);
+    const populated = spawnSync(process.execPath, ["--import", "tsx", fileURLToPath(new URL("../src/database/seed.ts", import.meta.url))], { env: process.env, encoding: "utf8" });
+    assert.equal(populated.status, 1, populated.stderr);
+    assert.match(populated.stderr, /already contains/);
+    assert(!populated.stdout.includes("Applied"), "refuse before migrations");
+    await assert.rejects(seed.seedDefenseData(data), /already contains/);
+    assert.equal(await count("orders"), 360);
+    const verify = async () => {
+      assert.equal(await count("products"), 60);
+      assert.equal(await count("packages"), 6);
+      assert.equal(await count("customers"), 60);
+      assert.equal(await count("customer_accounts"), 60);
+      assert.equal(await count("customer_order_requests"), 24);
+      assert.equal(await count("leads"), 24);
+      assert.equal(await count("order_followups"), 16);
+      assert.equal(await count("delivery_active_jobs"), 2);
+      assert.equal(await count("delivery_completions"), 264);
+      const [unsafeRuns] = await db.query("SELECT id FROM automation_runs WHERE state IN ('PENDING','PROCESSING')");
+      assert.equal(unsafeRuns.length, 0);
+      const [enabled] = await db.query("SELECT workflow FROM automation_settings WHERE enabled=TRUE");
+      assert.equal(enabled.length, 0);
+      const [stock] = await db.query(`SELECT p.sku,p.stock_on_hand onHand,p.stock_reserved reserved,
+        SUM(CASE m.type WHEN 'ADD' THEN m.quantity WHEN 'DEDUCT' THEN -m.quantity ELSE 0 END) ledgerOnHand,
+        SUM(CASE m.type WHEN 'RESERVE' THEN m.quantity WHEN 'DEDUCT' THEN -m.quantity WHEN 'RELEASE' THEN -m.quantity ELSE 0 END) ledgerReserved
+        FROM products p JOIN inventory_movements m ON m.product_id=p.id GROUP BY p.id`);
+      for (const p of stock) { assert.equal(p.onHand, Number(p.ledgerOnHand)); assert.equal(p.reserved, Number(p.ledgerReserved)); }
+      const [invalidCommission] = await db.query(`SELECT co.id FROM commissions co JOIN orders o ON o.id=co.order_id
+        WHERE o.payment_status<>'PAID' OR o.delivery_status<>'DELIVERED' OR o.agent_id IS NULL
+        OR NOT EXISTS(SELECT 1 FROM order_packages op WHERE op.order_id=o.id)`);
+      assert.equal(invalidCommission.length, 0);
+      const [commissions] = await db.query("SELECT amount,breakdown FROM commissions");
+      assert.equal(commissions.length, data.orders.filter(o => o.saleCompletedAt && o.agentId && o.sale.packages.length).length);
+      for (const commission of commissions) {
+        const parts = typeof commission.breakdown === "string" ? JSON.parse(commission.breakdown) : commission.breakdown;
+        assert.equal(Math.round(commission.amount * 100), parts.reduce((sum: number, part: any) => sum + packageCommission({ ...part, sellingPrice: data.packages.find(p => p.name === part.name)!.sellingPrice }), 0));
+      }
+      const c = await db.getConnection();
+      try {
+        const report = await getReport(c, { period: "overall" });
+        assert.equal(Number(report.totals.completedSales), 240);
+        assert.equal(Math.round(report.totals.revenue * 100), data.orders.filter(o => o.saleCompletedAt).reduce((sum, o) => sum + totalCents(o.sale), 0));
+        assert.equal(report.trend.length, 6);
+        assert.equal(report.packages.length, 6);
+        assert(report.slowProducts.some(p => p.unitsSold === 0));
+        assert(report.stockAlerts.length > 0);
+        const daily = await getReport(c, { period: "daily", date: businessDate(data.now) });
+        assert(daily.totals.revenue > 0);
+      } finally { c.release(); }
+    };
+    await verify();
+    // A failure after deletes must restore the old records, including configuration.
+    await db.query("UPDATE automation_settings SET enabled=TRUE WHERE workflow='LOW_STOCK'");
+    const [oldOrder] = await db.query("SELECT id FROM orders ORDER BY id LIMIT 1");
+    await db.query("CREATE TRIGGER demo_fail_insert BEFORE INSERT ON products FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Injected seed failure'");
+    await assert.rejects(seed.seedDefenseData(data, true), /Injected seed failure/);
+    await db.query("DROP TRIGGER demo_fail_insert");
+    assert.equal(await count("orders"), 360);
+    const [restored] = await db.query("SELECT id FROM orders ORDER BY id LIMIT 1");
+    assert.equal(restored[0].id, oldOrder[0].id);
+    assert.equal(Number((await db.query("SELECT enabled FROM automation_settings WHERE workflow='LOW_STOCK'"))[0][0].enabled), 1);
+    await seed.seedDefenseData(data, true);
+    await verify();
+    const resetCli = spawnSync(process.execPath, ["--import", "tsx", fileURLToPath(new URL("../src/database/seed.ts", import.meta.url)), "--reset", `--confirm=${schema}`], { env: process.env, encoding: "utf8" });
+    assert.equal(resetCli.status, 0, resetCli.stderr);
+    assert.match(resetCli.stdout, /orders: 360/);
+    await verify();
+
+    const { app } = await import("../src/app.js");
+    server = app.listen(0, "127.0.0.1");
+    await new Promise(resolve => server.once("listening", resolve));
+    const base = `http://127.0.0.1:${server.address().port}/api/v1/`;
+    async function call(path: string, token = "", body?: object, method = body ? "POST" : "GET") {
+      const response = await fetch(base + path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      const value = await response.json();
+      assert.equal(response.status, 200, JSON.stringify(value));
+      return value.data;
+    }
+    const staff = await call("auth/login", "", { email: "admin@tnl.local", password: demoPassword });
+    const performance = await call(`performance?month=${data.periods.at(-1)}`, staff.token);
+    assert.equal(performance.agents.length, 8);
+    assert(performance.agents.some((a: any) => a.incentiveStatus === "APPROVED"));
+    assert(performance.agents.some((a: any) => a.incentiveStatus === "ELIGIBLE"));
+    assert(performance.agents.some((a: any) => a.sales === 0));
+    const customer = await call("customer-auth/login", "", { email: "mara.santos@example.test", password: demoPassword });
+    assert((await call("customer/orders", customer.token)).length > 0);
+    const delivery = await call("auth/login", "", { email: "delivery1@tnl.local", password: demoPassword });
+    const deliveries = await call("delivery/orders", delivery.token);
+    assert(deliveries.some((o: any) => o.attemptId));
+    // Verify an existing reserved order can complete through the real delivery service.
+    const active = deliveries.find((o: any) => o.attemptId);
+    await call(`orders/${active.id}/delivery-status`, staff.token, { assignmentVersion: active.assignmentVersion, deliveryStatus: "DELIVERED", recipientName: active.recipientName, exceptionReason: "Test admin confirms the demonstration recipient handover." }, "PATCH");
+  } finally {
+    if (server) await new Promise<void>(resolve => server.close(() => resolve()));
+    if (db) await db.end();
+    await admin.query(`DROP DATABASE IF EXISTS \`${schema}\``);
+    await admin.end();
+  }
+});

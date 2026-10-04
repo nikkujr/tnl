@@ -29,11 +29,29 @@ Delivery staff use the existing sign-in and a mobile `/delivery` workspace. Admi
 
 Use `npm run build`, `npm start`, and `npm run worker:start` for compiled production processes. Both API and worker require the same database and mail configuration. Set `PUBLIC_APP_URL` to the customer-facing HTTPS origin for activation, reset, and unsubscribe links. Run migrations before either process starts. Do not run the demo seed against production data.
 
-The seed creates:
+The panel-defense seed creates 60 IT/mobile products, 6 packages, 8 agents,
+2 delivery staff, 60 customers with portal accounts, and 360 orders across six
+reporting months, plus CRM, inventory, delivery, campaign and performance data.
+Dates follow the day you run it using the Manila business calendar.
 
-- `admin@tnl.local`
-- `agent@tnl.local`
-- Password for both: `TnlDemo123!`
+- Admin: `admin@tnl.local`
+- Agents: `agent@tnl.local`, `agent2@tnl.local` through `agent8@tnl.local`
+- Delivery: `delivery1@tnl.local`, `delivery2@tnl.local`
+- Customer portal: `mara.santos@example.test`
+- Password for every demo account: `TnlDemo123!`
+
+`db:seed` refuses existing application data. To replace it with the defense
+dataset, stop the API and worker and run from `backend/`:
+
+```sh
+npm run db:reset -- --confirm=tnl_track
+```
+
+Replace `tnl_track` with the exact `DB_NAME` in your backend environment. This
+deletes all application records in that database and reloads the demo data.
+Both seed and reset refuse `NODE_ENV=production`; `npm run db:seed -- --check`
+previews counts without database writes. See [the defense guide](docs/DEMO_DATA.md)
+for state counts, sample scenarios, reset behavior and verification.
 
 Change these credentials outside local development.
 
