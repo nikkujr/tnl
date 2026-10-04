@@ -405,10 +405,7 @@ export class App implements OnInit, OnDestroy {
     this.editingOrderId = order?.id ?? null;
     this.newOrder = {
       customerId: order?.customerId ?? this.customers()[0]?.id ?? 0,
-      agentId:
-        order?.agentId ??
-        this.agents()[0]?.id ??
-        (this.session()?.role === 'AGENT' ? this.session()!.id : 0),
+      agentId: this.session()?.role === 'AGENT' ? this.session()!.id : order.agentId ?? 0,
       items: order?.items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -455,14 +452,14 @@ export class App implements OnInit, OnDestroy {
     );
   }
   submitOrder(): void {
-    if (this.session()?.role === 'ADMIN' && !this.newOrder.agentId) {
-      this.setError('Select an assigned agent.');
-      return;
-    }
     this.loading.set(true);
+    const input = {
+      ...this.newOrder,
+      agentId: this.session()?.role === 'AGENT' ? this.session()!.id : this.newOrder.agentId || null,
+    };
     const request = this.editingOrderId
-      ? this.api.updateOrder(this.editingOrderId, this.newOrder)
-      : this.api.createOrder(this.newOrder);
+      ? this.api.updateOrder(this.editingOrderId, input)
+      : this.api.createOrder(input);
     request.subscribe({
       next: () => {
         this.closeNewOrder();

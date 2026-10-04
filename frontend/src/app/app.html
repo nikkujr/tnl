@@ -409,7 +409,8 @@
             >
             @if (session()!.role === 'ADMIN') {
               <label
-                >Assigned agent<select name="agent" [(ngModel)]="newOrder.agentId" required>
+                >Assigned agent (optional)<select name="agent" [(ngModel)]="newOrder.agentId">
+                  <option [ngValue]="0">Office order — no agent</option>
                   @for (agent of activeAgents(); track agent.id) {
                     <option [ngValue]="agent.id">{{ agent.fullName }}</option>
                   }
@@ -497,7 +498,7 @@
           </p>
           <footer>
             <button type="button" class="secondary-button" (click)="closeNewOrder()">Cancel</button
-            ><button class="primary" type="submit">Create order</button>
+            ><button class="primary" type="submit">{{ editingOrderId ? 'Save changes' : 'Create order' }}</button>
           </footer>
         </form>
       </section>

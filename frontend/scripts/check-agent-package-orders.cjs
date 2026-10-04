@@ -13,7 +13,7 @@ async function main() {
   try {
     for (const [role, width] of [['AGENT', 1440], ['AGENT', 390], ['AGENT', 320], ['ADMIN', 1440], ['ADMIN', 390]]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
-      let submitted;
+      let submitted, updated, converted;
       await page.addInitScript((role) => {
         sessionStorage.setItem('tnl_access_token', 'order-layout-fixture');
         sessionStorage.setItem('tnl_user', JSON.stringify({ id: role === 'ADMIN' ? 1 : 2, email: 'staff@example.test', fullName: 'Jamie Co', role }));
@@ -27,6 +27,12 @@ async function main() {
         if (endpoint === 'products') data = [product];
         if (endpoint === 'agents') data = [{ id: 2, fullName: 'Jamie Co', email: 'staff@example.test', active: true }];
         if (endpoint === 'packages') data = [pack, { ...pack, id: 2, name: 'Sold out package', available: 0, components: [{ productId: 2, productName: 'Pen', quantity: 1 }] }, percentagePack, roundingPack];
+        if (endpoint === 'orders/1') {
+          if (request.method() === 'PUT') updated = request.postDataJSON();
+          data = { id: 1, trackingNumber: 'TNL-OFFICE', customerId: 1, agentId: null, agentName: null, items: [], packages: [{ packageId: 1, name: pack.name, quantity: 1, components: pack.components, sellingPrice: 1000 }], total: 1000, origin: 'LIVE', orderStatus: 'PENDING', deliveryStatus: null, paymentStatus: 'UNPAID', paymentMethod: 'Bank transfer', deliveryAddress: '123 Example Street', history: [], deliveryEvents: [] };
+        }
+        if (endpoint === 'requests') data = [{ id: 1, status: 'SUBMITTED', customerName: 'Office customer', agent_id: null, agentName: null, snapshot: { items: [], packages: [{ ...pack, packageId: 1, quantity: 1 }] }, delivery_address: '123 Example Street' }];
+        if (endpoint === 'requests/1/convert') { converted = true; data = { id: 1 }; }
         if (endpoint === 'orders' && request.method() === 'POST') {
           submitted = request.postDataJSON();
           return route.fulfill({ status: 201, json: { data: { id: 1 } } });
@@ -117,6 +123,19 @@ async function main() {
       assert.deepEqual(submitted.packages, [{ packageId: 1, quantity: role === 'AGENT' ? 4 : 1 }]);
       if (role === 'AGENT') assert.equal('agentId' in submitted, false, 'Agent sends a client-assigned owner');
       else assert.equal(submitted.agentId, null, 'Office order retains a credited agent');
+      if (role === 'ADMIN') {
+        await page.goto(`${base}/orders?edit=1`);
+        const editor = page.getByRole('dialog', { name: 'Edit pending order' });
+        await editor.waitFor();
+        assert.match(await editor.locator('select[name="agent"] option:checked').textContent(), /Office.*no agent/, 'Office order is silently assigned to the first agent');
+        await editor.getByRole('button', { name: 'Save changes' }).click();
+        await editor.waitFor({ state: 'hidden' });
+        assert.equal(updated.agentId, null, 'Office edit requires an agent');
+        await page.goto(`${base}/requests`);
+        await page.getByRole('button', { name: 'Convert to pending order' }).click();
+        await page.waitForURL('**/orders/1');
+        assert.equal(converted, true, 'Unassigned customer request cannot convert');
+      }
       console.log(`PASS: ${role} order creation at ${width}px`);
       await page.close();
     }
