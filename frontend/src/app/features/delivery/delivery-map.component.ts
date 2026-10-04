@@ -159,6 +159,9 @@ export class DeliveryMapComponent implements AfterViewInit, OnChanges, OnDestroy
         { padding: [30, 30], maxZoom: 15 },
       );
   }
+  focusPoint(point: Coordinate) {
+    this.map?.setView([point.latitude, point.longitude], 15);
+  }
   placePin() {
     if (!this.editable || !this.map) return;
     const center = this.map.getCenter();

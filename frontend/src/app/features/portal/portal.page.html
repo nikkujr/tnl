@@ -257,8 +257,21 @@
               #catalogSearchInput
               name="search"
               [(ngModel)]="search"
-              placeholder="Name or description" /></label
-          ><button class="primary" [disabled]="catalogLoading()">Search</button>
+              placeholder="Name or description"
+          /></label>
+          <label
+            >Offer type<select
+              aria-label="Offer type"
+              name="offerType"
+              [ngModel]="catalogKind()"
+              (ngModelChange)="changeCatalogKind($event)"
+            >
+              <option value="ALL">All offers</option>
+              <option value="PRODUCT">Products</option>
+              <option value="PACKAGE">Packages</option>
+            </select></label
+          >
+          <button class="primary" [disabled]="catalogLoading()">Search</button>
         </form>
       </section>
       @if (catalogLoading()) {
@@ -270,7 +283,7 @@
         </div>
       } @else {
         <p #catalogSummary class="catalog-summary" tabindex="-1" role="status">
-          Showing {{ catalogStart() }}–{{ catalogEnd() }} of {{ offers().length }} offers
+          Showing {{ catalogStart() }}–{{ catalogEnd() }} of {{ filteredOffers().length }} offers
         </p>
         <div class="grid">
           @for (o of visibleOffers(); track o.kind + o.id) {
@@ -301,7 +314,7 @@
             <div class="panel catalog-empty">
               <app-icon name="packageSearch" />
               <h3>No offers found</h3>
-              <p>Try a different search or check back for new offers.</p>
+              <p>Try another offer type or search, or check back when stock is available.</p>
             </div>
           }
         </div>

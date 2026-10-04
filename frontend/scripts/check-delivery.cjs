@@ -121,6 +121,24 @@ async function main() {
         url = new URL(request.url()),
         p = url.pathname.replace('/api/v1/', '');
       requests.push(p);
+      if (p === 'delivery/location-search') {
+        const query = url.searchParams.get('query');
+        if (query === 'offline')
+          return route.fulfill({
+            status: 502,
+            json: {
+              error: { message: 'Place search could not be reached. Try again or use the map.' },
+            },
+          });
+        return route.fulfill({
+          json: {
+            data:
+              query === 'no matches'
+                ? []
+                : [{ latitude: 14.07, longitude: 121.32, label: 'San Pablo, Laguna, Philippines' }],
+          },
+        });
+      }
       if (p.startsWith('delivery-employees') && request.method() !== 'GET')
         accountMutations.push({ path: p, body: request.postDataJSON() });
       if (sessionExpired && p.endsWith('/tracking'))
@@ -456,6 +474,49 @@ async function main() {
       const map = page.locator('app-delivery-panel .leaflet-container');
       await map.waitFor();
       await page.locator('.delivery-map-marker.destination').waitFor();
+      const search = page.getByLabel('Search destination', { exact: true });
+      assert.equal(
+        requests.filter((p) => p === 'delivery/location-search').length,
+        viewport.width === 1440 ? 0 : 3 * (viewport.width === 390 ? 1 : 2),
+        'Search should only run on explicit submission',
+      );
+      await search.fill('no matches');
+      await page.getByRole('button', { name: 'Search places', exact: true }).click();
+      await page
+        .getByText('No places found. Try a nearby landmark or place the pin manually.', {
+          exact: true,
+        })
+        .waitFor();
+      await search.fill('offline');
+      await page.getByRole('button', { name: 'Search places', exact: true }).click();
+      await page
+        .getByText('Place search could not be reached. Try again or use the map.', { exact: true })
+        .waitFor();
+      const beforeSaves = requests.filter((p) => p === 'orders/1/delivery-destination').length;
+      await search.fill('San Pablo');
+      await page.getByRole('button', { name: 'Search places', exact: true }).click();
+      await page
+        .getByRole('button', { name: 'San Pablo, Laguna, Philippines', exact: true })
+        .click();
+      await page.locator('.leaflet-marker-icon[title="Unsaved destination"]').waitFor();
+      assert.equal(
+        await page.getByLabel('Destination latitude', { exact: true }).inputValue(),
+        '14.07',
+      );
+      assert.equal(
+        requests.filter((p) => p === 'orders/1/delivery-destination').length,
+        beforeSaves,
+        'Selecting a search result saves without confirmation',
+      );
+      const foundPin = await page
+        .locator('.leaflet-marker-icon[title="Unsaved destination"]')
+        .boundingBox();
+      const foundMap = await map.boundingBox();
+      assert(
+        foundPin.x >= foundMap.x && foundPin.x + foundPin.width <= foundMap.x + foundMap.width,
+        'Searched pin is outside the map',
+      );
+      await page.getByRole('button', { name: 'Cancel pin changes', exact: true }).click();
       const before = await page.locator('.leaflet-marker-icon').first().getAttribute('style');
       const box = await map.boundingBox();
       await map.click({ position: { x: box.width * 0.7, y: box.height * 0.6 } });

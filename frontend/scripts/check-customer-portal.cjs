@@ -8,6 +8,8 @@ const offers = [
   { id: 1, kind: 'PACKAGE', revision: '1', name: 'Workday essentials', description: 'A useful set of everyday office accessories.', price: 1200, available: true, components: [{ productId: 3, productName: 'Desk organizer', quantity: 1 }] },
   { id: 2, kind: 'PRODUCT', revision: '1', name: 'Everyday notebook', description: 'Make room for your next good idea.', price: 180, available: true },
   { id: 3, kind: 'PRODUCT', revision: '1', name: 'Desk organizer', description: 'Keep the little things in their place.', price: 420, available: false },
+  { id: 4, kind: 'PACKAGE', revision: '1', name: 'Sold out bundle', price: 500, available: false },
+  ...Array.from({ length: 6 }, (_, i) => ({ id: 10 + i, kind: 'PRODUCT', revision: '1', name: `Available product ${i + 1}`, price: 100, available: true })),
 ];
 
 async function main() {
@@ -16,13 +18,14 @@ async function main() {
   let emptyCatalog = false;
   try {
     const page = await browser.newPage();
+    page.setDefaultTimeout(15000);
     await page.route('**/api/v1/**', async (route) => {
       const request = route.request();
       const endpoint = new URL(request.url()).pathname.split('/api/v1/')[1];
       const body = request.method() === 'POST' ? request.postDataJSON() : undefined;
       if (body) posted.push({ endpoint, body });
       let data = [];
-      if (endpoint === 'catalog') data = emptyCatalog ? [] : offers;
+      if (endpoint === 'catalog') { const search = new URL(request.url()).searchParams.get('search') || ''; data = emptyCatalog ? [] : offers.filter((o) => (o.name + ' ' + (o.description || '')).toLowerCase().includes(search.toLowerCase())); }
       if (endpoint === 'customer/me') data = { address: '123 Example Street', marketingOptIn: false };
       if (endpoint === 'customer-auth/login') {
         if (body.email === 'invalid@example.test') {
@@ -75,7 +78,7 @@ async function main() {
       await fits('Registration');
       if (viewport.width === 390) await screenshot('register-mobile');
       await page.locator('.auth-submit').click();
-      await page.getByRole('status').waitFor();
+      await page.locator('.auth-card .notice').waitFor();
       assert.ok(posted.some((entry) => entry.endpoint === 'customer-auth/register' && entry.body.fullName === customer.fullName));
 
       await page.locator('.auth-switch').getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -84,19 +87,19 @@ async function main() {
       assert.equal(await page.locator('input[type="password"]').count(), 0);
       await fits('Password recovery');
       await page.locator('.auth-submit').click();
-      await page.getByRole('status').waitFor();
+      await page.locator('.auth-card .notice').waitFor();
       assert.ok(posted.some((entry) => entry.endpoint === 'customer-auth/forgot-password'));
       console.log(`PASS: Sign-in, error, registration and recovery at ${viewport.width}px`);
     }
 
     await page.goto(`${base}/portal?verify=fixture-verification`);
     await page.locator('.auth-submit').click();
-    await page.getByRole('status').waitFor();
+    await page.locator('.auth-card .notice').waitFor();
     assert.deepEqual(posted.find((entry) => entry.endpoint === 'customer-auth/verify').body, { token: 'fixture-verification' });
     await page.goto(`${base}/portal?reset=fixture-reset`);
     await page.getByLabel('Password', { exact: true }).fill('NewPassword123!');
     await page.locator('.auth-submit').click();
-    await page.getByRole('status').waitFor();
+    await page.locator('.auth-card .notice').waitFor();
     assert.deepEqual(posted.find((entry) => entry.endpoint === 'customer-auth/reset-password').body, { token: 'fixture-reset', password: 'NewPassword123!' });
 
     await page.getByLabel('Email', { exact: true }).fill(customer.email);
@@ -106,6 +109,29 @@ async function main() {
     assert.equal(await page.locator('.auth-card').count(), 0);
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 900 });
+      await page.getByLabel('Offer type', { exact: true }).selectOption('ALL');
+      await page.getByText('Showing 1–6 of 8 offers', { exact: false }).waitFor();
+      assert.equal(await page.locator('.offer-card').filter({ hasText: 'Desk organizer' }).getByRole('heading', { name: 'Desk organizer', exact: true }).count(), 0);
+      assert.equal(await page.locator('.offer-card').filter({ hasText: 'Sold out bundle' }).count(), 0);
+      await page.getByRole('button', { name: 'Next', exact: true }).click();
+      await page.getByText('Showing 7–8 of 8 offers', { exact: false }).waitFor();
+      await page.getByLabel('Offer type', { exact: true }).selectOption('PRODUCT');
+      await page.getByText('Showing 1–6 of 7 offers', { exact: false }).waitFor();
+      assert.equal(await page.locator('.offer-card .tag').filter({ hasText: 'Package' }).count(), 0);
+      await page.getByLabel('Offer type', { exact: true }).selectOption('PACKAGE');
+      await page.getByText('Showing 1–1 of 1 offers', { exact: false }).waitFor();
+      assert.equal(await page.locator('.offer-card').count(), 1);
+      assert.equal(await page.locator('.catalog-pagination').count(), 0);
+      await page.getByLabel('Search products and packages', { exact: true }).fill('notebook');
+      await page.locator('.catalog-search').getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByRole('heading', { name: 'No offers found' }).waitFor();
+      await page.getByLabel('Offer type', { exact: true }).selectOption('PRODUCT');
+      await page.getByRole('heading', { name: 'Everyday notebook', exact: true }).waitFor();
+      await page.getByLabel('Search products and packages', { exact: true }).fill('');
+      await page.locator('.catalog-search').getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByText('Showing 1–6 of 7 offers', { exact: false }).waitFor();
+      await page.getByLabel('Offer type', { exact: true }).selectOption('ALL');
+      await page.getByText('Showing 1–6 of 8 offers', { exact: false }).waitFor();
       await fits('Customer catalog');
       if (width !== 320) await screenshot(`catalog-${width}`);
     }

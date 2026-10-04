@@ -252,3 +252,27 @@ textarea {
     gap: 5px;
   }
 }
+.destination-search {
+  margin: 16px 0;
+  display: grid;
+  gap: 10px;
+}
+.destination-search label {
+  display: grid;
+  gap: 6px;
+}
+.destination-search input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.place-results {
+  display: grid;
+  gap: 8px;
+}
+.place-results button {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-height: 44px;
+}

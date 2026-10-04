@@ -50,6 +50,7 @@ test(
     try {
       await admin.query(`CREATE DATABASE \`${schema}\``);
       process.env.DB_NAME = schema;
+      process.env.GEOAPIFY_API_KEY = "";
       process.env.DELIVERY_PHOTO_DIR = root;
       ({ db } = await import("../src/database/connection.js"));
       const sql = await readFile(
@@ -227,8 +228,13 @@ test(
             "orders",
             "delivery-employees",
             "delivery/dispatch",
+            "delivery/location-search?query=San%20Pablo",
           ])
             await call(path, "GET", undefined, driver, 403);
+          await call("delivery/location-search?query=San%20Pablo", "GET", undefined, agent, 403);
+          await call("delivery/location-search?query=San%20Pablo", "GET", undefined, owner, 403);
+          await call("delivery/location-search?query=ab", "GET", undefined, a, 400);
+          await call("delivery/location-search?query=San%20Pablo", "GET", undefined, a, 503);
           await call("account", "GET", undefined, driver);
           await call("notifications", "GET", undefined, driver);
           await call(

@@ -1,4 +1,7 @@
 import { Router } from "express";
+import { config } from "../../config.js";
+import { rateLimit } from "../../shared/rate-limit.js";
+import { searchPlaces } from "./geocoding.js";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import multer from "multer";
@@ -40,6 +43,11 @@ deliveryRouter.use(
 );
 const admin = [authenticate, authorize("ADMIN")];
 const employee = authorize("DELIVERY");
+deliveryRouter.get("/location-search", authorize("ADMIN"), rateLimit(30, 60000),
+  validate(z.object({ body: z.any(), params: z.any(), query: z.object({ query: z.string().trim().min(3).max(200) }).strict() })),
+  async (req, res) => { res.json({ data: await searchPlaces(String(req.query.query).trim(), config.GEOAPIFY_API_KEY) }); },
+);
+
 deliveryRouter.get("/dispatch", authorize("ADMIN"), async (req, res) => {
   const jobs = await orderList(req.user!, id(req.query.page ?? 1));
   res.json({

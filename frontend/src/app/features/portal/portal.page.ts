@@ -36,24 +36,30 @@ export class PortalPage {
   readonly notice = signal('');
   readonly busy = signal(false);
   readonly offers = signal<CatalogOffer[]>([]);
+  readonly catalogKind = signal<'ALL' | 'PRODUCT' | 'PACKAGE'>('ALL');
+  readonly filteredOffers = computed(() =>
+    this.offers().filter((offer) =>
+      offer.available && (this.catalogKind() === 'ALL' || offer.kind === this.catalogKind()),
+    ),
+  );
   readonly catalogPage = signal(1);
   readonly catalogPageSize = 6;
   readonly catalogLoading = signal(false);
   readonly catalogError = signal('');
   readonly catalogPageCount = computed(() =>
-    Math.max(1, Math.ceil(this.offers().length / this.catalogPageSize)),
+    Math.max(1, Math.ceil(this.filteredOffers().length / this.catalogPageSize)),
   );
   readonly visibleOffers = computed(() =>
-    this.offers().slice(
+    this.filteredOffers().slice(
       (this.catalogPage() - 1) * this.catalogPageSize,
       this.catalogPage() * this.catalogPageSize,
     ),
   );
   readonly catalogStart = computed(() =>
-    this.offers().length ? (this.catalogPage() - 1) * this.catalogPageSize + 1 : 0,
+    this.filteredOffers().length ? (this.catalogPage() - 1) * this.catalogPageSize + 1 : 0,
   );
   readonly catalogEnd = computed(() =>
-    Math.min(this.catalogPage() * this.catalogPageSize, this.offers().length),
+    Math.min(this.catalogPage() * this.catalogPageSize, this.filteredOffers().length),
   );
   private readonly catalogSummary = viewChild<ElementRef<HTMLElement>>('catalogSummary');
   private readonly catalogSearchInput =
@@ -138,6 +144,10 @@ export class PortalPage {
           );
         },
       });
+  }
+  changeCatalogKind(kind: 'ALL' | 'PRODUCT' | 'PACKAGE') {
+    this.catalogKind.set(kind);
+    this.catalogPage.set(1);
   }
   changeCatalogPage(page: number) {
     if (page < 1 || page > this.catalogPageCount() || this.catalogLoading()) return;

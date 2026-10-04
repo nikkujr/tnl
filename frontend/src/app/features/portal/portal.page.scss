@@ -61,9 +61,9 @@ button.primary:hover:not(:disabled) { background: var(--color-accent-hover, #625
 .section-heading h2 { margin: 8px 0; font-size: 28px; letter-spacing: -.035em; }
 .section-heading p { margin: 0; font-size: 13px; }
 .catalog-search { padding: 16px 20px; }
-.catalog-search .fields { grid-template-columns: 1fr auto; align-items: end; margin: 0; }
+.catalog-search .fields { grid-template-columns: minmax(0, 1fr) minmax(130px, 180px) auto; align-items: end; margin: 0; }
 .catalog-search label { font-size: 11px; font-weight: 600; }
-.catalog-search input { min-height: 42px; }
+.catalog-search input, .catalog-search select { min-height: 42px; }
 .catalog-search button { min-height: 42px; font-size: 12px; }
 .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .offer-card { display: flex; flex-direction: column; min-width: 0; padding: 16px; margin: 0; border-radius: 12px; }
@@ -131,4 +131,8 @@ button.primary:hover:not(:disabled) { background: var(--color-accent-hover, #625
   .grid { grid-template-columns: 1fr; }
   .portal-welcome h1 { font-size: 27px; }
   .portal-footer { flex-wrap: wrap; }
+}
+
+@media (max-width: 640px) {
+  .catalog-search .fields { grid-template-columns: 1fr; }
 }

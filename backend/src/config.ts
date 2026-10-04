@@ -15,6 +15,7 @@ const schema = z.object({
   DB_USER: z.string().min(1),
   DB_PASSWORD: z.string(),
   JWT_SECRET: z.string().min(32),
+  GEOAPIFY_API_KEY: z.string().trim().default(""),
   JWT_EXPIRES_IN: z.string().default("8h"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),

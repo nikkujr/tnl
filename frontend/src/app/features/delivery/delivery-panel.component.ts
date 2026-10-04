@@ -8,6 +8,7 @@ import {
   inject,
   signal,
   computed,
+  viewChild,
 } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -45,6 +46,13 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   readonly photoUrl = signal('');
   readonly preview = signal('');
   readonly sharing = signal(false);
+  placeQuery = '';
+  readonly placeResults = signal<Array<Coordinate & { label: string }>>([]);
+  readonly placeSearchBusy = signal(false);
+  readonly placeSearchError = signal('');
+  readonly placeSearchDone = signal(false);
+  private placeSearch?: Subscription;
+  private readonly deliveryMap = viewChild(DeliveryMapComponent);
   readonly draftDestination = signal<Coordinate | null>(null);
   readonly clock = signal(Date.now());
   readonly isEmployee = computed(() => this.session()?.role === 'DELIVERY');
@@ -128,6 +136,8 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   }
   ngOnChanges() {
     this.generation++;
+    this.clearPlaceSearch();
+    this.placeQuery = '';
     this.stopLocal();
     this.subscriptions.forEach((s) => s.unsubscribe());
     this.subscriptions = [];
@@ -305,6 +315,46 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
         }),
       );
     }, 'Dispatch assignment saved.');
+  }
+  clearPlaceSearch() {
+    this.placeSearch?.unsubscribe();
+    this.placeResults.set([]);
+    this.placeSearchError.set('');
+    this.placeSearchBusy.set(false);
+    this.placeSearchDone.set(false);
+  }
+  searchPlaces() {
+    if (!this.isAdmin() || this.busy()) return;
+    this.clearPlaceSearch();
+    const query = this.placeQuery.trim();
+    if (query.length < 3 || query.length > 200) {
+      this.placeSearchError.set('Enter a place or address between 3 and 200 characters.');
+      return;
+    }
+    this.placeSearchBusy.set(true);
+    this.placeSearch = this.api
+      .get<Array<Coordinate & { label: string }>>(
+        `delivery/location-search?query=${encodeURIComponent(query)}`,
+      )
+      .subscribe({
+        next: (r) => {
+          this.placeResults.set(r.data);
+          this.placeSearchBusy.set(false);
+          this.placeSearchDone.set(true);
+        },
+        error: (e) => {
+          this.placeSearchBusy.set(false);
+          this.placeSearchError.set(
+            e.error?.error?.message ?? 'Place search is unavailable. Use the map instead.',
+          );
+        },
+      });
+    this.watch(this.placeSearch);
+  }
+  selectPlace(place: Coordinate) {
+    if (!this.isAdmin() || this.busy()) return;
+    this.pin({ latitude: place.latitude, longitude: place.longitude });
+    this.deliveryMap()?.focusPoint(place);
   }
   pin(p: Coordinate) {
     this.latitude = p.latitude;
@@ -560,6 +610,8 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   ngOnDestroy() {
     this.alive = false;
     this.generation++;
+    this.clearPlaceSearch();
+    this.placeQuery = '';
     this.stopLocal();
     clearInterval(this.pollTimer);
     document.removeEventListener('visibilitychange', this.visibility);

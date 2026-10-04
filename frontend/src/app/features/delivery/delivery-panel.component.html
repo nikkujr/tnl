@@ -201,6 +201,53 @@
         m · Received: {{ track()!.position!.receivedAt | date: 'medium' }}
       </p>
     }
+    @if (isAdmin() && d.deliveryStatus !== 'DELIVERED') {
+      <section class="destination-search" aria-label="Destination place search">
+        <label
+          >Search destination<input
+            type="search"
+            [(ngModel)]="placeQuery"
+            (ngModelChange)="clearPlaceSearch()"
+            (keydown.enter)="$event.preventDefault(); searchPlaces()"
+            maxlength="200"
+            placeholder="Street, town or landmark in the Philippines"
+        /></label>
+        <button
+          type="button"
+          class="primary"
+          (click)="searchPlaces()"
+          [disabled]="busy() || placeSearchBusy()"
+        >
+          {{ placeSearchBusy() ? 'Searching…' : 'Search places' }}
+        </button>
+        <p class="muted">
+          Select a result, check the pin, then save the destination. The order's text address stays
+          unchanged.
+        </p>
+        @if (placeSearchError()) {
+          <p class="error" role="alert">{{ placeSearchError() }}</p>
+        }
+        @if (placeSearchDone() && !placeResults().length) {
+          <p role="status">No places found. Try a nearby landmark or place the pin manually.</p>
+        }
+        @if (placeResults().length) {
+          <div class="place-results">
+            @for (place of placeResults(); track $index) {
+              <button type="button" (click)="selectPlace(place)" [disabled]="busy()">
+                {{ place.label }}
+              </button>
+            }
+          </div>
+          <p class="muted">
+            Place search by
+            <a href="https://www.geoapify.com/" target="_blank" rel="noopener noreferrer"
+              >Geoapify</a
+            >
+            · © OpenStreetMap contributors
+          </p>
+        }
+      </section>
+    }
     <app-delivery-map
       [points]="points()"
       [editable]="isAdmin() && d.deliveryStatus !== 'DELIVERED' && !busy()"
