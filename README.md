@@ -14,13 +14,13 @@ Delivery staff use the existing sign-in and a mobile `/delivery` workspace. Admi
 ## Prerequisites
 
 - Node.js 24.15 or a compatible Angular 22 runtime
-- MySQL 8+
+- MySQL 8+ or MariaDB 10.4+ with InnoDB and utf8mb4
 - npm 11+
 
 ## Backend setup
 
 1. Copy `backend/.env.example` to `backend/.env`.
-2. Create the configured MySQL database and user.
+2. Create the configured database and user. Use `CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci` for the database so names and peso symbols are preserved.
 3. Install dependencies in `backend/`.
 4. Run `npm run db:migrate`.
 5. Run `npm run db:seed`.

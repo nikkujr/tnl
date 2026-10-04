@@ -24,7 +24,7 @@ export async function scopedOrder(
   lock = false,
 ) {
   const [rows] = await c.query<any[]>(
-    "SELECT * FROM orders WHERE id=?" + (lock ? " FOR SHARE" : ""),
+    "SELECT * FROM orders WHERE id=?" + (lock ? " LOCK IN SHARE MODE" : ""),
     [id],
   );
   const o = rows[0];

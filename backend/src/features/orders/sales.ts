@@ -100,7 +100,7 @@ export async function quote(
   }
   for (const i of input.packages ?? []) {
     const [rows] = await c.query<any[]>(
-      "SELECT * FROM packages WHERE id=? AND active=TRUE FOR SHARE",
+      "SELECT * FROM packages WHERE id=? AND active=TRUE LOCK IN SHARE MODE",
       [i.packageId],
     );
     if (!rows[0]) throw new HttpError(400, "Selected package is unavailable");
@@ -224,7 +224,7 @@ export async function createSale(
   actorId: number,
 ) {
   const [agents] = await c.query<any[]>(
-    "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE FOR SHARE",
+    "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE LOCK IN SHARE MODE",
     [input.agentId],
   );
   if (!agents.length) throw new HttpError(400, "Assigned agent must be active");

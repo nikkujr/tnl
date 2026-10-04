@@ -1,4 +1,5 @@
 import type { PoolConnection } from "mysql2/promise";
+import { jsonValue } from "../../shared/transaction.js";
 import { saleTotalSql } from "../orders/queries.js";
 import {
   reportBounds,
@@ -33,22 +34,37 @@ export async function getReport(c: PoolConnection, query: ReportQuery) {
     SUM(saleTotal) revenue,COUNT(*) orders FROM sales GROUP BY label ORDER BY label`,
     args,
   );
-  // Expand saved package components, never the current package catalog.
-  const [products] = await c.query<any[]>(
-    `WITH sales AS (${eligible}), units AS (
-    SELECT oi.product_id productId,oi.quantity,s.reportDate FROM order_items oi JOIN sales s ON s.id=oi.order_id
-    UNION ALL
-    SELECT part.productId,part.quantity*op.quantity,s.reportDate
-    FROM order_packages op JOIN sales s ON s.id=op.order_id
-    JOIN JSON_TABLE(op.components,'$[*]' COLUMNS(productId BIGINT PATH '$.productId',quantity INT PATH '$.quantity')) part ON TRUE
-  ), movement AS (SELECT productId,SUM(quantity) unitsSold,MAX(reportDate) lastSoldAt FROM units GROUP BY productId)
-    SELECT p.id,p.name,p.sku,p.active,p.stock_on_hand stockOnHand,p.stock_reserved stockReserved,
-      p.stock_on_hand-p.stock_reserved available,p.low_stock_threshold lowStockThreshold,
-      COALESCE(m.unitsSold,0) unitsSold,DATE_FORMAT(DATE_ADD(m.lastSoldAt,INTERVAL 8 HOUR),'%Y-%m-%d') lastSoldDate
-    FROM products p LEFT JOIN movement m ON m.productId=p.id
-    WHERE p.active=TRUE OR m.unitsSold>0`,
+  const [movement] = await c.query<any[]>(
+    `WITH sales AS (${eligible})
+    SELECT oi.product_id productId,SUM(oi.quantity) unitsSold,
+      DATE_FORMAT(DATE_ADD(MAX(s.reportDate),INTERVAL 8 HOUR),'%Y-%m-%d') lastSoldDate
+    FROM order_items oi JOIN sales s ON s.id=oi.order_id GROUP BY oi.product_id`,
     args,
   );
+  const units = new Map<number, { unitsSold: number; lastSoldDate: string }>(
+    movement.map(row => [Number(row.productId), { unitsSold: Number(row.unitsSold), lastSoldDate: row.lastSoldDate }]),
+  );
+  const [snapshots] = await c.query<any[]>(
+    `WITH sales AS (${eligible})
+    SELECT op.components,op.quantity,DATE_FORMAT(DATE_ADD(s.reportDate,INTERVAL 8 HOUR),'%Y-%m-%d') lastSoldDate
+    FROM order_packages op JOIN sales s ON s.id=op.order_id`, args,
+  );
+  // ponytail: expand saved components in memory for MariaDB 10.4; stream if report volumes outgrow memory.
+  for (const snapshot of snapshots) {
+    for (const part of jsonValue<{ productId: number; quantity: number }[]>(snapshot.components)) {
+      const id = Number(part.productId), current = units.get(id);
+      units.set(id, {
+        unitsSold: (current?.unitsSold ?? 0) + Number(part.quantity) * Number(snapshot.quantity),
+        lastSoldDate: current && current.lastSoldDate > snapshot.lastSoldDate ? current.lastSoldDate : snapshot.lastSoldDate,
+      });
+    }
+  }
+  const [catalog] = await c.query<any[]>(
+    `SELECT id,name,sku,active,stock_on_hand stockOnHand,stock_reserved stockReserved,
+      stock_on_hand-stock_reserved available,low_stock_threshold lowStockThreshold FROM products`,
+  );
+  const products = catalog.map(p => ({ ...p, unitsSold: 0, lastSoldDate: null, ...units.get(Number(p.id)) }))
+    .filter(p => p.active || p.unitsSold > 0);
   const fastProducts = products
     .filter((p) => Number(p.unitsSold) > 0)
     .sort(

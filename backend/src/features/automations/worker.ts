@@ -18,8 +18,9 @@ export async function claim() {
     await c.execute(
       "UPDATE automation_runs SET state=IF(send_started_at IS NULL,'PENDING','UNKNOWN'),last_error='Worker lease expired',lease_owner=NULL,lease_until=NULL WHERE state='PROCESSING' AND lease_until<UTC_TIMESTAMP(6)",
     );
+    // ponytail: claims briefly serialize for MariaDB 10.4; use SKIP LOCKED on newer servers if contention warrants it.
     const [rows] = await c.query<any[]>(
-      "SELECT * FROM automation_runs WHERE state='PENDING' AND available_at<=UTC_TIMESTAMP(6) ORDER BY available_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
+      "SELECT * FROM automation_runs WHERE state='PENDING' AND available_at<=UTC_TIMESTAMP(6) ORDER BY available_at,id LIMIT 1 FOR UPDATE",
     );
     if (!rows[0]) return null;
     const run = rows[0];
@@ -94,7 +95,7 @@ export async function execute(run: any) {
         }
         if (p.productId) {
           const [products] = await c.query<any[]>(
-            "SELECT active,stock_on_hand-stock_reserved available,low_stock_threshold FROM products WHERE id=? FOR SHARE",
+            "SELECT active,stock_on_hand-stock_reserved available,low_stock_threshold FROM products WHERE id=? LOCK IN SHARE MODE",
             [p.productId],
           );
           if (

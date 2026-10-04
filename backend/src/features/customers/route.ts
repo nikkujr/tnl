@@ -178,7 +178,7 @@ router.put(
           );
         if (agentId) {
           const [agents] = await c.query<any[]>(
-            "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE FOR SHARE",
+            "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE LOCK IN SHARE MODE",
             [agentId],
           );
           if (!agents.length)

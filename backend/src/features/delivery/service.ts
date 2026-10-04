@@ -58,7 +58,7 @@ export async function lockOrder(
     );
   // Recheck account state inside the business transaction, including password-reset races.
   const [accounts] = await c.query<any[]>(
-    "SELECT id FROM users WHERE id=? AND role=? AND active=TRUE AND token_version=? FOR SHARE",
+    "SELECT id FROM users WHERE id=? AND role=? AND active=TRUE AND token_version=? LOCK IN SHARE MODE",
     [user.id, user.role, user.tokenVersion ?? 0],
   );
   if (!accounts.length)
@@ -286,7 +286,7 @@ export async function assign(
     );
   if (employee !== null) {
     const [rows] = await c.query<any[]>(
-      "SELECT id FROM users WHERE id=? AND role='DELIVERY' AND active=TRUE FOR SHARE",
+      "SELECT id FROM users WHERE id=? AND role='DELIVERY' AND active=TRUE LOCK IN SHARE MODE",
       [employee],
     );
     if (!rows.length)

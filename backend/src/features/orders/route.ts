@@ -406,7 +406,7 @@ router.post(
           throw new HttpError(409, "Only pending orders can be decided");
         if (approve) {
           const [agents] = await c.query<any[]>(
-            "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE FOR SHARE",
+            "SELECT id FROM users WHERE id=? AND role='AGENT' AND active=TRUE LOCK IN SHARE MODE",
             [o.agent_id],
           );
           if (!agents.length)

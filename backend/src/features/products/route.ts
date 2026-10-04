@@ -132,8 +132,8 @@ router.delete("/:id", authorize("ADMIN"), async (req, res, next) => {
     const id = Number(req.params.id);
     const [orders] = await db.query<any[]>(
       `SELECT COUNT(DISTINCT o.id) pendingCount FROM orders o
-       WHERE o.order_status IN ('PENDING','APPROVED') AND (EXISTS(SELECT 1 FROM order_items oi WHERE oi.order_id=o.id AND oi.product_id=?) OR EXISTS(SELECT 1 FROM order_packages op WHERE op.order_id=o.id AND JSON_CONTAINS(JSON_EXTRACT(op.components,'$[*].productId'),CAST(? AS JSON))))`,
-      [id, id],
+       WHERE o.order_status IN ('PENDING','APPROVED') AND (EXISTS(SELECT 1 FROM order_items oi WHERE oi.order_id=o.id AND oi.product_id=?) OR EXISTS(SELECT 1 FROM order_packages op WHERE op.order_id=o.id AND JSON_CONTAINS(JSON_EXTRACT(op.components,'$[*].productId'),?)))`,
+      [id, JSON.stringify(id)],
     );
     if (orders[0].pendingCount > 0)
       throw new HttpError(409, "Product has pending or approved orders");

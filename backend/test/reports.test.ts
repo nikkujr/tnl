@@ -303,6 +303,19 @@ test(
         await call("?period=monthly&month=2030-13", undefined, 400);
         await call("?period=unknown", undefined, 400);
       });
+      await t.test("product deletion checks numeric saved package components", async () => {
+        await db.execute("INSERT INTO products(id,category_id,name,sku,price) VALUES(99,1,'Package only','PACKAGE-ONLY',10),(100,1,'Unused','UNUSED',10)");
+        const pending = await order("2030-01-01 00:00:00", null, 1, "PENDING", "UNPAID", null);
+        await db.execute("DELETE FROM order_items WHERE order_id=?", [pending]);
+        await db.execute("INSERT INTO order_packages(order_id,package_id,name,quantity,selling_price,commission_type,commission_value,components) VALUES(?,1,'Saved package',1,50,'FIXED',5,?)", [pending, JSON.stringify([{ productId: 99, quantity: 1 }])]);
+        const remove = (id: number) => fetch(base.replace(/reports$/, `products/${id}`), {
+          method: "DELETE", headers: { authorization: `Bearer ${token(1, "ADMIN")}` },
+        });
+        assert.equal((await remove(99)).status, 409);
+        assert.equal((await remove(100)).status, 204);
+        await db.execute("UPDATE orders SET order_status='CANCELLED' WHERE id=?", [pending]);
+        assert.equal((await remove(99)).status, 204);
+      });
     } finally {
       if (server)
         await new Promise<void>((resolve) => server.close(() => resolve()));
