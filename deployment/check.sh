@@ -45,4 +45,7 @@ test "$(find backups -mindepth 1 -maxdepth 1 ! -name '.partial-*' | wc -l)" -eq 
 : > "$DEPLOY_CHECK_LOG"
 if bash manage.sh restore missing --confirm-replace >/dev/null 2>&1; then echo 'Missing backup accepted' >&2; exit 1; fi
 ! grep -q 'stop\|exec\|run' "$DEPLOY_CHECK_LOG"
+: > "$DEPLOY_CHECK_LOG"
+bash manage.sh rename-admin >/dev/null
+grep -q -- '-e ADMIN_EMAIL=admin@tnltrack.tech api node --input-type=module' "$DEPLOY_CHECK_LOG"
 echo 'Deployment failure-path checks passed.'

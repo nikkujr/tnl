@@ -44,6 +44,27 @@ case "${1:-help}" in
     compose run --rm --no-deps -T -e ADMIN_EMAIL -e ADMIN_NAME -e ADMIN_PASSWORD api node deployment/create-admin.mjs
     unset ADMIN_PASSWORD
     ;;
+  rename-admin)
+    require_config
+    compose run --rm --no-deps -T -e "ADMIN_EMAIL=${2:-admin@tnltrack.tech}" api node --input-type=module <<'JS'
+import { z } from 'zod';
+import { db } from './dist/database/connection.js';
+try {
+  const email = z.email().parse(process.env.ADMIN_EMAIL).toLowerCase();
+  const [result] = await db.execute(
+    "UPDATE users SET email=?,token_version=token_version+1 WHERE email=? AND role='ADMIN' AND active=TRUE",
+    [email, 'admin@tnl.local'],
+  );
+  if (!result.affectedRows) {
+    const [rows] = await db.execute("SELECT id FROM users WHERE email=? AND role='ADMIN' AND active=TRUE", [email]);
+    if (!rows.length) throw new Error('Seeded admin account not found. Run the demo seed first.');
+  }
+  console.log(`Admin login: ${email}. Password unchanged.`);
+} finally {
+  await db.end();
+}
+JS
+    ;;
   status|logs|stop)
     require_config
     case "$1" in
@@ -86,6 +107,6 @@ case "${1:-help}" in
     echo 'Restored. Web/API/worker remain stopped. Reconcile restored email outbox before running deploy.'
     ;;
   *)
-    echo 'Usage: bash manage.sh {init|deploy|admin|status|logs [SERVICE]|stop|backup|restore BACKUP_DIR --confirm-replace}'
+    echo 'Usage: bash manage.sh {init|deploy|admin|rename-admin [EMAIL]|status|logs [SERVICE]|stop|backup|restore BACKUP_DIR --confirm-replace}'
     ;;
 esac

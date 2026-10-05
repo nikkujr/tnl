@@ -62,6 +62,17 @@ bash manage.sh stop           # Preserves volumes
 
 `deploy` builds first, waits for MySQL, stops application writers, runs compiled migrations with their SQL files, then starts services. Updates cause brief downtime. A migration failure leaves application services stopped. Use the script for first installs/upgrades; direct Compose startup bypasses migration ordering. Containers restart on reboot when Docker starts. Logs rotate at 10 MB x 3 per container. Check worker heartbeats/backlog in Automations; `/health` only checks API availability.
 
+## Panel-defense admin email
+
+After loading the demo seed, rename `admin@tnl.local` to `admin@tnltrack.tech`:
+
+```bash
+git pull --ff-only
+bash manage.sh rename-admin
+```
+
+No image rebuild is needed. This preserves the admin ID, password and related records, and invalidates existing sessions when the email changes. It is safe to run again; an email owned by another account is rejected. The seeded password remains `TnlDemo123!`. Run this again after each demo reset. Optionally pass a different email with `bash manage.sh rename-admin EMAIL`.
+
 ## Backup and restore
 
 `backup` pauses API/worker writes and photo cleanup while dumping the database and archiving photos, then restarts only the API/worker services that were running. Completed directories contain `database.sql.gz` and `photos.tar.gz`; incomplete attempts remain in `.partial-*`. Backups contain customer data: copy to protected off-server storage, test restoration, and rotate according to your policy (the application deployment guide recommends 30 days).
