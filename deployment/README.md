@@ -62,6 +62,17 @@ bash manage.sh stop           # Preserves volumes
 
 `deploy` builds first, waits for MySQL, stops application writers, runs compiled migrations with their SQL files, then starts services. Updates cause brief downtime. A migration failure leaves application services stopped. Use the script for first installs/upgrades; direct Compose startup bypasses migration ordering. Containers restart on reboot when Docker starts. Logs rotate at 10 MB x 3 per container. Check worker heartbeats/backlog in Automations; `/health` only checks API availability.
 
+## Panel-defense demo data
+
+After deploying, load the panel-defense dataset and configure the admin email in one command:
+
+```bash
+git pull --ff-only
+bash manage.sh seed-demo --confirm-replace
+```
+
+This backs up the database/photos, stops the application, replaces **all application records**, renames the seeded admin to `admin@tnltrack.tech`, and starts the services. Sign in with `TnlDemo123!`. It uses development mode only for the one-off seed process; the deployed services remain in production mode. No image rebuild is needed for this script update. Workflows start disabled and seeding sends no email. Failed seed/rename operations leave the application stopped for investigation. Use this only for your dedicated demo VPS, never a live business database. See [dataset contents](../docs/DEMO_DATA.md).
+
 ## Panel-defense admin email
 
 After loading the demo seed, rename `admin@tnl.local` to `admin@tnltrack.tech`:

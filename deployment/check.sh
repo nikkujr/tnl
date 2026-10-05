@@ -15,6 +15,7 @@ shift 5 # compose --env-file .env -f compose.yaml
 case "$*" in
   'ps --services --status running api worker') echo api ;;
   *dist/database/migrate.js*) [[ "${DEPLOY_CHECK_FAIL:-}" != migrate ]] ;;
+  *dist/database/seed.js*) [[ "${DEPLOY_CHECK_FAIL:-}" != seed ]] ;;
   'exec -T db sh -c '*) echo 'fake database dump' ;;
   *'tar -czf '*) [[ "${DEPLOY_CHECK_FAIL:-}" != photos ]] ;;
 esac
@@ -48,4 +49,24 @@ if bash manage.sh restore missing --confirm-replace >/dev/null 2>&1; then echo '
 : > "$DEPLOY_CHECK_LOG"
 bash manage.sh rename-admin >/dev/null
 grep -q -- '-e ADMIN_EMAIL=admin@tnltrack.tech api node --input-type=module' "$DEPLOY_CHECK_LOG"
+: > "$DEPLOY_CHECK_LOG"
+if bash manage.sh seed-demo >/dev/null 2>&1; then echo 'Unconfirmed demo reset accepted' >&2; exit 1; fi
+! grep -q 'seed.js' "$DEPLOY_CHECK_LOG"
+: > "$DEPLOY_CHECK_LOG"
+if DEPLOY_CHECK_FAIL=photos bash manage.sh seed-demo --confirm-replace >/dev/null 2>&1; then echo 'Failed backup ignored' >&2; exit 1; fi
+! grep -q 'seed.js' "$DEPLOY_CHECK_LOG"
+: > "$DEPLOY_CHECK_LOG"
+if DEPLOY_CHECK_FAIL=seed bash manage.sh seed-demo --confirm-replace >/dev/null 2>&1; then echo 'Failed seed ignored' >&2; exit 1; fi
+grep -q 'stop web api worker' "$DEPLOY_CHECK_LOG"
+grep -q -- '-e NODE_ENV=development api node dist/database/seed.js --reset --confirm=tnl_track' "$DEPLOY_CHECK_LOG"
+! grep -q 'ADMIN_EMAIL\|up -d --wait --wait-timeout 180' "$DEPLOY_CHECK_LOG"
+# Allow a fresh UTC timestamp for the next completed backup.
+sleep 1
+: > "$DEPLOY_CHECK_LOG"
+bash manage.sh seed-demo --confirm-replace >/dev/null
+seed_line=$(grep -n 'seed.js' "$DEPLOY_CHECK_LOG" | cut -d: -f1)
+rename_line=$(grep -n 'ADMIN_EMAIL' "$DEPLOY_CHECK_LOG" | cut -d: -f1)
+start_line=$(grep -n 'up -d --wait --wait-timeout 180' "$DEPLOY_CHECK_LOG" | cut -d: -f1)
+test "$seed_line" -lt "$rename_line"
+test "$rename_line" -lt "$start_line"
 echo 'Deployment failure-path checks passed.'

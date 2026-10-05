@@ -44,6 +44,18 @@ case "${1:-help}" in
     compose run --rm --no-deps -T -e ADMIN_EMAIL -e ADMIN_NAME -e ADMIN_PASSWORD api node deployment/create-admin.mjs
     unset ADMIN_PASSWORD
     ;;
+  seed-demo)
+    require_config
+    [[ $# -eq 2 && "$2" == --confirm-replace ]] || { echo 'Usage: bash manage.sh seed-demo --confirm-replace (replaces ALL application records)' >&2; exit 1; }
+    compose up -d --wait --wait-timeout 300 db
+    bash ./manage.sh backup
+    compose stop web api worker
+    # This one-off process targets the explicitly confirmed demo database.
+    compose run --rm --no-deps -T -e NODE_ENV=development api node dist/database/seed.js --reset --confirm=tnl_track
+    bash ./manage.sh rename-admin
+    compose up -d --wait --wait-timeout 180
+    echo 'Demo ready. Admin: admin@tnltrack.tech / TnlDemo123!'
+    ;;
   rename-admin)
     require_config
     compose run --rm --no-deps -T -e "ADMIN_EMAIL=${2:-admin@tnltrack.tech}" api node --input-type=module <<'JS'
@@ -107,6 +119,6 @@ JS
     echo 'Restored. Web/API/worker remain stopped. Reconcile restored email outbox before running deploy.'
     ;;
   *)
-    echo 'Usage: bash manage.sh {init|deploy|admin|rename-admin [EMAIL]|status|logs [SERVICE]|stop|backup|restore BACKUP_DIR --confirm-replace}'
+    echo 'Usage: bash manage.sh {init|deploy|admin|seed-demo --confirm-replace|rename-admin [EMAIL]|status|logs [SERVICE]|stop|backup|restore BACKUP_DIR --confirm-replace}'
     ;;
 esac
