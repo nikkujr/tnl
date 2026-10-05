@@ -33,6 +33,7 @@ import {
 } from "./features/automations/route.js";
 
 export const app = express();
+app.set("trust proxy", config.TRUST_PROXY);
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(cors({ origin: config.corsOrigins, credentials: false }));

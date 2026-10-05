@@ -19,6 +19,8 @@ Delivery staff use the existing sign-in and a mobile `/delivery` workspace. Admi
 
 ## Backend setup
 
+For a Linux VPS with Docker, use the [deployment folder](deployment/README.md) for HTTPS, migrations, admin creation and backup/restore scripts.
+
 1. Copy `backend/.env.example` to `backend/.env`.
 2. Create the configured database and user. Use `CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci` for the database so names and peso symbols are preserved.
 3. Install dependencies in `backend/`.

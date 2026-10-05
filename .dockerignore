@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.angular
+**/.env
+**/.env.*
+!**/.env.example
+**/private-delivery-photos
+.git
+.agents
+.codex
+.claude
+.cache
+.tmp
+deployment/backups
+**/*.log
