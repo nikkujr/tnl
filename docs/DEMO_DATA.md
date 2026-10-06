@@ -78,7 +78,7 @@ attribution and cannot sign in.
 | Customer requests | 24: 12 submitted, 8 converted with matching order terms, 4 declined |
 | Leads | 24: 8 converted, 4 each New, Contacted, Qualified and Lost |
 | Follow-ups | 16: 8 answered and 8 awaiting agent replies |
-| Customer reviews | 80 reviews of completed, fully paid purchases, with ratings from 1 to 5 and varied service feedback |
+| Agent reviews | 80 reviews of agents on completed, fully paid orders, with ratings from 1 to 5 and varied communication/support feedback; no office-order reviews |
 | Delivery issues | 4: 2 unresolved and 2 resolved |
 | Active delivery jobs | 1 per employee, with assigned queues and destination pins |
 | Campaigns | 4: 1 draft, 1 future scheduled, 2 completed with recipient histories |
@@ -102,7 +102,7 @@ attribution and cannot sign in.
    One target deliberately has no incentive. Bonuses and commissions remain
    separate from sales and are award records, not payouts.
    Show agent rating averages/counts and open Customer feedback to filter reviews
-   by agent or office order; feedback uses its submission month.
+   by agent; feedback uses its submission month.
 4. Open an order with packages and standalone items. The package component
    snapshot drives stock and product movement; standalone prices add to revenue
    without earning agent commission. Office orders have no credited agent or
@@ -112,8 +112,9 @@ attribution and cannot sign in.
    requests and follow-up replies. Sign in through the customer portal as Mara
    Santos to see owned history and submit a new request. Requests reserve nothing
    until their converted order is approved.
-   Open a delivered, fully paid order to read its saved review or submit a new
-   rating and comment if it has not been reviewed yet.
+   Open a delivered, fully paid order with an agent to read its saved agent review
+   or use Rate your agent if it has not been reviewed yet. Office orders show no
+   review section.
 6. Sign in as either delivery employee to see the assigned queue and active job.
    Open Dispatch as admin to inspect destination pins and resolve an issue.
    Start real location sharing from the employee's browser to demonstrate the map.

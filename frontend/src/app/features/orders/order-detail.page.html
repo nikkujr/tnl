@@ -187,7 +187,7 @@
       <aside class="side-column">
         @if (session().role === 'ADMIN') {
           <section class="surface customer-review">
-            <div class="section-head"><h3>Customer review</h3><p>Feedback on this purchase and service experience.</p></div>
+            <div class="section-head"><h3>{{ data.agentId ? 'Agent review' : 'Historical customer review' }}</h3><p>{{ data.agentId ? 'Customer feedback on their agent’s communication and support.' : 'Previously submitted office feedback.' }}</p></div>
             @if (data.review; as review) {
               <div class="review-body">
                 <p class="review-score"><span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span> <strong>{{ review.rating }} / 5</strong></p>

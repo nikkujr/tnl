@@ -81,7 +81,7 @@ See [the implementation specification](issues/README.md), [API contract](docs/AP
 
 Customer emails use a shared TNL Track HTML layout with purple branding, action buttons, and a plain-text alternative. **Automations → Settings** previews the same design as you edit a message, without sending an email. See [email templates and verification](docs/EMAILS.md).
 
-Admins can use **Reports → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, admin-approved bonuses, and customer ratings/reviews. Customers can review each delivered, fully paid order once from the portal. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets, rewards or reviews are created automatically.
+Admins can use **Reports → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, admin-approved bonuses, and customer ratings/reviews. Customers can rate their agent once per delivered, fully paid order from the portal. Office orders show no review section. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets, rewards or reviews are created automatically.
 
 In **Customers**, admins can select **View** for contact and account information, completed purchase totals, and paginated requests, orders, reviews and follow-ups. Admin order details also display the customer's saved review and link to their customer profile.
 

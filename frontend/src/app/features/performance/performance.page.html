@@ -275,7 +275,7 @@
     @if (tab() === 'feedback') {
       <section class="panel">
         <div class="section-heading">
-          <div><h3>Customer feedback</h3><p>Reviews submitted during {{ data.period }} · Ratings describe the purchase and service experience. Agent averages appear in the team leaderboard.</p></div>
+          <div><h3>Customer feedback</h3><p>Reviews submitted during {{ data.period }} · Ratings assess agent communication, recommendations, and support. Agent averages appear in the team leaderboard.</p></div>
           <label class="feedback-filter">Agent
             <select aria-label="Agent" [ngModel]="feedbackAgent()" (ngModelChange)="feedbackAgent.set($event)">
               <option value="all">All agents and office orders</option>

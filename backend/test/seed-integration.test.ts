@@ -40,6 +40,8 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
       assert.equal(await count("customer_accounts"), 60);
       assert.equal(await count("customer_order_requests"), 24);
       assert.equal(await count("order_reviews"), 80);
+      const [invalidReviews] = await db.query("SELECT r.order_id FROM order_reviews r JOIN orders o ON o.id=r.order_id WHERE r.agent_id IS NULL OR NOT(r.agent_id<=>o.agent_id) OR o.payment_status<>'PAID' OR o.delivery_status<>'DELIVERED'");
+      assert.equal(invalidReviews.length, 0);
       assert.equal(await count("leads"), 24);
       assert.equal(await count("order_followups"), 16);
       assert.equal(await count("delivery_active_jobs"), 2);
@@ -120,7 +122,29 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     const [eligible] = await db.query("SELECT o.* FROM orders o LEFT JOIN order_reviews r ON r.order_id=o.id WHERE o.sale_completed_at IS NOT NULL AND o.agent_id IS NOT NULL AND r.order_id IS NULL ORDER BY o.id LIMIT 1");
     const reviewedOrder = eligible[0], reviewer = await tokenFor(reviewedOrder.customer_id);
     const feedback = { rating: 5, review: '  My agent explained the package and replied promptly.  ' };
-    assert.equal((await call(`customer/orders/${reviewedOrder.id}`, reviewer)).canReview, true);
+    const [officeOrders] = await db.query("SELECT id,customer_id FROM orders WHERE agent_id IS NULL AND sale_completed_at IS NOT NULL LIMIT 1");
+    const office = officeOrders[0], officeToken = await tokenFor(office.customer_id);
+    const officeDetail = await call(`customer/orders/${office.id}`, officeToken);
+    assert.equal(officeDetail.agentId, null);
+    assert.equal(officeDetail.canReview, false);
+    assert.equal(officeDetail.review, null);
+    await call(`customer/orders/${office.id}/review`, officeToken, feedback, "POST", 409);
+    // Earlier office feedback is retained for admins but never offered as an agent review.
+    await db.query("INSERT INTO order_reviews(order_id,customer_id,agent_id,rating,review) VALUES(?,?,NULL,3,'Historical office purchase feedback')", [office.id, office.customer_id]);
+    assert.equal((await call(`customer/orders/${office.id}`, officeToken)).review, null);
+    await call(`customer/orders/${office.id}/review`, officeToken, { rating: 3, review: "Historical office purchase feedback" }, "POST", 409);
+    assert.equal((await call(`orders/${office.id}`, staff.token)).review.review, "Historical office purchase feedback");
+    await db.query("DELETE FROM order_reviews WHERE order_id=?", [office.id]);
+    // Historical store/import attribution is not a field agent to be rated.
+    await db.query("UPDATE orders SET agent_id=(SELECT id FROM users WHERE email='historical-import@tnl.local') WHERE id=?", [office.id]);
+    const historicalDetail = await call(`customer/orders/${office.id}`, officeToken);
+    assert.equal(historicalDetail.agentId, null);
+    assert.equal(historicalDetail.canReview, false);
+    await call(`customer/orders/${office.id}/review`, officeToken, feedback, "POST", 409);
+    await db.query("UPDATE orders SET agent_id=NULL WHERE id=?", [office.id]);
+    const eligibleDetail = await call(`customer/orders/${reviewedOrder.id}`, reviewer);
+    assert.equal(eligibleDetail.agentId, reviewedOrder.agent_id);
+    assert.equal(eligibleDetail.canReview, true);
     await call(`customer/orders/${reviewedOrder.id}/review`, "", feedback, "POST", 401);
     await call(`customer/orders/${reviewedOrder.id}/review`, staff.token, feedback, "POST", 401);
     const [other] = await db.query("SELECT id FROM customers WHERE id<>? LIMIT 1", [reviewedOrder.customer_id]);

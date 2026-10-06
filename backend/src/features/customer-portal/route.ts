@@ -87,7 +87,7 @@ customerRouter.get("/orders/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const [rows] = await db.query<any[]>(
-      `SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName,(${reportSaleSql}) reviewEligible FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?`,
+      `SELECT o.id,o.tracking_number trackingNumber,CASE WHEN u.role='AGENT' THEN o.agent_id END agentId,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName,(${reportSaleSql} AND u.role='AGENT') reviewEligible FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?`,
       [id, req.customer!.customerId],
     );
     if (!rows[0]) throw new HttpError(404, "Order not found");
@@ -107,7 +107,7 @@ customerRouter.get("/orders/:id", async (req, res, next) => {
     res.json({
       data: {
         ...order,
-        review: reviews[0] ?? null,
+        review: order.agentId ? reviews[0] ?? null : null,
         canReview: Boolean(reviewEligible) && !reviews.length,
         ...customerSale(await readSale(db, id)),
         deliveryEvents,
@@ -130,11 +130,12 @@ customerRouter.post(
       const id = Number(req.params.id);
       const data = await transaction(async (c) => {
         const [orders] = await c.query<any[]>(
-          `SELECT o.agent_id,(${reportSaleSql}) eligible FROM orders o WHERE o.id=? AND o.customer_id=? FOR UPDATE`,
+          `SELECT CASE WHEN u.role='AGENT' THEN o.agent_id END agent_id,(${reportSaleSql}) eligible FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=? FOR UPDATE`,
           [id, req.customer!.customerId],
         );
         if (!orders[0]) throw new HttpError(404, "Order not found");
-        if (!orders[0].eligible) throw new HttpError(409, "Reviews are available after delivery and full payment.");
+        if (!orders[0].agent_id) throw new HttpError(409, "This order has no agent to review.");
+        if (!orders[0].eligible) throw new HttpError(409, "Agent reviews are available after delivery and full payment.");
         const [existing] = await c.query<any[]>("SELECT rating,review,created_at createdAt FROM order_reviews WHERE order_id=?", [id]);
         if (existing.length) {
           if (existing[0].rating !== req.body.rating || existing[0].review !== req.body.review)

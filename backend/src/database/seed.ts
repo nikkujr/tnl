@@ -142,18 +142,19 @@ export async function seedDefenseData(data: DemoData, reset = false) {
       }
     }
     const reviewComments = [
-      "Follow-ups were slow and I had to contact the office repeatedly for a delivery update.",
-      "The package was correct, but my agent did not clearly explain the delivery arrangements.",
-      "The products work well. Updates about the schedule could have been more consistent.",
+      "My agent rarely replied to follow-ups and I had to contact the office for help.",
+      "My agent did not clearly explain the package terms or answer my questions.",
+      "My agent answered my questions, but updates about the order could have been more consistent.",
       "My agent explained the package clearly and helped coordinate the delivery with the office.",
-      "Helpful recommendations, prompt replies, and all package accessories arrived as discussed.",
+      "My agent gave helpful recommendations, replied promptly, and explained all package accessories clearly.",
     ];
-    for (const [i, o] of data.orders.filter(o => o.saleCompletedAt).entries()) {
-      if (i % 3 !== 0) continue;
-      const rating = [5, 4, 5, 3, 4, 5, 2, 5, 4, 1][Math.floor(i / 3) % 10]!;
+    const reviewableOrders = data.orders.filter(o => o.saleCompletedAt && o.agentId);
+    const reviewCount = Math.min(80, reviewableOrders.length);
+    for (let i = 0; i < reviewCount; i++) {
+      const o = reviewableOrders[Math.floor(i * reviewableOrders.length / reviewCount)]!;
+      const rating = [5, 4, 5, 3, 4, 5, 2, 5, 4, 1][i % 10]!;
       await insert(c, "INSERT INTO order_reviews(order_id,customer_id,agent_id,rating,review,created_at) VALUES(?,?,?,?,?,?)",
-        [orderIds.get(o.id), customerIds.get(o.customerId), o.agentId ? userIds.get(o.agentId) : null, rating,
-          o.agentId ? reviewComments[rating - 1] : reviewComments[rating - 1]!.replaceAll("my agent", "the office").replaceAll("My agent", "The office"),
+        [orderIds.get(o.id), customerIds.get(o.customerId), userIds.get(o.agentId!), rating, reviewComments[rating - 1],
           new Date(Math.min(data.now.getTime(), o.saleCompletedAt!.getTime() + 6 * 3600000))]);
     }
     // One active job per employee; location sharing requires a real browser session.

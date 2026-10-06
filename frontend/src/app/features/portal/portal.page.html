@@ -482,15 +482,16 @@
             </div>
           }
           <p>Total: {{ o.total | currency: 'PHP' : 'symbol-narrow' }}</p>
+          @if (o.agentId) {
           <section class="order-review" aria-labelledby="order-review-heading">
-            <h3 id="order-review-heading">Your rating and review</h3>
+            <h3 id="order-review-heading">{{ o.review ? 'Your agent review' : 'Rate your agent' }}</h3>
             @if (reviewNotice()) { <p role="status">{{ reviewNotice() }}</p> }
             @if (o.review; as feedback) {
               <p class="review-score"><strong>{{ feedback.rating }} / 5</strong> <span aria-hidden="true">{{ '★'.repeat(feedback.rating) }}</span></p>
               <p class="review-comment">{{ feedback.review }}</p>
               <small>Submitted {{ feedback.createdAt | date: 'medium' }}. One review per order.</small>
             } @else if (o.canReview) {
-              <p>How was your purchase{{ o.agentName ? ' and the support from ' + o.agentName : '' }}? Your feedback helps us improve our service.</p>
+              <p>How was the support from {{ o.agentName }}? Rate their communication, recommendations, and assistance with your order.</p>
               <form class="fields" #reviewForm="ngForm" (ngSubmit)="reviewForm.valid && submitReview()">
                 <fieldset class="review-rating" [disabled]="reviewSaving()" aria-describedby="rating-selection">
                   <legend>Rating</legend>
@@ -502,13 +503,14 @@
                   }
                 </fieldset>
                 <p id="rating-selection" class="rating-selection" aria-live="polite">{{ orderRating ? orderRating + ' out of 5 · ' + ratingDescriptions[orderRating] : 'Select a rating' }}</p>
-                <label>Review<textarea name="orderReview" [(ngModel)]="orderReview" required minlength="2" maxlength="2000" [disabled]="reviewSaving()" placeholder="Tell us about your purchase and the support you received."></textarea></label>
-                <small>Your review is shared with the admin to assess service and agent performance. Submitted reviews cannot be edited.</small>
+                <label>Review<textarea name="orderReview" [(ngModel)]="orderReview" required minlength="2" maxlength="2000" [disabled]="reviewSaving()" placeholder="Tell us about the support you received from your agent."></textarea></label>
+                <small>This rating is for your agent. Your feedback is shared with the admin to assess agent performance. Submitted reviews cannot be edited.</small>
                 @if (reviewError()) { <p class="error" role="alert">{{ reviewError() }}</p> }
                 <div class="review-actions"><button class="primary" type="submit" [disabled]="reviewSaving() || reviewForm.invalid || orderRating < 1 || orderReview.trim().length < 2">{{ reviewSaving() ? 'Submitting…' : 'Submit review' }}</button></div>
               </form>
-            } @else { <p>You can leave a review after your order is delivered and fully paid.</p> }
+            } @else { <p>You can rate your agent after your order is delivered and fully paid.</p> }
           </section>
+          }
           <h3>Delivery timeline</h3>
           <app-delivery-panel
             [orderId]="o.id"

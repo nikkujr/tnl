@@ -20,15 +20,15 @@ const track = { state: 'STOPPED', serverTime: now, destination: null, position: 
         sessionStorage.setItem('tnl_access_token', 'fixture');
         sessionStorage.setItem('tnl_user', JSON.stringify({ id: 1, role: 'CUSTOMER', fullName: 'Mara Santos', email: 'mara@example.test' }));
       });
-      const orders = [1, 2].map(id => ({ id, trackingNumber: `TNL-REVIEW-${id}`, orderStatus: id === 1 ? 'COMPLETED' : 'APPROVED', deliveryStatus: id === 1 ? 'DELIVERED' : 'PREPARING', paymentStatus: id === 1 ? 'PAID' : 'UNPAID', deliveryAddress: 'Demo address', createdAt: now, agentName: 'Jamie Co', total: 28995, items: [], packages: [], deliveryEvents: [], followups: [], canReview: id === 1, review: null }));
+      const orders = [1, 2, 3].map(id => ({ id, trackingNumber: `TNL-REVIEW-${id}`, orderStatus: id === 2 ? 'APPROVED' : 'COMPLETED', deliveryStatus: id === 2 ? 'PREPARING' : 'DELIVERED', paymentStatus: id === 2 ? 'UNPAID' : 'PAID', deliveryAddress: 'Demo address', createdAt: now, agentId: id === 3 ? null : 2, agentName: id === 3 ? null : 'Jamie Co', total: 28995, items: [], packages: [], deliveryEvents: [], followups: [], canReview: id === 1, review: null }));
       let failOnce = true, posts = 0;
       await page.route('**/api/v1/**', async route => {
         const endpoint = new URL(route.request().url()).pathname.split('/api/v1/')[1];
         let data = [];
         if (endpoint === 'customer/me') data = { address: 'Demo address', marketingOptIn: false };
         if (endpoint === 'customer/orders') data = orders;
-        if (/customer\/orders\/[12]$/.test(endpoint)) data = orders[Number(endpoint.split('/').at(-1)) - 1];
-        if (/customer\/orders\/[12]\/delivery$/.test(endpoint)) data = { history: [], issues: [], items: [], packages: [], completion: null, tracking: track };
+        if (/customer\/orders\/[123]$/.test(endpoint)) data = orders[Number(endpoint.split('/').at(-1)) - 1];
+        if (/customer\/orders\/[123]\/delivery$/.test(endpoint)) data = { history: [], issues: [], items: [], packages: [], completion: null, tracking: track };
         if (endpoint.endsWith('/tracking')) data = track;
         if (endpoint.endsWith('/review')) {
           posts++;
@@ -44,11 +44,16 @@ const track = { state: 'STOPPED', serverTime: now, destination: null, position: 
       await page.goto(`${base}/portal`);
       await page.getByRole('button', { name: 'My orders', exact: true }).click();
       await page.getByRole('button', { name: 'Details and follow-up' }).last().click();
-      await page.locator('.order-review').getByText('You can leave a review after your order is delivered and fully paid.').waitFor();
+      await page.locator('app-delivery-panel').waitFor();
+      assert.equal(await page.locator('.order-review').count(), 0, 'Office orders must not show any rating/review section');
+      await page.getByRole('button', { name: 'Details and follow-up' }).nth(1).click();
+      await page.locator('.order-review').getByText('You can rate your agent after your order is delivered and fully paid.').waitFor();
       assert.equal(await page.getByRole('button', { name: 'Submit review', exact: true }).count(), 0);
       await page.getByRole('button', { name: 'Details and follow-up' }).first().click();
       const submit = page.getByRole('button', { name: 'Submit review', exact: true });
       await submit.waitFor();
+      await page.getByRole('heading', { name: 'Rate your agent', exact: true }).waitFor();
+      assert.match(await page.locator('.order-review').innerText(), /communication, recommendations, and assistance/);
       assert(await submit.isDisabled());
       await page.getByTitle('4 out of 5 — Very good', { exact: true }).click();
       await page.locator('.review-rating label.filled').nth(3).waitFor();
