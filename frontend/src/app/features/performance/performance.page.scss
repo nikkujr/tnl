@@ -506,3 +506,9 @@ textarea:focus-visible {
     font-size: 24px;
   }
 }
+.feedback-filter { max-width: 280px; }
+.feedback-card { padding: 18px 22px; border-top: 1px solid var(--line); break-inside: avoid; }
+.feedback-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.feedback-heading strong { color: var(--green); }
+.feedback-comment { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 12px; color: var(--ink); }
+@media print { .feedback-filter { display: none; } }

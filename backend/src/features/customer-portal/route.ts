@@ -21,6 +21,7 @@ import {
   staffRecipients,
 } from "../automations/events.js";
 import { termsRevision } from "../catalog/terms.js";
+import { reportSaleSql } from "../reports/model.js";
 export const customerRouter = Router(),
   staffRouter = Router();
 customerRouter.use(authenticateCustomer);
@@ -86,10 +87,15 @@ customerRouter.get("/orders/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const [rows] = await db.query<any[]>(
-      "SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?",
+      `SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName,(${reportSaleSql}) reviewEligible FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?`,
       [id, req.customer!.customerId],
     );
     if (!rows[0]) throw new HttpError(404, "Order not found");
+    const [reviews] = await db.query<any[]>(
+      "SELECT rating,review,created_at createdAt FROM order_reviews WHERE order_id=? AND customer_id=?",
+      [id, req.customer!.customerId],
+    );
+    const { reviewEligible, ...order } = rows[0];
     const [deliveryEvents] = await db.query(
       "SELECT status,occurred_at occurredAt FROM delivery_events WHERE order_id=? ORDER BY occurred_at,id",
       [id],
@@ -100,7 +106,9 @@ customerRouter.get("/orders/:id", async (req, res, next) => {
     );
     res.json({
       data: {
-        ...rows[0],
+        ...order,
+        review: reviews[0] ?? null,
+        canReview: Boolean(reviewEligible) && !reviews.length,
         ...customerSale(await readSale(db, id)),
         deliveryEvents,
         followups,
@@ -110,6 +118,38 @@ customerRouter.get("/orders/:id", async (req, res, next) => {
     next(e);
   }
 });
+customerRouter.post(
+  "/orders/:id/review",
+  validate(z.object({
+    body: z.object({ rating: z.number().int().min(1).max(5), review: z.string().trim().min(2).max(2000) }).strict(),
+    params: z.object({ id: z.coerce.number().int().positive() }),
+    query: z.any(),
+  })),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const data = await transaction(async (c) => {
+        const [orders] = await c.query<any[]>(
+          `SELECT o.agent_id,(${reportSaleSql}) eligible FROM orders o WHERE o.id=? AND o.customer_id=? FOR UPDATE`,
+          [id, req.customer!.customerId],
+        );
+        if (!orders[0]) throw new HttpError(404, "Order not found");
+        if (!orders[0].eligible) throw new HttpError(409, "Reviews are available after delivery and full payment.");
+        const [existing] = await c.query<any[]>("SELECT rating,review,created_at createdAt FROM order_reviews WHERE order_id=?", [id]);
+        if (existing.length) {
+          if (existing[0].rating !== req.body.rating || existing[0].review !== req.body.review)
+            throw new HttpError(409, "You have already reviewed this order.");
+          return { ...existing[0], reused: true };
+        }
+        await c.execute("INSERT INTO order_reviews(order_id,customer_id,agent_id,rating,review) VALUES(?,?,?,?,?)",
+          [id, req.customer!.customerId, orders[0].agent_id, req.body.rating, req.body.review]);
+        const [saved] = await c.query<any[]>("SELECT rating,review,created_at createdAt FROM order_reviews WHERE order_id=?", [id]);
+        return { ...saved[0], reused: false };
+      });
+      res.status(data.reused ? 200 : 201).json({ data });
+    } catch (error) { next(error); }
+  },
+);
 const requestBody = selection.safeExtend({
   deliveryAddress: z.string().trim().min(5).max(500),
   paymentMethod: z

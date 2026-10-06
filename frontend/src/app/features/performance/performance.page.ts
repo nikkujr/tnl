@@ -24,6 +24,8 @@ interface PerformanceAgent {
   pipeline: number;
   pending: number;
   commission: number;
+  reviewCount: number;
+  averageRating: number | null;
   targetId: number | null;
   salesTarget: number | null;
   incentiveAmount: number | null;
@@ -36,6 +38,7 @@ interface PerformanceReport {
   period: string;
   timeZone: string;
   agents: PerformanceAgent[];
+  reviews: Array<{ orderId: number; trackingNumber: string; customerName: string; agentId: number | null; agentName: string | null; rating: number; review: string; createdAt: string }>;
   trend: Array<{ day: string; sales: number; deals: number }>;
   totals: {
     sales: number;
@@ -81,7 +84,11 @@ export class PerformancePage implements OnInit {
   readonly saving = signal(false);
   readonly error = signal('');
   readonly success = signal('');
-  readonly tab = signal<'overview' | 'targets' | 'rewards'>('overview');
+  readonly tab = signal<'overview' | 'targets' | 'rewards' | 'feedback'>('overview');
+  readonly feedbackAgent = signal('all');
+  readonly visibleReviews = computed(() => (this.report()?.reviews ?? []).filter((review) =>
+    this.feedbackAgent() === 'all' || (this.feedbackAgent() === 'office' ? review.agentId === null : String(review.agentId) === this.feedbackAgent()),
+  ));
   readonly editing = signal<PerformanceAgent | null>(null);
   readonly bonusOpen = signal(false);
   salesTarget = 0;
@@ -125,6 +132,7 @@ export class PerformancePage implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.report.set(null);
+    this.feedbackAgent.set('all');
     this.editing.set(null);
     this.bonusOpen.set(false);
     this.api.get<PerformanceReport>('performance', { month: this.month }).subscribe({
@@ -234,6 +242,7 @@ export class PerformancePage implements OnInit {
       ...data.agents.map((row) => ({ section: 'Agents and targets', ...row })),
       ...data.trend.map((row) => ({ section: 'Daily completed sales', ...row })),
       ...data.rewards.map((row) => ({ section: 'Approved rewards (not payouts)', ...row })),
+      ...(data.reviews ?? []).map((row) => ({ section: 'Customer feedback', ...row })),
     ];
     downloadCsv(
       `tnl-performance-${data.period}.csv`,

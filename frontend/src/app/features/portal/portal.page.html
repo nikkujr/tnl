@@ -482,6 +482,32 @@
             </div>
           }
           <p>Total: {{ o.total | currency: 'PHP' : 'symbol-narrow' }}</p>
+          <section class="order-review" aria-labelledby="order-review-heading">
+            <h3 id="order-review-heading">Your rating and review</h3>
+            @if (reviewNotice()) { <p role="status">{{ reviewNotice() }}</p> }
+            @if (o.review; as feedback) {
+              <p class="review-score"><strong>{{ feedback.rating }} / 5</strong> <span aria-hidden="true">{{ '★'.repeat(feedback.rating) }}</span></p>
+              <p class="review-comment">{{ feedback.review }}</p>
+              <small>Submitted {{ feedback.createdAt | date: 'medium' }}. One review per order.</small>
+            } @else if (o.canReview) {
+              <p>How was your purchase{{ o.agentName ? ' and the support from ' + o.agentName : '' }}? Your feedback helps us improve our service.</p>
+              <form class="fields" #reviewForm="ngForm" (ngSubmit)="reviewForm.valid && submitReview()">
+                <fieldset class="review-rating" [disabled]="reviewSaving()">
+                  <legend>Rating</legend>
+                  @for (rating of ratingChoices; track rating) {
+                    <label [class.selected]="orderRating === rating">
+                      <input type="radio" name="orderRating" [value]="rating" [(ngModel)]="orderRating" required />
+                      {{ rating }} <span aria-hidden="true">★</span><span class="rating-description">out of 5</span>
+                    </label>
+                  }
+                </fieldset>
+                <label>Review<textarea name="orderReview" [(ngModel)]="orderReview" required minlength="2" maxlength="2000" [disabled]="reviewSaving()" placeholder="Tell us about your purchase and the support you received."></textarea></label>
+                <small>Your review is shared with the admin to assess service and agent performance. Submitted reviews cannot be edited.</small>
+                @if (reviewError()) { <p class="error" role="alert">{{ reviewError() }}</p> }
+                <button class="primary" type="submit" [disabled]="reviewSaving() || reviewForm.invalid || orderRating < 1 || orderReview.trim().length < 2">{{ reviewSaving() ? 'Submitting…' : 'Submit review' }}</button>
+              </form>
+            } @else { <p>You can leave a review after your order is delivered and fully paid.</p> }
+          </section>
           <h3>Delivery timeline</h3>
           <app-delivery-panel
             [orderId]="o.id"

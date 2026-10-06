@@ -81,7 +81,7 @@ See [the implementation specification](issues/README.md), [API contract](docs/AP
 
 Customer emails use a shared TNL Track HTML layout with purple branding, action buttons, and a plain-text alternative. **Automations → Settings** previews the same design as you edit a message, without sending an email. See [email templates and verification](docs/EMAILS.md).
 
-Admins can use **Reports → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, and admin-approved bonuses. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets or rewards are created automatically.
+Admins can use **Reports → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, admin-approved bonuses, and customer ratings/reviews. Customers can review each delivered, fully paid order once from the portal. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets, rewards or reviews are created automatically.
 
 **Reports → Daily / Monthly / Overall reports** includes completed sales revenue and trends, top 10 fast-selling and slow-moving products with charts and tables, top customers and packages, order/payment status breakdowns, and current low-stock products. Product movement includes saved package components; slow movers include active stocked products with zero sales. See [report definitions and checks](docs/REPORTS.md).
 

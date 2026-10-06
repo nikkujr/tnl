@@ -84,6 +84,13 @@ export class PortalPage {
   paymentMethod = 'Cash on delivery';
   search = '';
   followupMessage = 'Please provide an update on my order.';
+  readonly reviewSaving = signal(false);
+  readonly reviewError = signal('');
+  readonly reviewNotice = signal('');
+  readonly ratingChoices = [1, 2, 3, 4, 5];
+  orderRating = 0;
+  orderReview = '';
+  private detailRequest = 0;
   private magic = '';
   unsubscribe = '';
   setMode(mode: AuthMode) {
@@ -296,8 +303,14 @@ export class PortalPage {
       });
   }
   view(id: number) {
+    const request = ++this.detailRequest;
+    this.reviewError.set('');
+    this.reviewNotice.set('');
     this.api.get('customer/orders/' + id).subscribe({
       next: (r) => {
+        if (request !== this.detailRequest) return;
+        this.orderRating = 0;
+        this.orderReview = '';
         this.detail.set(r.data);
         this.tab = 'orders';
       },
@@ -326,6 +339,26 @@ export class PortalPage {
         error: (e) => this.fail(e),
       });
   }
+  submitReview() {
+    const order = this.detail();
+    if (!order?.canReview || this.reviewSaving() || this.orderRating < 1 || this.orderReview.trim().length < 2) return;
+    this.reviewSaving.set(true);
+    this.reviewError.set('');
+    this.reviewNotice.set('');
+    this.api.post(`customer/orders/${order.id}/review`, { rating: this.orderRating, review: this.orderReview.trim() }).subscribe({
+      next: (r) => {
+        this.reviewSaving.set(false);
+        if (this.detail()?.id !== order.id) return;
+        this.detail.update((current) => ({ ...current, review: r.data, canReview: false }));
+        this.reviewNotice.set('Thank you. Your review has been submitted.');
+      },
+      error: (e) => {
+        this.reviewSaving.set(false);
+        if (e.status === 401) this.fail(e);
+        else if (this.detail()?.id === order.id) this.reviewError.set(e.error?.error?.message ?? 'Unable to submit your review. Please try again.');
+      },
+    });
+  }
   preferences() {
     this.api.patch('customer/preferences', { marketingOptIn: this.marketingOptIn }).subscribe({
       next: () => this.notice.set('Marketing preference saved.'),
@@ -343,6 +376,11 @@ export class PortalPage {
     });
   }
   logout() {
+    ++this.detailRequest;
+    this.orderRating = 0;
+    this.orderReview = '';
+    this.reviewError.set('');
+    this.reviewNotice.set('');
     this.error.set('');
     this.notice.set('');
     this.sessionService.logout();

@@ -39,6 +39,7 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
       assert.equal(await count("customers"), 60);
       assert.equal(await count("customer_accounts"), 60);
       assert.equal(await count("customer_order_requests"), 24);
+      assert.equal(await count("order_reviews"), 80);
       assert.equal(await count("leads"), 24);
       assert.equal(await count("order_followups"), 16);
       assert.equal(await count("delivery_active_jobs"), 2);
@@ -97,10 +98,10 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     server = app.listen(0, "127.0.0.1");
     await new Promise(resolve => server.once("listening", resolve));
     const base = `http://127.0.0.1:${server.address().port}/api/v1/`;
-    async function call(path: string, token = "", body?: object, method = body ? "POST" : "GET") {
+    async function call(path: string, token = "", body?: object, method = body ? "POST" : "GET", expected: number | number[] = 200) {
       const response = await fetch(base + path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
       const value = await response.json();
-      assert.equal(response.status, 200, JSON.stringify(value));
+      assert([expected].flat().includes(response.status), `${response.status}: ${JSON.stringify(value)}`);
       return value.data;
     }
     const staff = await call("auth/login", "", { email: "admin@tnl.local", password: demoPassword });
@@ -111,6 +112,57 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     assert(performance.agents.some((a: any) => a.sales === 0));
     const customer = await call("customer-auth/login", "", { email: "mara.santos@example.test", password: demoPassword });
     assert((await call("customer/orders", customer.token)).length > 0);
+    const { signCustomer } = await import("../src/features/customer-auth/session.js");
+    const tokenFor = async (customerId: number) => {
+      const [rows] = await db.query("SELECT ca.id,ca.customer_id customerId,ca.token_version tokenVersion,c.full_name fullName,c.email FROM customer_accounts ca JOIN customers c ON c.id=ca.customer_id WHERE ca.customer_id=?", [customerId]);
+      return signCustomer({ ...rows[0], role: "CUSTOMER" });
+    };
+    const [eligible] = await db.query("SELECT o.* FROM orders o LEFT JOIN order_reviews r ON r.order_id=o.id WHERE o.sale_completed_at IS NOT NULL AND o.agent_id IS NOT NULL AND r.order_id IS NULL ORDER BY o.id LIMIT 1");
+    const reviewedOrder = eligible[0], reviewer = await tokenFor(reviewedOrder.customer_id);
+    const feedback = { rating: 5, review: '  My agent explained the package and replied promptly.  ' };
+    assert.equal((await call(`customer/orders/${reviewedOrder.id}`, reviewer)).canReview, true);
+    await call(`customer/orders/${reviewedOrder.id}/review`, "", feedback, "POST", 401);
+    await call(`customer/orders/${reviewedOrder.id}/review`, staff.token, feedback, "POST", 401);
+    const [other] = await db.query("SELECT id FROM customers WHERE id<>? LIMIT 1", [reviewedOrder.customer_id]);
+    const otherToken = await tokenFor(other[0].id);
+    await call(`customer/orders/${reviewedOrder.id}/review`, otherToken, feedback, "POST", 404);
+    await call(`customer/orders/${reviewedOrder.id}`, otherToken, undefined, "GET", 404);
+    for (const body of [{ ...feedback, rating: 0 }, { ...feedback, rating: 6 }, { ...feedback, rating: 1.5 }, { ...feedback, rating: "5" }, { ...feedback, review: "  " }, { ...feedback, review: "x".repeat(2001) }, { ...feedback, agentId: 999 }])
+      await call(`customer/orders/${reviewedOrder.id}/review`, reviewer, body, "POST", 400);
+    const [unfinished] = await db.query("SELECT o.* FROM orders o WHERE o.order_status IN ('PENDING','APPROVED','CANCELLED','REJECTED') OR o.payment_status<>'PAID'");
+    // Each workflow state is blocked even if the caller owns the order.
+    const examples = new Map<string, any>();
+    for (const o of unfinished) examples.set(`${o.order_status}-${o.payment_status}-${o.delivery_status}`, o);
+    for (const o of examples.values()) {
+      const token = await tokenFor(o.customer_id);
+      assert.equal((await call(`customer/orders/${o.id}`, token)).canReview, false);
+      await call(`customer/orders/${o.id}/review`, token, feedback, "POST", 409);
+    }
+    const posted = await Promise.all([call(`customer/orders/${reviewedOrder.id}/review`, reviewer, feedback, "POST", [200, 201]), call(`customer/orders/${reviewedOrder.id}/review`, reviewer, feedback, "POST", [200, 201])]);
+    assert.equal(posted.filter(r => r.reused).length, 1);
+    assert.equal(posted[0].createdAt, posted[1].createdAt);
+    assert.equal(await count("order_reviews"), 81);
+    await call(`customer/orders/${reviewedOrder.id}/review`, reviewer, { ...feedback, rating: 4 }, "POST", 409);
+    const readBack = await call(`customer/orders/${reviewedOrder.id}`, reviewer);
+    assert.equal(readBack.canReview, false);
+    assert.equal(readBack.review.review, feedback.review.trim());
+    await db.query("UPDATE customers SET assigned_agent_id=(SELECT id FROM users WHERE role='AGENT' AND id<>? LIMIT 1) WHERE id=?", [reviewedOrder.agent_id, reviewedOrder.customer_id]);
+    const rated = await call(`performance?month=${data.periods.at(-1)}`, staff.token);
+    assert.equal(rated.reviews.find((r: any) => r.orderId === reviewedOrder.id).agentId, reviewedOrder.agent_id);
+    for (const agent of rated.agents) {
+      const reviews = rated.reviews.filter((r: any) => r.agentId === agent.id);
+      assert.equal(Number(agent.reviewCount), reviews.length);
+      assert.equal(agent.averageRating, reviews.length ? Math.round(reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length * 100) / 100 : null);
+    }
+    await call("performance", reviewer, undefined, "GET", [401, 403]);
+    // Feedback is grouped by submission month, independently of sale completion.
+    const { monthBounds } = await import("../src/features/performance/model.js");
+    const priorMonthTime = new Date(monthBounds(data.periods.at(-1)!).start.getTime() - 1000);
+    await db.query("UPDATE order_reviews SET created_at=? WHERE order_id=?", [priorMonthTime, reviewedOrder.id]);
+    const currentFeedback = await call(`performance?month=${data.periods.at(-1)}`, staff.token);
+    assert(!currentFeedback.reviews.some((r: any) => r.orderId === reviewedOrder.id));
+    const priorFeedback = await call(`performance?month=${businessDate(priorMonthTime).slice(0, 7)}`, staff.token);
+    assert.equal(priorFeedback.reviews.find((r: any) => r.orderId === reviewedOrder.id).rating, 5);
     const delivery = await call("auth/login", "", { email: "delivery1@tnl.local", password: demoPassword });
     const deliveries = await call("delivery/orders", delivery.token);
     assert(deliveries.some((o: any) => o.attemptId));

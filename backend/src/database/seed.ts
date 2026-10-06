@@ -16,7 +16,7 @@ const resetTables = [
   "delivery_attempts", "delivery_issues", "delivery_completions", "delivery_photos",
   "agent_rewards", "agent_targets", "automation_runs", "domain_events",
   "automation_episodes", "worker_heartbeats", "staff_notifications", "campaign_runs",
-  "customer_auth_tokens", "customer_accounts", "customer_order_requests", "order_followups",
+  "customer_auth_tokens", "customer_accounts", "customer_order_requests", "order_followups", "order_reviews",
   "import_rows", "commissions", "delivery_events", "inventory_movements", "order_events",
   "order_items", "order_packages", "orders", "import_batches", "leads", "customers",
   "package_items", "packages", "products", "categories", "campaigns", "users",
@@ -140,6 +140,21 @@ export async function seedDefenseData(data: DemoData, reset = false) {
         const breakdown = s.packages.map(p => ({ packageId: p.packageId, name: p.name, quantity: p.quantity, commissionType: p.commissionType, commissionValue: p.commissionValue, amount: pesos(packageCommission(p)) }));
         await insert(c, "INSERT INTO commissions(order_id,agent_id,rate,amount,breakdown,source,created_at) VALUES(?,?,NULL,?,?,'PACKAGE',?)", [id, userIds.get(o.agentId), pesos(breakdown.reduce((sum, p) => sum + cents(p.amount), 0)), JSON.stringify(breakdown), o.saleCompletedAt]);
       }
+    }
+    const reviewComments = [
+      "Follow-ups were slow and I had to contact the office repeatedly for a delivery update.",
+      "The package was correct, but my agent did not clearly explain the delivery arrangements.",
+      "The products work well. Updates about the schedule could have been more consistent.",
+      "My agent explained the package clearly and helped coordinate the delivery with the office.",
+      "Helpful recommendations, prompt replies, and all package accessories arrived as discussed.",
+    ];
+    for (const [i, o] of data.orders.filter(o => o.saleCompletedAt).entries()) {
+      if (i % 3 !== 0) continue;
+      const rating = [5, 4, 5, 3, 4, 5, 2, 5, 4, 1][Math.floor(i / 3) % 10]!;
+      await insert(c, "INSERT INTO order_reviews(order_id,customer_id,agent_id,rating,review,created_at) VALUES(?,?,?,?,?,?)",
+        [orderIds.get(o.id), customerIds.get(o.customerId), o.agentId ? userIds.get(o.agentId) : null, rating,
+          o.agentId ? reviewComments[rating - 1] : reviewComments[rating - 1]!.replaceAll("my agent", "the office").replaceAll("My agent", "The office"),
+          new Date(Math.min(data.now.getTime(), o.saleCompletedAt!.getTime() + 6 * 3600000))]);
     }
     // One active job per employee; location sharing requires a real browser session.
     for (const employeeId of [10, 11]) {

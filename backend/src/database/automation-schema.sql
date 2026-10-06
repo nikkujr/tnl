@@ -87,6 +87,19 @@ CREATE TABLE IF NOT EXISTS order_followups (
   FOREIGN KEY(replied_by) REFERENCES users(id),
   INDEX(order_id,replied_at)
 );
+CREATE TABLE IF NOT EXISTS order_reviews (
+  order_id BIGINT UNSIGNED PRIMARY KEY,
+  customer_id BIGINT UNSIGNED NOT NULL,
+  agent_id BIGINT UNSIGNED NULL,
+  rating TINYINT UNSIGNED NOT NULL,
+  review VARCHAR(2000) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX(created_at,agent_id),
+  FOREIGN KEY(order_id) REFERENCES orders(id),
+  FOREIGN KEY(customer_id) REFERENCES customers(id),
+  FOREIGN KEY(agent_id) REFERENCES users(id),
+  CHECK(rating BETWEEN 1 AND 5)
+);
 CREATE TABLE IF NOT EXISTS domain_events (
   id CHAR(36) PRIMARY KEY,
   type VARCHAR(80) NOT NULL,

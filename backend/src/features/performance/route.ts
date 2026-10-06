@@ -44,7 +44,8 @@ router.get(
       COALESCE(s.sales,0) sales,COALESCE(s.deals,0) deals,
       COALESCE(p.pipeline,0) pipeline,COALESCE(p.pending,0) pending,
       COALESCE(c.commission,0) commission,t.id targetId,t.sales_target salesTarget,t.incentive_amount incentiveAmount,
-      COALESCE(r.incentives,0) incentives,COALESCE(r.bonuses,0) bonuses,ri.id incentiveRewardId
+      COALESCE(r.incentives,0) incentives,COALESCE(r.bonuses,0) bonuses,ri.id incentiveRewardId,
+      COALESCE(fb.reviewCount,0) reviewCount,fb.averageRating averageRating
       FROM users u
       LEFT JOIN (SELECT o.agent_id,SUM(${saleTotalSql("o")}) sales,COUNT(*) deals FROM orders o WHERE ${completedSaleSql} GROUP BY o.agent_id) s ON s.agent_id=u.id
       LEFT JOIN (SELECT o.agent_id,COUNT(*) pipeline,SUM(o.order_status='PENDING') pending FROM orders o
@@ -55,8 +56,9 @@ router.get(
       LEFT JOIN agent_targets t ON t.agent_id=u.id AND t.period=?
       LEFT JOIN agent_rewards ri ON ri.target_id=t.id
       LEFT JOIN (SELECT agent_id,SUM(IF(kind='INCENTIVE',amount,0)) incentives,SUM(IF(kind='BONUS',amount,0)) bonuses FROM agent_rewards WHERE period=? GROUP BY agent_id) r ON r.agent_id=u.id
+      LEFT JOIN (SELECT agent_id,COUNT(*) reviewCount,ROUND(AVG(rating),2) averageRating FROM order_reviews WHERE created_at>=? AND created_at<? GROUP BY agent_id) fb ON fb.agent_id=u.id
       WHERE u.role='AGENT' ORDER BY sales DESC,deals DESC,u.id ASC`,
-        [start, end, start, end, start, end, period, period],
+        [start, end, start, end, start, end, period, period, start, end],
       );
       const [daily] = await db.query<any[]>(
         `SELECT DATE_FORMAT(DATE_ADD(o.sale_completed_at,INTERVAL 8 HOUR),'%Y-%m-%d') day,
@@ -67,6 +69,13 @@ router.get(
         `SELECT r.id,r.agent_id agentId,u.full_name agentName,r.kind,r.amount,r.reason,r.created_at createdAt,a.full_name approvedBy
       FROM agent_rewards r JOIN users u ON u.id=r.agent_id JOIN users a ON a.id=r.approved_by WHERE r.period=? ORDER BY r.id DESC`,
         [period],
+      );
+      const [reviews] = await db.query<any[]>(
+        `SELECT r.order_id orderId,o.tracking_number trackingNumber,c.full_name customerName,
+          r.agent_id agentId,u.full_name agentName,r.rating,r.review,r.created_at createdAt
+         FROM order_reviews r JOIN orders o ON o.id=r.order_id JOIN customers c ON c.id=r.customer_id
+         LEFT JOIN users u ON u.id=r.agent_id WHERE r.created_at>=? AND r.created_at<?
+         ORDER BY r.created_at DESC,r.order_id DESC`, [start, end],
       );
       const trend = Array.from({ length: days }, (_, i) => {
         const day = `${period}-${String(i + 1).padStart(2, "0")}`;
@@ -115,6 +124,7 @@ router.get(
           agents: rows,
           trend,
           rewards,
+          reviews,
           totals,
         },
       });
