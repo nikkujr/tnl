@@ -57,7 +57,9 @@ router.get("/", async (req, res, next) => {
     const [rows] = await db.query(
       `SELECT id,email,phone,full_name fullName,commission_rate commissionRate,active,created_at createdAt,
       (SELECT COALESCE(SUM(c.amount),0) FROM commissions c WHERE c.agent_id=users.id) totalCommission,
-      (SELECT COUNT(*) FROM orders o WHERE o.agent_id=users.id AND o.delivery_status='DELIVERED' AND o.payment_status='PAID') closedDeals
+      (SELECT COUNT(*) FROM orders o WHERE o.agent_id=users.id AND o.delivery_status='DELIVERED' AND o.payment_status='PAID') closedDeals,
+      (SELECT COUNT(*) FROM order_reviews r WHERE r.agent_id=users.id) reviewCount,
+      (SELECT ROUND(AVG(r.rating),2) FROM order_reviews r WHERE r.agent_id=users.id) averageRating
       FROM users WHERE role='AGENT'${activeOnly} AND (full_name LIKE ? OR email LIKE ? OR COALESCE(phone,'') LIKE ?) ORDER BY active DESC,full_name`,
       [search, search, search],
     );
@@ -80,7 +82,9 @@ router.get(
       const id = Number(req.params.id);
       const [agents] = await db.query<any[]>(
         `SELECT id,email,phone,full_name fullName,commission_rate commissionRate,active,created_at createdAt,
-       (SELECT COUNT(*) FROM orders o WHERE o.agent_id=users.id AND o.delivery_status='DELIVERED' AND o.payment_status='PAID') closedDeals
+       (SELECT COUNT(*) FROM orders o WHERE o.agent_id=users.id AND o.delivery_status='DELIVERED' AND o.payment_status='PAID') closedDeals,
+       (SELECT COUNT(*) FROM order_reviews r WHERE r.agent_id=users.id) reviewCount,
+       (SELECT ROUND(AVG(r.rating),2) FROM order_reviews r WHERE r.agent_id=users.id) averageRating
        FROM users WHERE id=? AND role='AGENT'`,
         [id],
       );
@@ -128,6 +132,30 @@ router.get(
     }
   },
 );
+router.get(
+  "/:id/reviews",
+  validate(z.object({
+    body: z.any(),
+    params: z.object({ id: z.coerce.number().int().positive() }),
+    query: z.object({ page: z.coerce.number().int().positive().optional(), limit: z.coerce.number().int().min(1).max(100).optional() }),
+  })),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id), page = Number(req.query.page ?? 1), limit = Number(req.query.limit ?? 20);
+      const [agents] = await db.query<any[]>("SELECT id FROM users WHERE id=? AND role='AGENT'", [id]);
+      if (!agents.length) throw new HttpError(404, "Agent not found");
+      const [counts] = await db.query<any[]>("SELECT COUNT(*) total FROM order_reviews WHERE agent_id=?", [id]);
+      const [reviews] = await db.query<any[]>(
+        `SELECT r.order_id orderId,o.tracking_number trackingNumber,r.customer_id customerId,c.full_name customerName,
+          r.rating,r.review,r.created_at createdAt
+         FROM order_reviews r JOIN orders o ON o.id=r.order_id JOIN customers c ON c.id=r.customer_id
+         WHERE r.agent_id=? ORDER BY r.created_at DESC,r.order_id DESC LIMIT ? OFFSET ?`, [id, limit, (page - 1) * limit],
+      );
+      res.json({ data: reviews, meta: { page, limit, total: counts[0].total } });
+    } catch (error) { next(error); }
+  },
+);
+
 const body = z.object({
   fullName: z.string().min(2).max(160),
   email: z.email(),

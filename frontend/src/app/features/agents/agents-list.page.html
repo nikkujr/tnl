@@ -36,7 +36,8 @@
       <div class="management-row">
         <span
           ><strong>{{ item.fullName }}</strong
-          ><small>{{ item.active ? 'Active' : 'Inactive' }}</small></span
+          ><small>{{ item.active ? 'Active' : 'Inactive' }}</small>
+          <small class="agent-rating">@if (item.averageRating != null) { {{ item.averageRating | number: '1.1-2' }} / 5 · {{ item.reviewCount }} reviews } @else { No reviews }</small></span
         >
         <span
           >{{ item.email }}<small>{{ item.phone }}</small></span

@@ -169,6 +169,8 @@ export interface Agent {
   totalCommission?: number;
   active: boolean;
   closedDeals: number;
+  reviewCount: number;
+  averageRating: number | null;
 }
 export interface Commission {
   id: number;
@@ -228,6 +230,15 @@ export interface AgentDetail extends Agent {
   orders: AgentOrder[];
   commissions: AgentCommission[];
   totalCommission: number;
+}
+export interface AgentReview {
+  orderId: number;
+  trackingNumber: string;
+  customerId: number;
+  customerName: string;
+  rating: number;
+  review: string;
+  createdAt: string;
 }
 export interface CreateOrderInput {
   customerId: number;
@@ -570,6 +581,9 @@ export class ApiService {
   }
   getAgent(id: number): Observable<ApiResponse<AgentDetail>> {
     return this.http.get<ApiResponse<AgentDetail>>(`${this.baseUrl}/agents/${id}`);
+  }
+  getAgentReviews(id: number, page = 1, limit = 20): Observable<ApiResponse<AgentReview[]>> {
+    return this.http.get<ApiResponse<AgentReview[]>>(`${this.baseUrl}/agents/${id}/reviews`, { params: { page, limit } });
   }
   createAgent(input: {
     fullName: string;

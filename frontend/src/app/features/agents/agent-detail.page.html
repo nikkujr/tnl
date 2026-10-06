@@ -49,7 +49,32 @@
         <small>Earned commission</small
         ><strong>{{ data.totalCommission | currency: 'PHP' : 'symbol-narrow' }}</strong>
       </div>
+      <div class="stat-tile customer-rating">
+        <small>Customer rating · all time</small>
+        <strong>{{ data.averageRating == null ? 'No reviews' : (data.averageRating | number: '1.1-2') + ' / 5' }}</strong>
+        <span>{{ data.reviewCount ?? 0 }} reviews</span>
+      </div>
     </div>
+
+    <section class="surface customer-feedback" aria-labelledby="agent-feedback-heading">
+      <div class="section-head"><div><h3 id="agent-feedback-heading">Customer feedback</h3><p>All reviews credited to this agent, newest first. Customer reassignment does not change review credit. Office orders are excluded.</p></div></div>
+      @if (reviewsError()) {
+        <div class="alert" role="alert">{{ reviewsError() }} <button type="button" class="ghost-button" (click)="loadReviews()" [disabled]="reviewsLoading()">Retry feedback</button></div>
+      }
+      @if (reviewsLoading()) { <div class="empty" role="status">Loading customer feedback…</div> }
+      @else if (!reviewsError()) {
+        @for (review of reviews(); track review.orderId) {
+          <article class="feedback-card">
+            <div class="feedback-heading"><strong>{{ review.rating }} / 5 <span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span></strong><small>{{ review.createdAt | date: 'medium' : '+0800' }} (UTC+8)</small></div>
+            <p class="feedback-comment">{{ review.review }}</p>
+            <p><a [routerLink]="['/customers', review.customerId]">{{ review.customerName }}</a> · <a [routerLink]="['/orders', review.orderId]">{{ review.trackingNumber }}</a></p>
+          </article>
+        } @empty { <div class="empty">No customer reviews for this agent yet.</div> }
+        @if (reviewTotal > reviewLimit) {
+          <div class="feedback-pagination"><button type="button" class="ghost-button" [disabled]="reviewPage === 1" (click)="changeReviewPage(-1)">Previous feedback</button><span>Page {{ reviewPage }} · {{ reviewTotal }} reviews</span><button type="button" class="ghost-button" [disabled]="reviewPage * reviewLimit >= reviewTotal" (click)="changeReviewPage(1)">Next feedback</button></div>
+        }
+      }
+    </section>
 
     <app-agent-rewards [agentId]="data.id" [showManagementLink]="true" />
 

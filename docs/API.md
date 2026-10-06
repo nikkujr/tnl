@@ -225,6 +225,8 @@ Consent is rechecked before each recipient send. SMTP configuration is checked b
 ## Agents and commissions
 
 - `GET /agents` — optionally pass `activeOnly=true` for assignment controls; `totalCommission` sums posted earnings in pesos, including retained legacy postings. `commissionRate` is a legacy field, not an earned amount.
+- `GET /agents` and `GET /agents/:id` also include all-time `reviewCount` and nullable `averageRating` (1..5, rounded to two decimals). Ratings use the saved review's agent credit, including inactive agents. Customer reassignment does not change credit; office reviews are excluded. No reviews means count 0 and average null.
+- `GET /agents/:id/reviews?page=1&limit=20` — admin-only paginated feedback, newest submission first with order ID as the tie-breaker. Returns `{data:[{orderId,trackingNumber,customerId,customerName,rating,review,createdAt}],meta:{page,limit,total}}`. Page must be a positive integer; limit is 1..100. A missing/non-agent identity returns 404, invalid pagination/ID returns 400. Agents, customers and delivery staff are denied. Feedback includes all submission months; Performance remains scoped to its chosen month.
 - `GET /agents/:id` — includes posted commissions, their total, and each order's `commissionAmount` and `commissionStatus`: EARNED, STANDALONE, CANCELLED, LEGACY_REVIEW, OTHER_AGENT, POSTING_REVIEW, AWAITING_APPROVAL, AWAITING_PAYMENT, AWAITING_DELIVERY, or AWAITING_COMPLETION. A standalone-only sale earns no commission even when delivered and paid. Status reads never create or backfill postings.
 - `POST /agents` — create with name, email, phone, password, and optional legacy commission rate
 - `PUT /agents/:id` — update contact/legacy rate and optionally replace the password

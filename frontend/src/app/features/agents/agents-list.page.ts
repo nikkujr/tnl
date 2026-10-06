@@ -1,6 +1,6 @@
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe } from '@angular/common';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService, Agent } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
@@ -18,6 +18,7 @@ import {
   imports: [
     FormsModule,
     CurrencyPipe,
+    DecimalPipe,
     RouterLink,
     ActionDialogComponent,
     AppIconComponent,

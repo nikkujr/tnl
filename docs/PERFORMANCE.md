@@ -18,6 +18,8 @@ The star picker supports pointer selection and keyboard arrows and displays a na
 
 The team leaderboard shows each agent's average rating and review count. **Customer feedback** shows comments, rating, customer, submission time and an order link, with filters for individual agents or office orders. The reporting month uses the review's submission date in Asia/Manila, including feedback about older purchases. Feedback stays credited to the agent on the order even when the customer is reassigned. Office orders have no agent and are excluded from agent averages. Ratings describe the purchase and service experience and do not change sales rankings, targets, commissions or awards. Agents without reviews display **No reviews**.
 
+**Agents** also shows each agent's all-time average and review count. Select **View** to see the all-time rating summary and a paginated customer feedback list with customer/order links. Inactive agents retain their history; agents without feedback display **No reviews**. This admin view uses all submission months, independently of Performance's month picker. Run `node frontend/scripts/check-agent-feedback.cjs` with Playwright/Chrome and the same `LAYOUT_URL`/`LAYOUT_SCREENSHOT_DIR` environment variables for averages, pagination, retry, empty states, safe comments and links at desktop/mobile widths in light and dark themes.
+
 ## Monthly targets and incentives
 
 Set one peso sales target per agent per month, with an optional fixed peso incentive. Use zero for a target without a financial reward. Target progress can exceed 100%; the progress bar stops at 100%.

@@ -1,8 +1,8 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AgentDetail, AgentOrder, ApiService } from '../../core/api.service';
+import { AgentDetail, AgentOrder, AgentReview, ApiService } from '../../core/api.service';
 import { AppIconComponent } from '../../shared/app-icon.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { AgentRewardsComponent } from '../../shared/agent-rewards.component';
@@ -11,7 +11,7 @@ type SectionKey = 'customers' | 'orders' | 'commissions';
 
 @Component({
   selector: 'app-agent-detail-page',
-  imports: [CurrencyPipe, DatePipe, RouterLink, AppIconComponent, BreadcrumbComponent, AgentRewardsComponent],
+  imports: [CurrencyPipe, DatePipe, DecimalPipe, RouterLink, AppIconComponent, BreadcrumbComponent, AgentRewardsComponent],
   templateUrl: './agent-detail.page.html',
   styleUrls: ['./agent-detail.page.scss'],
 })
@@ -27,6 +27,14 @@ export class AgentDetailPage implements OnInit {
   readonly error = signal('');
   readonly collapsedSections = signal<Set<SectionKey>>(new Set());
   readonly chartsAnimated = signal(false);
+  readonly reviews = signal<AgentReview[]>([]);
+  readonly reviewsLoading = signal(false);
+  readonly reviewsError = signal('');
+  reviewPage = 1;
+  reviewTotal = 0;
+  readonly reviewLimit = 20;
+  private requestNumber = 0;
+  private reviewRequest = 0;
 
   readonly commissionTrend = computed(() => {
     const data = this.agent();
@@ -79,21 +87,59 @@ export class AgentDetailPage implements OnInit {
   }
 
   private load(id: number): void {
+    const request = ++this.requestNumber;
+    ++this.reviewRequest;
+    this.reviewPage = 1;
+    this.reviewTotal = 0;
+    this.reviews.set([]);
+    this.reviewsLoading.set(false);
+    this.reviewsError.set('');
     this.agent.set(null);
     this.loading.set(true);
     this.error.set('');
     this.chartsAnimated.set(false);
-    this.api.getAgent(id).subscribe({
+    this.api.getAgent(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ data }) => {
+        if (request !== this.requestNumber) return;
         this.agent.set(data);
         this.loading.set(false);
+        this.loadReviews();
         window.setTimeout(() => this.chartsAnimated.set(true), 30);
       },
       error: (error) => {
+        if (request !== this.requestNumber) return;
         this.loading.set(false);
         this.error.set(error.error?.error?.message ?? 'Unable to load this agent.');
       },
     });
+  }
+
+  loadReviews(): void {
+    const agent = this.agent();
+    if (!agent) return;
+    const request = ++this.reviewRequest;
+    this.reviewsLoading.set(true);
+    this.reviewsError.set('');
+    this.api.getAgentReviews(agent.id, this.reviewPage, this.reviewLimit)
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: ({ data, meta }) => {
+          if (request !== this.reviewRequest) return;
+          this.reviews.set(data);
+          this.reviewTotal = meta?.total ?? data.length;
+          this.reviewsLoading.set(false);
+        },
+        error: e => {
+          if (request !== this.reviewRequest) return;
+          this.reviewsLoading.set(false);
+          this.reviewsError.set(e.error?.error?.message ?? 'Unable to load customer feedback.');
+        },
+      });
+  }
+  changeReviewPage(delta: number): void {
+    const page = this.reviewPage + delta;
+    if (page < 1 || (page - 1) * this.reviewLimit >= this.reviewTotal || this.reviewsLoading()) return;
+    this.reviewPage = page;
+    this.loadReviews();
   }
 
   back(): void {

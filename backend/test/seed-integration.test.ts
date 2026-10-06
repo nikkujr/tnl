@@ -193,7 +193,41 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     assert(!currentFeedback.reviews.some((r: any) => r.orderId === reviewedOrder.id));
     const priorFeedback = await call(`performance?month=${businessDate(priorMonthTime).slice(0, 7)}`, staff.token);
     assert.equal(priorFeedback.reviews.find((r: any) => r.orderId === reviewedOrder.id).rating, 5);
+    const listedAgents = await call("agents", staff.token);
+    const [allReviews] = await db.query("SELECT order_id orderId,customer_id customerId,agent_id agentId,rating,created_at createdAt FROM order_reviews");
+    for (const listed of listedAgents) {
+      const expected = allReviews.filter((r: any) => r.agentId === listed.id);
+      const average = expected.length ? Math.round(expected.reduce((sum: number, r: any) => sum + r.rating, 0) / expected.length * 100) / 100 : null;
+      const detail = await call(`agents/${listed.id}`, staff.token);
+      assert.equal(listed.averageRating, average);
+      assert.equal(Number(listed.reviewCount), expected.length);
+      assert.equal(detail.averageRating, average);
+      assert.equal(Number(detail.reviewCount), expected.length);
+      const reviews = await call(`agents/${listed.id}/reviews?limit=100`, staff.token);
+      assert.equal(reviews.length, expected.length);
+      const sorted = expected.sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime() || b.orderId - a.orderId);
+      assert.deepEqual(reviews.map((r: any) => r.orderId), sorted.map((r: any) => r.orderId));
+      assert(reviews.every((r: any) => expected.some((e: any) => e.orderId === r.orderId && e.customerId === r.customerId)));
+      if (expected.length > 2) {
+        const first = await call(`agents/${listed.id}/reviews?limit=2`, staff.token);
+        const second = await call(`agents/${listed.id}/reviews?limit=2&page=2`, staff.token);
+        assert.equal(first.length, 2);
+        assert.deepEqual(second.map((r: any) => r.orderId), sorted.slice(2, 4).map((r: any) => r.orderId));
+      }
+    }
+    const creditedReviews = await call(`agents/${reviewedOrder.agent_id}/reviews?limit=100`, staff.token);
+    assert(creditedReviews.some((r: any) => r.orderId === reviewedOrder.id), "Reassignment or a different submission month changed agent review credit");
+    for (const token of [agentLogin.token, reviewer, ""])
+      await call(`agents/${reviewedOrder.agent_id}/reviews`, token, undefined, "GET", token === agentLogin.token ? 403 : [401, 403]);
+    await call("agents/invalid/reviews", staff.token, undefined, "GET", 400);
+    await call("agents/99999999/reviews", staff.token, undefined, "GET", 404);
+    await call(`agents/${staff.user.id}/reviews`, staff.token, undefined, "GET", 404);
+    for (const query of ["page=0", "page=1.5", "limit=0", "limit=101"])
+      await call(`agents/${reviewedOrder.agent_id}/reviews?${query}`, staff.token, undefined, "GET", 400);
+    await db.query("UPDATE users SET active=FALSE WHERE id=?", [reviewedOrder.agent_id]);
+    assert.equal((await call(`agents/${reviewedOrder.agent_id}`, staff.token)).reviewCount, creditedReviews.length);
     const delivery = await call("auth/login", "", { email: "delivery1@tnl.local", password: demoPassword });
+    await call(`agents/${reviewedOrder.agent_id}/reviews`, delivery.token, undefined, "GET", 403);
     const deliveries = await call("delivery/orders", delivery.token);
     assert(deliveries.some((o: any) => o.attemptId));
     // Verify an existing reserved order can complete through the real delivery service.

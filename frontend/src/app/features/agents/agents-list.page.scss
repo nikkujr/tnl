@@ -21,6 +21,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.management-row .agent-rating { color: var(--green, #7167c9); }
 @media (max-width: 760px) {
   .agents-table .management-row {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
