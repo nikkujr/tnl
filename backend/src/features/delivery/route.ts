@@ -11,7 +11,7 @@ import { authenticateCustomer } from "../customer-auth/session.js";
 import { HttpError, validate } from "../../shared/http.js";
 import { transaction } from "../../shared/transaction.js";
 import { notify, staffRecipients } from "../automations/events.js";
-import { fence, statusBody, positionBody } from "./model.js";
+import { fence, statusBody, positionBody, estimatedDeliveryAt } from "./model.js";
 import {
   audit,
   lockOrder,
@@ -20,6 +20,7 @@ import {
   stopLocations,
   advanceDelivery,
   assign,
+  saveEstimate,
 } from "./service.js";
 import { orderList, orderDetail, privateRead, tracking } from "./query.js";
 import { stagePhoto, readProof } from "./photos.js";
@@ -85,7 +86,7 @@ deliveryRouter.get("/orders/:id/proof-photo", async (req, res) => {
 deliveryRouter.post(
   "/orders/:id/start",
   employee,
-  check(fence.omit({ attemptId: true }).strict()),
+  check(fence.omit({ attemptId: true }).extend({ estimatedDeliveryAt: estimatedDeliveryAt.optional() }).strict()),
   async (req, res) => {
     const data = await transaction(async (c) => {
       const o = await lockOrder(
@@ -133,6 +134,7 @@ deliveryRouter.post(
         await advanceDelivery(c, o, req.user!, {
           deliveryStatus: "DISPATCHED",
           attemptId,
+          estimatedDeliveryAt: req.body.estimatedDeliveryAt,
         });
       await audit(
         c,
@@ -377,6 +379,18 @@ deliveryRouter.post(
         req.file.buffer,
       ),
     });
+  },
+);
+deliveryManagementRouter.patch(
+  "/:id/delivery-estimate",
+  ...admin,
+  check(z.object({ assignmentVersion: z.number().int().nonnegative(), estimatedDeliveryAt }).strict()),
+  async (req, res) => {
+    await transaction(async (c) => {
+      const o = await lockOrder(c, id(req.params.id), req.user!, req.body.assignmentVersion);
+      await saveEstimate(c, o, req.body.estimatedDeliveryAt, req.user!.id);
+    });
+    res.json({ data: { saved: true } });
   },
 );
 deliveryManagementRouter.patch(

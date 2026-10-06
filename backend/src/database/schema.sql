@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS orders (
   agent_id BIGINT UNSIGNED NULL,
   delivery_employee_id BIGINT UNSIGNED NULL,
   delivery_assignment_version INT UNSIGNED NOT NULL DEFAULT 0,
+  estimated_delivery_at DATETIME NULL,
   destination_latitude DECIMAL(10,7) NULL,
   destination_longitude DECIMAL(10,7) NULL,
   product_id BIGINT UNSIGNED NULL,

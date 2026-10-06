@@ -55,6 +55,10 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   private readonly deliveryMap = viewChild(DeliveryMapComponent);
   readonly draftDestination = signal<Coordinate | null>(null);
   readonly clock = signal(Date.now());
+  readonly estimateOverdue = computed(() => {
+    const estimate = this.track()?.estimatedDeliveryAt;
+    return !!estimate && Date.parse(estimate) < this.clock() + this.offset;
+  });
   readonly isEmployee = computed(() => this.session()?.role === 'DELIVERY');
   readonly isAdmin = computed(() => this.session()?.role === 'ADMIN');
   private offset = 0;
@@ -78,6 +82,11 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   private lastPoll = 0;
   private polling = false;
   employeeId: number | null = null;
+  estimate = '';
+  estimateValid() {
+    const estimate = Date.parse(this.estimate + '+08:00');
+    return Number.isFinite(estimate) && estimate > this.clock() + this.offset;
+  }
   latitude: number | null = null;
   longitude: number | null = null;
   recipientName = '';
@@ -147,6 +156,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
     this.draftDestination.set(null);
     this.error.set('');
     this.notice.set('');
+    this.estimate = '';
     this.clearPhoto();
     this.clearDraft();
     this.loadedPhotoOrder = 0;
@@ -179,6 +189,9 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
             this.detail.set(r.data);
             this.setTracking(r.data.tracking);
             this.employeeId = r.data.employeeId ?? null;
+            this.estimate = r.data.estimatedDeliveryAt
+              ? new Date(new Date(r.data.estimatedDeliveryAt).getTime() + 8 * 3600000).toISOString().slice(0, 16)
+              : '';
             if (!this.draftDestination()) this.resetPin();
             if (
               r.data.completion?.photoState === 'AVAILABLE' &&
@@ -275,6 +288,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
       await firstValueFrom(
         this.api.post(`${this.base()}/start`, {
           assignmentVersion: this.detail()!.assignmentVersion,
+          ...(this.detail()!.deliveryStatus === 'PREPARING' ? { estimatedDeliveryAt: this.estimate + '+08:00' } : {}),
         }),
       );
     }, 'Delivery started. You can enable live location sharing.');
@@ -292,6 +306,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
           ? this.api.patch(`orders/${this.orderId}/delivery-status`, {
               assignmentVersion: this.detail()!.assignmentVersion,
               deliveryStatus: status,
+              ...(status === 'DISPATCHED' ? { estimatedDeliveryAt: this.estimate + '+08:00' } : {}),
             })
           : this.api.patch(`${this.base()}/status`, { ...this.fence(), deliveryStatus: status }),
       );
@@ -305,6 +320,14 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
       this.stopLocal();
       this.issueText = '';
     }, 'Issue sent to the admin. Another attempt needs their resolution.');
+  }
+  saveEstimate() {
+    void this.act(async () => {
+      await firstValueFrom(this.api.patch(`orders/${this.orderId}/delivery-estimate`, {
+        assignmentVersion: this.detail()!.assignmentVersion,
+        estimatedDeliveryAt: this.estimate + '+08:00',
+      }));
+    }, 'Estimated delivery updated for the customer.');
   }
   assign() {
     void this.act(async () => {

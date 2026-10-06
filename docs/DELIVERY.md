@@ -6,6 +6,8 @@ Order details group employee assignment and milestone buttons under **Dispatch &
 
 ## Workflow and invariants
 
+Dispatching requires a future **Estimated arrival** date and time. Admins enter it in dispatch controls or save/revise it with **Save estimate**; employees confirm it when starting a PREPARING order. The portal, tracking-number page, agent view and delivery queue show the estimate in Philippine time (UTC+08:00). Customers receive revisions through private tracking polling and see an explicit message when the estimate has passed. Estimates are guidance, not guarantees, and are stored in UTC separately from actual delivery completion. Existing unscheduled orders display **Awaiting a delivery schedule**; no arrival time is invented for them.
+
 Admins open **View proof of delivery** from completed dispatch cards or the completed order's action bar. Evidence appears above the map with recipient, completion time, employee and the authenticated photo. Expired photos, admin exceptions and older orders without recorded evidence have explicit messages.
 
 Only approved, unfinished LIVE orders can be assigned to active delivery employees. Existing orders start unassigned. Imported records stay read-only. Accounts cannot be deactivated while unfinished assignments remain; reassign or remove those assignments first.
@@ -28,11 +30,12 @@ All paths below have `/api/v1` as their prefix, use bearer authentication, and w
 | `POST /delivery-employees/:id/reset-password` | Admin; `{newPassword}`; revokes sessions |
 | `GET /delivery/dispatch?page=1` | Admin; up to 100 orders with latest tracking |
 | `PATCH /orders/:id/delivery-assignment` | Admin; `{employeeId: number|null,assignmentVersion}` |
+| `PATCH /orders/:id/delivery-estimate` | Admin; `{estimatedDeliveryAt,assignmentVersion}`; future ISO date/time with timezone; unfinished approved LIVE orders only |
 | `PATCH /orders/:id/delivery-destination` | Admin; `{latitude: number|null,longitude: number|null,assignmentVersion}`; both coordinates or both null |
 | `POST /orders/:id/delivery-issues/:issueId/resolve` | Admin; `{resolution}` |
 | `GET /delivery/orders?page=1` | Delivery employee; up to 100 own assignments |
 | `GET /delivery/orders/:id` | Admin, owning sales agent, assigned employee; fulfillment details |
-| `POST /delivery/orders/:id/start` | Assigned employee; `{assignmentVersion}`; returns `{attemptId}`, repeated start reuses active attempt |
+| `POST /delivery/orders/:id/start` | Assigned employee; `{assignmentVersion,estimatedDeliveryAt?}`; starting PREPARING needs a future supplied/saved estimate; returns `{attemptId}`, repeated start reuses active attempt |
 | `POST /delivery/orders/:id/pause` | Assigned employee; `{assignmentVersion,attemptId}` |
 | `POST /delivery/orders/:id/issues` | Assigned employee; fence plus `{explanation}` |
 | `PATCH /delivery/orders/:id/status` | Assigned employee; fence plus `{deliveryStatus,notes?,recipientName?,photoId?}` |
@@ -47,7 +50,7 @@ All paths below have `/api/v1` as their prefix, use bearer authentication, and w
 | `GET /customer/orders/:id/proof-photo` | Verified owning customer; authenticated binary |
 | `POST /auth/logout` | Active staff; invalidates staff sessions, stops employee location |
 
-The existing admin `PATCH /orders/:id/delivery-status` now takes `{assignmentVersion,deliveryStatus,notes?,recipientName?,photoId?,exceptionReason?}`. DELIVERED requires evidence; without a photo, `recipientName` and `exceptionReason` are required. Sales agent mutation returns 403. This is an intentional client contract change.
+The existing admin `PATCH /orders/:id/delivery-status` now takes `{assignmentVersion,deliveryStatus,estimatedDeliveryAt?,notes?,recipientName?,photoId?,exceptionReason?}`. Leaving PREPARING for a traveling stage requires a future supplied/saved estimate, including when skipping forward. DELIVERED requires evidence; without a photo, `recipientName` and `exceptionReason` are required. Sales agent mutation returns 403. Estimate revisions are audited and available as nullable `estimatedDeliveryAt` in private detail/tracking and delivery queues.
 
 Mutation authorization is rechecked inside the order transaction. Private detail/tracking/photo reads hold a shared order lock through ownership verification and retrieval, preventing audience changes midway through reassignment. The fulfillment DTO omits prices, commission terms, payment controls and unrelated customer data. Invalid assignments/attempts/session versions conflict instead of overwriting new state. Invalid images return 400, size overflow 413, expired committed photos 410, and unavailable proof storage 503.
 

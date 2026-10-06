@@ -4,6 +4,7 @@ export const fence = z.object({
   assignmentVersion: z.number().int().nonnegative(),
   attemptId: z.uuid().optional(),
 });
+export const estimatedDeliveryAt = z.iso.datetime({ offset: true });
 export const completionFields = {
   recipientName: z.string().trim().min(2).max(160).optional(),
   photoId: z.uuid().optional(),
@@ -13,6 +14,7 @@ export const statusBody = fence
   .extend({
     deliveryStatus: z.enum(deliveryStages),
     notes: z.string().trim().max(500).optional(),
+    estimatedDeliveryAt: estimatedDeliveryAt.optional(),
     ...completionFields,
   })
   .strict();

@@ -65,6 +65,15 @@ small {
   border-radius: 14px;
   background: var(--color-surface-alt, #f3f5fa);
 }
+.delivery-estimate {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--color-surface-alt, #f3f5fa);
+}
+.delivery-estimate strong { display: block; margin-top: 6px; }
+.delivery-estimate p { margin: 6px 0 0; }
+input[type='datetime-local'] { min-width: 0; }
 .delivery-action-card h4 {
   margin-bottom: 6px;
 }

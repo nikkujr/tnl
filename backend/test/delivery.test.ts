@@ -64,7 +64,7 @@ test(
         await db.query(statement);
       // Exercise an installed database's old enum as well as repeatable additive upgrades.
       await db.query(
-        "ALTER TABLE orders DROP COLUMN delivery_employee_id,DROP COLUMN delivery_assignment_version,DROP COLUMN destination_latitude,DROP COLUMN destination_longitude",
+        "ALTER TABLE orders DROP COLUMN delivery_employee_id,DROP COLUMN delivery_assignment_version,DROP COLUMN destination_latitude,DROP COLUMN destination_longitude,DROP COLUMN estimated_delivery_at",
       );
       await db.query(
         "ALTER TABLE users MODIFY role ENUM('ADMIN','AGENT') NOT NULL",
@@ -146,7 +146,8 @@ test(
           201,
         )
       ).id;
-      const create = async () => {
+      const futureEstimate = () => new Date(Math.floor(Date.now() / 1000) * 1000 + 4 * 3600000).toISOString();
+      const create = async (withEstimate = true) => {
         const o = await call(
           "orders",
           "POST",
@@ -163,6 +164,7 @@ test(
           201,
         );
         await call(`orders/${o.id}/decision`, "POST", { decision: "APPROVE" });
+        if (withEstimate) await call(`orders/${o.id}/delivery-estimate`, "PATCH", { assignmentVersion: 0, estimatedDeliveryAt: futureEstimate() });
         return o.id;
       };
       const assign = async (
@@ -251,6 +253,35 @@ test(
           );
         },
       );
+      await t.test("dispatch requires a future estimate, preserves UTC, and exposes revisions only to scoped viewers", async () => {
+        const order = await create(false);
+        const path = `orders/${order}/delivery-estimate`;
+        assert.equal((await call(`customer/orders/${order}/delivery`, "GET", undefined, owner)).estimatedDeliveryAt, null);
+        await call(`orders/${order}/delivery-status`, "PATCH", { assignmentVersion: 0, deliveryStatus: "DISPATCHED" }, a, 400);
+        await call(`orders/${order}/delivery-status`, "PATCH", { assignmentVersion: 0, deliveryStatus: "IN_TRANSIT" }, a, 400);
+        await assign(order, 3);
+        await call(`delivery/orders/${order}/start`, "POST", { assignmentVersion: 1 }, driver, 400);
+        assert.equal((await call(`delivery/orders/${order}`, "GET", undefined, driver)).attemptId, null);
+        for (const value of ["invalid", "2026-10-09T14:00", new Date(Date.now() - 1000).toISOString()])
+          await call(path, "PATCH", { assignmentVersion: 1, estimatedDeliveryAt: value }, a, 400);
+        const eta = futureEstimate();
+        for (const auth of [agent, driver, owner]) await call(path, "PATCH", { assignmentVersion: 1, estimatedDeliveryAt: eta }, auth, 403);
+        await call(path, "PATCH", { assignmentVersion: 0, estimatedDeliveryAt: eta }, a, 409);
+        const offsetEta = new Date(Date.parse(eta) + 8 * 3600000).toISOString().replace("Z", "+08:00");
+        const started = await call(`delivery/orders/${order}/start`, "POST", { assignmentVersion: 1, estimatedDeliveryAt: offsetEta }, driver);
+        assert.equal((await call(`customer/orders/${order}/delivery`, "GET", undefined, owner)).estimatedDeliveryAt, eta);
+        const revised = new Date(Date.parse(eta) + 3600000).toISOString();
+        await call(path, "PATCH", { assignmentVersion: 1, estimatedDeliveryAt: revised });
+        assert.equal((await call(`customer/orders/${order}/delivery-tracking`, "GET", undefined, owner)).estimatedDeliveryAt, revised);
+        assert.equal((await call("tracking/" + (await call(`orders/${order}`)).trackingNumber, "GET", undefined, "")).estimatedDeliveryAt, revised);
+        await call(`customer/orders/${order}/delivery`, "GET", undefined, customer(2), 404);
+        await call(`customer/orders/${order}/delivery-tracking`, "GET", undefined, customer(2), 404);
+        await call(`delivery/orders/${order}/pause`, "POST", { assignmentVersion: 1, attemptId: started.attemptId }, driver);
+        await call(`orders/${order}/delivery-status`, "PATCH", { assignmentVersion: 1, deliveryStatus: "DELIVERED", recipientName: "Customer", exceptionReason: "Office handoff without a camera" });
+        await call(path, "PATCH", { assignmentVersion: 1, estimatedDeliveryAt: futureEstimate() }, a, 409);
+        const [[audit]] = await db.query("SELECT COUNT(*) count FROM order_events WHERE order_id=? AND type='DELIVERY_ESTIMATE_UPDATED'", [order]);
+        assert.equal(audit.count, 2);
+      });
       const o = await create(),
         o2 = await create();
       await assign(o, 3);

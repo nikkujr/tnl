@@ -7,7 +7,7 @@ router.get("/:trackingNumber", async (req, res, next) => {
   try {
     const [orders] = await db.query<any[]>(
       `SELECT id,tracking_number trackingNumber,order_status orderStatus,
-      delivery_status deliveryStatus FROM orders WHERE tracking_number=?`,
+      delivery_status deliveryStatus,estimated_delivery_at estimatedDeliveryAt FROM orders WHERE tracking_number=?`,
       [req.params.trackingNumber],
     );
     const order = orders[0];

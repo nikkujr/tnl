@@ -8,6 +8,8 @@ numbers and street numbers are fictional; customer and lead emails use
 
 ## Load or reset
 
+Dispatched demo orders include an estimated arrival: pending deliveries use a future date/time relative to seeding, and completed deliveries retain their historical estimate. The portal and tracking pages show estimates in Philippine time.
+
 Configure `backend/.env` for a dedicated demo database, then run from `backend/`:
 
 ```sh

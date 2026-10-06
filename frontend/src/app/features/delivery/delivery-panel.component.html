@@ -17,6 +17,20 @@
       <strong>{{ (d.deliveryStatus || 'Not started').replaceAll('_', ' ') | titlecase }}</strong
       ><span>Employee: {{ d.employeeName || 'Awaiting assignment' }}</span>
     </div>
+    @if (d.deliveryStatus !== 'DELIVERED') {
+      <div class="delivery-estimate" aria-label="Delivery estimate">
+        <span class="eyebrow">Estimated arrival</span>
+        @if (track()?.estimatedDeliveryAt; as eta) {
+          <strong>{{ eta | date: 'MMM d, y, h:mm a' : '+0800' }} <small>Philippine time</small></strong>
+          <p class="muted">This is an estimate. Traffic and delivery conditions may affect arrival.</p>
+          @if (estimateOverdue()) {
+            <p class="error">The estimated arrival time has passed. Please contact us for an update.</p>
+          }
+        } @else {
+          <p>Awaiting a delivery schedule.</p>
+        }
+      </div>
+    }
     @if (isEmployee()) {
       <p>{{ d.address }}</p>
       <p>
@@ -96,6 +110,10 @@
             Save assignment
           </button>
         </div>
+        <div class="assignment-row">
+          <label>Estimated arrival (Philippine time)<input type="datetime-local" [(ngModel)]="estimate" /></label>
+          <button type="button" [disabled]="busy() || !estimateValid()" (click)="saveEstimate()">Save estimate</button>
+        </div>
         <div class="status-actions">
           <div>
             <strong>Update delivery status</strong>
@@ -103,7 +121,7 @@
           </div>
           <div class="actions">
             @if (d.deliveryStatus === 'PREPARING') {
-              <button class="primary" [disabled]="busy()" (click)="advance('DISPATCHED')">
+              <button class="primary" [disabled]="busy() || !estimateValid()" (click)="advance('DISPATCHED')">
                 Mark dispatched
               </button>
             }
@@ -134,9 +152,13 @@
           Start your delivery, update each stage, then record the recipient and proof of handoff.
         </p>
         @if (!d.attemptId) {
+          @if (d.deliveryStatus === 'PREPARING') {
+            <label>Estimated arrival (Philippine time)<input type="datetime-local" [(ngModel)]="estimate" /></label>
+            <p class="muted">Confirm the arrival estimate before starting delivery.</p>
+          }
           <button
             class="primary"
-            [disabled]="busy() || d.issues.some(unresolved)"
+            [disabled]="busy() || d.issues.some(unresolved) || (d.deliveryStatus === 'PREPARING' && !estimateValid())"
             (click)="start()"
           >
             Start delivery

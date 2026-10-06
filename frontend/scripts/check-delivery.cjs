@@ -22,6 +22,8 @@ async function main() {
       posts = 0;
     let destination = { latitude: 13.77, longitude: 122.98 };
     let milestone = 'PREPARING';
+    let estimatedDeliveryAt = null;
+    const futureEstimate = () => new Date(Date.now() + 12 * 3600000).toISOString().slice(0, 16);
     let proofState = 'AVAILABLE',
       hasEvidence = true;
     const now = () => new Date().toISOString();
@@ -32,6 +34,7 @@ async function main() {
       recipientName: 'Sample Customer',
       recipientPhone: '09171234567',
       deliveryStatus: completed ? 'DELIVERED' : milestone,
+      estimatedDeliveryAt,
       assignmentVersion: 1,
       employeeId: 3,
       employeeName: 'Delivery Employee',
@@ -42,6 +45,7 @@ async function main() {
       state: shared ? (latest ? 'LIVE' : 'UNAVAILABLE') : 'STOPPED',
       serverTime: now(),
       deliveryStatus: job().deliveryStatus,
+      estimatedDeliveryAt,
       employeeName: 'Delivery Employee',
       destination,
       position: shared ? latest : null,
@@ -233,7 +237,12 @@ async function main() {
         delete data.recipientPhone;
       }
       if (p === 'customer/orders/1/delivery-tracking') data = tracking();
+      if (p === 'tracking/TN-DELIVERY-001') data = { trackingNumber: job().trackingNumber, orderStatus: 'APPROVED', deliveryStatus: milestone, estimatedDeliveryAt, events: [] };
       if (p.endsWith('/start') && !p.endsWith('/tracking/start')) {
+        if (milestone === 'PREPARING') {
+          estimatedDeliveryAt = new Date(request.postDataJSON().estimatedDeliveryAt).toISOString();
+          assert(Date.parse(estimatedDeliveryAt) > Date.now());
+        }
         active = true;
         if (milestone === 'PREPARING') milestone = 'DISPATCHED';
         data = { attemptId: job().attemptId };
@@ -282,7 +291,12 @@ async function main() {
         shared = false;
         latest = null;
       }
-      if (p === 'orders/1/delivery-status') milestone = request.postDataJSON().deliveryStatus;
+      if (p === 'orders/1/delivery-status') {
+        const body = request.postDataJSON();
+        milestone = body.deliveryStatus;
+        if (body.estimatedDeliveryAt) estimatedDeliveryAt = new Date(body.estimatedDeliveryAt).toISOString();
+      }
+      if (p === 'orders/1/delivery-estimate') estimatedDeliveryAt = new Date(request.postDataJSON().estimatedDeliveryAt).toISOString();
       if (p === 'delivery-employees')
         data = [
           {
@@ -348,6 +362,8 @@ async function main() {
         });
       }
     }
+    assert(await page.getByRole('button', { name: 'Start delivery', exact: true }).isDisabled());
+    await page.getByLabel('Estimated arrival (Philippine time)', { exact: true }).fill(futureEstimate());
     await page.getByRole('button', { name: 'Start delivery', exact: true }).click();
     await page.getByRole('button', { name: 'Share live location', exact: true }).waitFor();
     await page.evaluate(() => (window.fixtureDenied = true));
@@ -589,6 +605,13 @@ async function main() {
           .isVisible(),
       );
       assert(await page.getByRole('button', { name: 'Mark dispatched', exact: true }).isVisible());
+      await page.getByLabel('Estimated arrival (Philippine time)', { exact: true }).fill(futureEstimate());
+      await page.getByRole('button', { name: 'Save estimate', exact: true }).click();
+      await page.getByText('Estimated delivery updated for the customer.', { exact: true }).waitFor();
+      assert(Date.parse(estimatedDeliveryAt) > Date.now());
+      await page.getByRole('button', { name: 'Save estimate', exact: true }).click();
+      await page.getByText('Estimated delivery updated for the customer.', { exact: true }).waitFor();
+      assert(Date.parse(estimatedDeliveryAt) > Date.now());
       await page.getByRole('button', { name: 'Mark dispatched', exact: true }).click();
       await page.getByRole('button', { name: 'Mark in transit', exact: true }).waitFor();
       await page.getByRole('button', { name: 'Mark in transit', exact: true }).click();
@@ -722,6 +745,11 @@ async function main() {
     hasEvidence = true;
     completed = false;
     shared = true;
+    await page.goto(base + '/tracking');
+    await page.getByPlaceholder('Enter tracking number').fill('TN-DELIVERY-001');
+    await page.getByRole('button', { name: 'Track order', exact: true }).click();
+    await page.getByText('Estimated arrival:', { exact: true }).waitFor();
+    assert((await page.locator('.timeline').textContent()).includes('Philippine time'));
     latest = {
       latitude: 13.765,
       longitude: 122.976,
@@ -747,6 +775,18 @@ async function main() {
     await page.getByRole('button', { name: 'Details and follow-up', exact: true }).click();
     await page.locator('.location-status.live').waitFor();
     await page.locator('.leaflet-container').waitFor();
+    const arrival = page.getByLabel('Delivery estimate', { exact: true });
+    assert((await arrival.textContent()).includes('Philippine time'));
+    assert.equal(await page.getByLabel('Estimated arrival (Philippine time)', { exact: true }).count(), 0);
+    estimatedDeliveryAt = new Date(Date.now() + 7 * 3600000).toISOString();
+    await page.clock.runFor(11000);
+    const expectedArrival = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(estimatedDeliveryAt)).replace(' at ', ', ');
+    assert((await arrival.textContent()).includes(expectedArrival), 'Customer did not receive the revised arrival estimate');
+    if (process.env.LAYOUT_SCREENSHOT_DIR) await arrival.screenshot({ path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'customer-arrival.png') });
+    if (process.env.LAYOUT_SCREENSHOT_DIR) await arrival.screenshot({ path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'customer-arrival.png') });
+    estimatedDeliveryAt = new Date(Date.now() - 60000).toISOString();
+    await page.clock.runFor(11000);
+    await page.getByText('The estimated arrival time has passed. Please contact us for an update.', { exact: true }).waitFor();
     assert.equal(
       await page.getByRole('button', { name: 'Place destination pin', exact: true }).count(),
       0,

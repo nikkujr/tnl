@@ -252,7 +252,7 @@ Team reports and reward management require an active Admin identity. Agents can 
 ### `GET /tracking/:trackingNumber`
 
 No authentication is required. Returns non-sensitive order status, delivery
-status and chronological stage timestamps. No full address, coordinates, internal notes, contact/payment information, or internal IDs are returned.
+status, nullable `estimatedDeliveryAt` (UTC), and chronological stage timestamps. No full address, coordinates, internal notes, contact/payment information, or internal IDs are returned.
 
 ## Health
 

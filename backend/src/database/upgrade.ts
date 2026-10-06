@@ -10,6 +10,7 @@ export async function upgrade() {
     orders: {
       delivery_employee_id: "BIGINT UNSIGNED NULL",
       delivery_assignment_version: "INT UNSIGNED NOT NULL DEFAULT 0",
+      estimated_delivery_at: "DATETIME NULL",
       destination_latitude: "DECIMAL(10,7) NULL",
       destination_longitude: "DECIMAL(10,7) NULL",
       sales_version: "ENUM('LEGACY','PACKAGE') NOT NULL DEFAULT 'LEGACY'",

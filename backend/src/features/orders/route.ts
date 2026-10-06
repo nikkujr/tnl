@@ -22,7 +22,7 @@ import { deliveryStages, saleTotalSql } from "./queries.js";
 import { paymentEpisode } from "../automations/payment-episode.js";
 import { stockEpisode } from "../automations/stock.js";
 import { event, orderChanged } from "../automations/events.js";
-import { completionFields } from "../delivery/model.js";
+import { completionFields, estimatedDeliveryAt } from "../delivery/model.js";
 import { advanceDelivery, lockOrder } from "../delivery/service.js";
 import { deliveryManagementRouter } from "../delivery/route.js";
 
@@ -568,6 +568,7 @@ router.patch(
 const deliveryBody = z.object({
   assignmentVersion: z.number().int().nonnegative(),
   ...completionFields,
+  estimatedDeliveryAt: estimatedDeliveryAt.optional(),
   deliveryStatus: z.enum(deliveryStages),
   notes: z.string().max(500).optional(),
   latitude: z.number().min(-90).max(90).nullable().optional(),

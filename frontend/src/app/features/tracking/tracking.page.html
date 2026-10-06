@@ -24,6 +24,12 @@
         }}</span>
       </div>
       <div class="timeline">
+        @if (data.deliveryStatus !== 'DELIVERED') {
+          <p><strong>Estimated arrival:</strong> {{ data.estimatedDeliveryAt ? (data.estimatedDeliveryAt | date: 'MMM d, y, h:mm a' : '+0800') + ' (Philippine time)' : 'Awaiting a delivery schedule.' }}</p>
+          @if (data.estimatedDeliveryAt) {
+            <p>This is an estimate. Traffic and delivery conditions may affect arrival.</p>
+          }
+        }
         @for (event of data.events; track $index) {
           <div class="timeline-step complete">
             <i></i

@@ -4,9 +4,10 @@ import { Subscription } from 'rxjs';
 import { DeliveryApi, DeliveryJob } from './delivery-api.service';
 import { DeliveryPanelComponent } from './delivery-panel.component';
 import { DeliveryMapComponent, MapPoint } from './delivery-map.component';
+import { DatePipe } from '@angular/common';
 @Component({
   selector: 'app-delivery-page',
-  imports: [RouterLink, DeliveryPanelComponent, DeliveryMapComponent],
+  imports: [RouterLink, DeliveryPanelComponent, DeliveryMapComponent, DatePipe],
   styleUrl: './delivery.scss',
   template: ` <header class="delivery-heading">
       <span class="eyebrow">TNL Track</span>
@@ -47,6 +48,9 @@ import { DeliveryMapComponent, MapPoint } from './delivery-map.component';
             <h3>{{ j.trackingNumber }}</h3>
             <p>{{ j.recipientName }}</p>
             <p>{{ j.address }}</p>
+            @if (j.deliveryStatus !== 'DELIVERED') {
+              <p>Estimated arrival: {{ j.estimatedDeliveryAt ? (j.estimatedDeliveryAt | date: 'MMM d, h:mm a' : '+0800') + ' (Philippine time)' : 'Awaiting schedule' }}</p>
+            }
             @if (admin) {
               <p>Employee: {{ j.employeeName || 'Unassigned' }}</p>
             }

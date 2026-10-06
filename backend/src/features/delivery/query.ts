@@ -42,7 +42,7 @@ export async function tracking(id: number, c: Reader = db) {
   // One statement gives a consistent assignment/session/position view during reassignment.
   const [rows] = await c.query<any[]>(
     `SELECT o.destination_latitude latitude,o.destination_longitude longitude,
- o.delivery_status deliveryStatus,u.full_name employeeName,a.id attemptId,s.id sessionId,
+ o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,u.full_name employeeName,a.id attemptId,s.id sessionId,
  p.latitude positionLatitude,p.longitude positionLongitude,p.accuracy,p.observed_at observedAt,p.received_at receivedAt
  FROM orders o LEFT JOIN users u ON u.id=o.delivery_employee_id
  LEFT JOIN delivery_active_jobs j ON j.order_id=o.id LEFT JOIN delivery_attempts a ON a.id=j.attempt_id
@@ -61,6 +61,7 @@ export async function tracking(id: number, c: Reader = db) {
     state,
     serverTime: new Date(now).toISOString(),
     deliveryStatus: r?.deliveryStatus ?? null,
+    estimatedDeliveryAt: r?.estimatedDeliveryAt ?? null,
     employeeName: r?.employeeName ?? null,
     destination:
       r?.latitude != null
@@ -80,7 +81,7 @@ export async function tracking(id: number, c: Reader = db) {
 export async function orderList(user: SessionUser, page = 1) {
   const [rows] = await db.query<any[]>(
     `SELECT o.id,o.tracking_number trackingNumber,o.delivery_address address,
- o.delivery_status deliveryStatus,o.order_status orderStatus,o.delivery_employee_id employeeId,
+ o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,o.order_status orderStatus,o.delivery_employee_id employeeId,
  o.delivery_assignment_version assignmentVersion,o.destination_latitude latitude,o.destination_longitude longitude,
  c.full_name recipientName,c.phone recipientPhone,u.full_name employeeName,j.attempt_id attemptId,
  (SELECT COUNT(*) FROM delivery_issues i WHERE i.order_id=o.id AND i.resolved_at IS NULL) issueCount
@@ -94,7 +95,7 @@ export async function orderList(user: SessionUser, page = 1) {
 }
 export async function orderDetail(o: any, user: Viewer, c: Reader = db) {
   const [rows] = await c.query<any[]>(
-    `SELECT o.id,o.tracking_number trackingNumber,o.delivery_address address,o.delivery_status deliveryStatus,
+    `SELECT o.id,o.tracking_number trackingNumber,o.delivery_address address,o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,
  o.delivery_assignment_version assignmentVersion,o.delivery_employee_id employeeId,c.full_name recipientName,c.phone recipientPhone,
  u.full_name employeeName,j.attempt_id attemptId FROM orders o JOIN customers c ON c.id=o.customer_id
  LEFT JOIN users u ON u.id=o.delivery_employee_id LEFT JOIN delivery_active_jobs j ON j.order_id=o.id WHERE o.id=?`,

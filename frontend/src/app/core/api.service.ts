@@ -133,6 +133,7 @@ export interface TrackingResult {
   trackingNumber: string;
   orderStatus: string;
   deliveryStatus: string | null;
+  estimatedDeliveryAt: string | null;
   events: Array<{
     status: string;
     occurredAt: string;

@@ -214,6 +214,7 @@ test(
           "PATCH",
           {
             deliveryStatus: status,
+            ...(status !== "DELIVERED" ? { estimatedDeliveryAt: new Date(Date.now() + 4 * 3600000).toISOString() } : {}),
             assignmentVersion: 0,
             notes: "Internal notes",
             recipientName: "Test recipient",

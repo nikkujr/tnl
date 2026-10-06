@@ -136,6 +136,21 @@ export async function expireLocationSessions(c: PoolConnection) {
     );
   }
 }
+export async function saveEstimate(
+  c: PoolConnection, o: any, value: string, actor: number,
+) {
+  if (o.order_status !== "APPROVED" || o.delivery_status === "DELIVERED")
+    throw new HttpError(409, "Only unfinished approved deliveries can change their estimate");
+  const estimate = new Date(value);
+  if (!Number.isFinite(estimate.getTime()) || estimate.getTime() <= Date.now())
+    throw new HttpError(400, "Choose a future estimated delivery date and time");
+  await c.execute("UPDATE orders SET estimated_delivery_at=? WHERE id=?", [estimate, o.id]);
+  await audit(
+    c, o.id, actor, "DELIVERY_ESTIMATE_UPDATED",
+    `Estimated delivery changed from ${o.estimated_delivery_at ? new Date(o.estimated_delivery_at).toISOString() : "not set"} to ${estimate.toISOString()}.`,
+  );
+  o.estimated_delivery_at = estimate;
+}
 export async function advanceDelivery(
   c: PoolConnection,
   o: any,
@@ -156,6 +171,11 @@ export async function advanceDelivery(
     return { id: o.id, deliveryStatus: o.delivery_status };
   if (user.role === "DELIVERY")
     await requireAttempt(c, o, user, body.attemptId);
+  if (body.deliveryStatus !== "DELIVERED") {
+    if (body.estimatedDeliveryAt) await saveEstimate(c, o, body.estimatedDeliveryAt, user.id);
+    if (o.delivery_status === "PREPARING" && (!o.estimated_delivery_at || new Date(o.estimated_delivery_at).getTime() <= Date.now()))
+      throw new HttpError(400, "Set a future estimated delivery date and time before dispatching");
+  }
   if (body.deliveryStatus === "DELIVERED") {
     if (!body.recipientName)
       throw new HttpError(400, "Recipient name is required");

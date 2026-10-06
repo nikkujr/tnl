@@ -110,6 +110,11 @@ export async function seedDefenseData(data: DemoData, reset = false) {
          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'LIVE','PACKAGE',?,?,?,?,?)`,
         [o.trackingNumber, customerIds.get(o.customerId), o.agentId ? userIds.get(o.agentId) : null, o.employeeId ? userIds.get(o.employeeId) : null, o.employeeId ? 1 : 0, o.approvedAt ? customer.latitude : null, o.approvedAt ? customer.longitude : null, customer.address, o.paymentMethod, o.paymentStatus, cashReceived, cashReceived === null ? null : pesos(Math.max(0, cents(cashReceived) - total)), o.orderStatus, o.deliveryStatus, o.approvedAt, o.deliveryChangedAt, o.saleCompletedAt, o.createdAt, o.updatedAt]);
       orderIds.set(o.id, id);
+      if (o.deliveryStatus && o.deliveryStatus !== "PREPARING") {
+        const estimate = o.deliveryStatus === "DELIVERED" ? o.deliveryChangedAt! : new Date(data.now.getTime() + (2 + o.id % 6) * 3600000);
+        await c.execute("UPDATE orders SET estimated_delivery_at=? WHERE id=?", [estimate, id]);
+        await orderEvent(id, adminId, "DELIVERY_ESTIMATE_UPDATED", `Estimated delivery set to ${estimate.toISOString()}.`, o.approvedAt!);
+      }
       await saveSale(c, id, s);
       // Staff product/mixed orders come from the office; agents may select packages only.
       await orderEvent(id, s.items.length ? adminId : o.agentId ? userIds.get(o.agentId)! : adminId, "CREATED", `Order created totaling ₱${pesos(total).toFixed(2)}.`, o.createdAt);

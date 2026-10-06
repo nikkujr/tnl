@@ -11,6 +11,7 @@ export interface DeliveryTracking {
   serverTime: string;
   employeeName: string | null;
   deliveryStatus: string | null;
+  estimatedDeliveryAt: string | null;
   destination: Coordinate | null;
   position: (Coordinate & { accuracy: number; observedAt: string; receivedAt: string }) | null;
 }
@@ -26,6 +27,7 @@ export interface DeliveryJob {
   trackingNumber: string;
   address: string;
   deliveryStatus: string;
+  estimatedDeliveryAt: string | null;
   assignmentVersion: number;
   employeeId: number | null;
   employeeName: string | null;
