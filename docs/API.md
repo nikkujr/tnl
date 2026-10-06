@@ -70,6 +70,14 @@ current. See [report definitions](REPORTS.md) for date, ranking, and value seman
 
 Admins see all customers. Agents see only customers assigned to them.
 
+### `GET /customers/:id?view=orders&page=1&limit=20`
+
+Admin only. Returns `{data:{customer,summary,records},meta:{page,limit,total}}`. `view` is `orders`, `requests`, `reviews`, or `followups`; pages are positive integers and limit is 1..100. History is newest first with an ID tie-breaker; `meta.total` counts the selected history. Missing customer returns 404; invalid ID, view or pagination returns 400. Agents, customers and delivery staff cannot access this endpoint.
+
+The safe contact profile includes contact details, current agent assignment, creation date, marketing consent and portal account/verification status. No credentials, tokens or recovery links are returned. Summary contains all-time order/request/review/follow-up counts, delivered/completed and fully paid purchase count/value (excluding cancelled/rejected orders), and nullable average customer rating. This customer average combines reviews across agents and office orders; it does not replace per-agent performance averages.
+
+Order records include saved totals, workflow/payment states and delivery addresses. Requests include saved product/package names and quantities, total, status, decline reason and a converted-order link when present. Reviews include rating, comment, submission date and the order's credited agent. Follow-ups include the message, reply, responder and reply date. Reviews and history are scoped to the selected customer regardless of their current agent assignment.
+
 ### `POST /customers`
 
 ```json
@@ -124,6 +132,8 @@ Stock is updated and an inventory movement is recorded in one transaction.
 Updates the positive low-stock threshold and reorder level.
 
 ## Orders
+
+`GET /orders/:id` includes `review` for admins (null or `{rating,review,createdAt,agentId,agentName}`). The review retains the agent credited on the original order. This field is omitted for agent sessions; the existing order ownership rules still apply.
 
 ### `GET /orders`
 

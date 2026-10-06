@@ -86,8 +86,8 @@
           </div>
           <div class="overview-grid">
             <div>
-              <small>Customer</small><strong>{{ data.customerName }}</strong
-              ><span>{{ data.customerEmail }} · {{ data.customerPhone }}</span>
+              <small>Customer</small><strong>@if (session().role === 'ADMIN') { <a [routerLink]="['/customers', data.customerId]">{{ data.customerName }}</a> } @else { {{ data.customerName }} }</strong>
+              <span>{{ data.customerEmail }} · {{ data.customerPhone }}</span>
             </div>
             <div>
               <small>Assigned agent</small><strong>{{ data.agentName || 'Office order — no agent' }}</strong
@@ -185,6 +185,19 @@
       </div>
 
       <aside class="side-column">
+        @if (session().role === 'ADMIN') {
+          <section class="surface customer-review">
+            <div class="section-head"><h3>Customer review</h3><p>Feedback on this purchase and service experience.</p></div>
+            @if (data.review; as review) {
+              <div class="review-body">
+                <p class="review-score"><span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span> <strong>{{ review.rating }} / 5</strong></p>
+                <p class="review-comment">{{ review.review }}</p>
+                <small>{{ data.customerName }} · {{ review.createdAt | date: 'medium' : '+0800' }} (UTC+8)</small>
+                <small>Credited to {{ review.agentName || 'Office — no agent' }}</small>
+              </div>
+            } @else { <p class="empty">This customer has not reviewed the order yet.</p> }
+          </section>
+        }
         <section class="surface">
           <div class="section-head">
             <h3>Delivery progress</h3>

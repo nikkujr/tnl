@@ -57,6 +57,9 @@
           ><strong>{{ customer.assignedAgentName || 'Unassigned' }}</strong></span
         >
         <span class="table-actions">
+          @if (session()!.role === 'ADMIN') {
+            <a class="row-action" [routerLink]="['/customers', customer.id]" [attr.aria-label]="'View ' + customer.fullName">View</a>
+          }
           <button class="row-action" (click)="openForm(customer)">Edit</button>
           @if (!customer.portalAccountActive && !customer.portalAccountExists) {
             <button class="row-action" (click)="invite(customer)">Invite to portal</button>

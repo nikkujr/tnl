@@ -83,6 +83,8 @@ Customer emails use a shared TNL Track HTML layout with purple branding, action 
 
 Admins can use **Reports → Performance** for monthly agent sales rankings, figures/charts, targets, fixed incentives, admin-approved bonuses, and customer ratings/reviews. Customers can review each delivered, fully paid order once from the portal. See [performance rules and acceptance](docs/PERFORMANCE.md). Run migrations before using the updated API; no targets, rewards or reviews are created automatically.
 
+In **Customers**, admins can select **View** for contact and account information, completed purchase totals, and paginated requests, orders, reviews and follow-ups. Admin order details also display the customer's saved review and link to their customer profile.
+
 **Reports → Daily / Monthly / Overall reports** includes completed sales revenue and trends, top 10 fast-selling and slow-moving products with charts and tables, top customers and packages, order/payment status breakdowns, and current low-stock products. Product movement includes saved package components; slow movers include active stocked products with zero sales. See [report definitions and checks](docs/REPORTS.md).
 
 Daily, Monthly, Overall and Performance reports include **Print / Save PDF** and **Export CSV** for the loaded report. Printing hides navigation and editing controls; CSV includes the report period, timezone, load timestamp and unformatted numerical values. See [output conventions](docs/REPORTS.md#print-and-csv).

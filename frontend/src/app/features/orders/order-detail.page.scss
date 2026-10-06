@@ -70,6 +70,12 @@
 .item-total strong { font-size: 14px; }
 
 .side-column { display: grid; gap: 20px; position: sticky; top: 20px; align-self: start; }
+.review-body { padding: 20px 22px; display: grid; gap: 12px; }
+.review-body p { margin: 0; }
+.review-body small { color: var(--muted, #667085); overflow-wrap: anywhere; }
+.review-score { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.review-score span { color: var(--green, #7167c9); font-size: 24px; }
+.review-comment { white-space: pre-wrap; overflow-wrap: anywhere; }
 .history-column { padding-bottom: 8px; }
 .history-list { padding: 6px 22px 18px; max-height: 480px; overflow-y: auto; }
 .history-item { position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding-bottom: 20px; }

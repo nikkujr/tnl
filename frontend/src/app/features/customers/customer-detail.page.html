@@ -1,0 +1,214 @@
+<div class="customer-detail-page">
+  <app-breadcrumb
+    [items]="[
+      { label: 'Dashboard', link: '/dashboard' },
+      { label: 'Customers', link: '/customers' },
+      { label: data()?.customer.fullName || 'Customer details' },
+    ]"
+  />
+  <div class="bar">
+    <div>
+      <span class="eyebrow">Customer profile</span>
+      <h2>{{ data()?.customer.fullName || 'Customer details' }}</h2>
+      <p>Contact information and the full relationship history.</p>
+    </div>
+    <a class="secondary" routerLink="/customers">Back to customers</a>
+  </div>
+  @if (error()) {
+    <div class="notice error" role="alert">
+      {{ error() }} <button type="button" (click)="load()" [disabled]="loading()">Try again</button>
+    </div>
+  }
+  @if (data(); as detail) {
+    <section class="panel contact-panel" aria-labelledby="contact-heading">
+      <h3 id="contact-heading">Contact information</h3>
+      <dl class="contact-grid">
+        <div>
+          <dt>Email</dt>
+          <dd>
+            <a [href]="'mailto:' + detail.customer.email">{{ detail.customer.email }}</a>
+          </dd>
+        </div>
+        <div>
+          <dt>Phone</dt>
+          <dd>
+            <a [href]="'tel:' + detail.customer.phone">{{ detail.customer.phone }}</a>
+          </dd>
+        </div>
+        <div>
+          <dt>Address</dt>
+          <dd>{{ detail.customer.address }}</dd>
+        </div>
+        <div>
+          <dt>Assigned agent</dt>
+          <dd>
+            @if (detail.customer.assignedAgentId) {
+              <a [routerLink]="['/agents', detail.customer.assignedAgentId]">{{
+                detail.customer.assignedAgentName
+              }}</a>
+            } @else {
+              Unassigned
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>Customer since</dt>
+          <dd>{{ detail.customer.createdAt | date: 'mediumDate' : '+0800' }}</dd>
+        </div>
+        <div>
+          <dt>Portal account</dt>
+          <dd>
+            {{
+              detail.customer.portalAccountActive
+                ? 'Active and verified'
+                : detail.customer.portalAccountExists
+                  ? 'Inactive or awaiting verification'
+                  : 'No account'
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Marketing emails</dt>
+          <dd>{{ detail.customer.marketingOptIn ? 'Opted in' : 'Not opted in' }}</dd>
+        </div>
+        @if (detail.customer.portalVerifiedAt) {
+          <div>
+            <dt>Portal verified</dt>
+            <dd>{{ detail.customer.portalVerifiedAt | date: 'medium' : '+0800' }} (UTC+8)</dd>
+          </div>
+        }
+      </dl>
+    </section>
+    <div class="summary-grid">
+      <article class="panel">
+        <small>Completed purchases</small><strong>{{ detail.summary.completedOrders }}</strong
+        ><span>Delivered and fully paid</span>
+      </article>
+      <article class="panel">
+        <small>Completed purchase value</small
+        ><strong>{{ detail.summary.completedSpend | currency: 'PHP' : 'symbol-narrow' }}</strong
+        ><span>Saved order totals</span>
+      </article>
+      <article class="panel">
+        <small>Customer feedback</small
+        ><strong>{{
+          detail.summary.averageRating == null
+            ? 'No reviews'
+            : (detail.summary.averageRating | number: '1.1-2') + ' / 5'
+        }}</strong
+        ><span>{{ detail.summary.reviewCount }} reviews across all agents and office orders</span>
+      </article>
+    </div>
+    <div class="history-tabs" role="group" aria-label="Customer history">
+      @for (tab of views; track tab.value) {
+        <button
+          type="button"
+          [class.selected]="view === tab.value"
+          [attr.aria-pressed]="view === tab.value"
+          [disabled]="loading()"
+          (click)="selectView(tab.value)"
+        >
+          {{ tab.label }} <span>{{ detail.summary[tab.count] }}</span>
+        </button>
+      }
+    </div>
+  }
+  @if (loading()) {
+    <div class="panel empty" role="status">Loading customer history…</div>
+  }
+  @if (data(); as detail) {
+    @if (!loading() && !error()) {
+      <section class="panel history-panel" [attr.aria-label]="titleCase(view)">
+        @for (record of detail.records; track record.id) {
+          <article class="history-card">
+            <div class="record-heading">
+              @if (view === 'orders') {
+                <a class="record-title" [routerLink]="['/orders', record.id]">{{
+                  record.trackingNumber
+                }}</a>
+              } @else if (record.orderId) {
+                <a class="record-title" [routerLink]="['/orders', record.orderId]">{{
+                  record.trackingNumber
+                }}</a>
+              } @else {
+                <strong>Request #{{ record.id }}</strong>
+              }
+              <small>{{ record.createdAt | date: 'medium' : '+0800' }} (UTC+8)</small>
+            </div>
+            @if (view === 'orders') {
+              <div class="record-status">
+                <span>{{ titleCase(record.orderStatus) }}</span
+                ><span>{{ titleCase(record.deliveryStatus) }}</span
+                ><span>{{ titleCase(record.paymentStatus) }}</span>
+              </div>
+              <p>
+                {{ record.total | currency: 'PHP' : 'symbol-narrow' }} · {{ record.paymentMethod }}
+              </p>
+              <p class="muted">
+                {{ record.agentName || 'Office — no agent' }} · {{ record.deliveryAddress }}
+              </p>
+            } @else if (view === 'requests') {
+              <p>
+                <span class="status">{{ titleCase(record.status) }}</span> ·
+                {{ record.total | currency: 'PHP' : 'symbol-narrow' }}
+              </p>
+              <ul>
+                @for (selection of record.selections; track $index) {
+                  <li>{{ selection.name }} × {{ selection.quantity }}</li>
+                }
+              </ul>
+              <p class="muted">
+                {{ record.agentName || 'Office — no agent' }} · {{ record.paymentMethod }} ·
+                {{ record.deliveryAddress }}
+              </p>
+              @if (record.declineReason) {
+                <p class="comment">Declined: {{ record.declineReason }}</p>
+              }
+            } @else if (view === 'reviews') {
+              <p class="review-score">
+                <span aria-hidden="true"
+                  >{{ '★'.repeat(record.rating) }}{{ '☆'.repeat(5 - record.rating) }}</span
+                >
+                <strong>{{ record.rating }} / 5</strong>
+              </p>
+              <p class="comment">{{ record.review }}</p>
+              <small>Credited to {{ record.agentName || 'Office — no agent' }}</small>
+            } @else {
+              <p class="comment">{{ record.message }}</p>
+              @if (record.reply) {
+                <div class="followup-reply">
+                  <p class="comment">{{ record.reply }}</p>
+                  <small
+                    >{{ record.repliedBy }} ·
+                    {{ record.repliedAt | date: 'medium' : '+0800' }} (UTC+8)</small
+                  >
+                </div>
+              } @else {
+                <small>Awaiting reply</small>
+              }
+            }
+          </article>
+        } @empty {
+          <div class="empty">
+            No {{ view === 'followups' ? 'follow-ups' : view }} for this customer yet.
+          </div>
+        }
+      </section>
+      @if (total > limit) {
+        <div class="pagination">
+          <button type="button" class="secondary" [disabled]="page === 1" (click)="changePage(-1)">
+            Previous</button
+          ><span>Page {{ page }} · {{ total }} records</span
+          ><button
+            type="button"
+            class="secondary"
+            [disabled]="page * limit >= total"
+            (click)="changePage(1)"
+          >
+            Next
+          </button>
+        </div>
+      }
+    }
+  }
+</div>

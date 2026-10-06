@@ -88,6 +88,7 @@ export class PortalPage {
   readonly reviewError = signal('');
   readonly reviewNotice = signal('');
   readonly ratingChoices = [1, 2, 3, 4, 5];
+  readonly ratingDescriptions = ['Select a rating', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
   orderRating = 0;
   orderReview = '';
   private detailRequest = 0;

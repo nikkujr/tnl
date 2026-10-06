@@ -492,19 +492,20 @@
             } @else if (o.canReview) {
               <p>How was your purchase{{ o.agentName ? ' and the support from ' + o.agentName : '' }}? Your feedback helps us improve our service.</p>
               <form class="fields" #reviewForm="ngForm" (ngSubmit)="reviewForm.valid && submitReview()">
-                <fieldset class="review-rating" [disabled]="reviewSaving()">
+                <fieldset class="review-rating" [disabled]="reviewSaving()" aria-describedby="rating-selection">
                   <legend>Rating</legend>
                   @for (rating of ratingChoices; track rating) {
-                    <label [class.selected]="orderRating === rating">
-                      <input type="radio" name="orderRating" [value]="rating" [(ngModel)]="orderRating" required />
-                      {{ rating }} <span aria-hidden="true">★</span><span class="rating-description">out of 5</span>
+                    <label [class.filled]="orderRating >= rating" [attr.title]="rating + ' out of 5 — ' + ratingDescriptions[rating]">
+                      <input type="radio" name="orderRating" [value]="rating" [(ngModel)]="orderRating" [attr.aria-label]="rating + ' out of 5 — ' + ratingDescriptions[rating]" required />
+                      <span class="rating-star" aria-hidden="true">★</span>
                     </label>
                   }
                 </fieldset>
+                <p id="rating-selection" class="rating-selection" aria-live="polite">{{ orderRating ? orderRating + ' out of 5 · ' + ratingDescriptions[orderRating] : 'Select a rating' }}</p>
                 <label>Review<textarea name="orderReview" [(ngModel)]="orderReview" required minlength="2" maxlength="2000" [disabled]="reviewSaving()" placeholder="Tell us about your purchase and the support you received."></textarea></label>
                 <small>Your review is shared with the admin to assess service and agent performance. Submitted reviews cannot be edited.</small>
                 @if (reviewError()) { <p class="error" role="alert">{{ reviewError() }}</p> }
-                <button class="primary" type="submit" [disabled]="reviewSaving() || reviewForm.invalid || orderRating < 1 || orderReview.trim().length < 2">{{ reviewSaving() ? 'Submitting…' : 'Submit review' }}</button>
+                <div class="review-actions"><button class="primary" type="submit" [disabled]="reviewSaving() || reviewForm.invalid || orderRating < 1 || orderReview.trim().length < 2">{{ reviewSaving() ? 'Submitting…' : 'Submit review' }}</button></div>
               </form>
             } @else { <p>You can leave a review after your order is delivered and fully paid.</p> }
           </section>

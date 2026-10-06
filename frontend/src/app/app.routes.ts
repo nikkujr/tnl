@@ -88,6 +88,11 @@ export const routes: Routes = [
       import('./features/orders/orders-list.page').then((module) => module.OrdersListPage),
   },
   {
+    path: 'customers/:id',
+    canMatch: [roleGuard(['ADMIN'])],
+    loadComponent: () => import('./features/customers/customer-detail.page').then(m => m.CustomerDetailPage),
+  },
+  {
     path: 'customers',
     canMatch: [roleGuard(['ADMIN', 'AGENT'])],
     loadComponent: () =>

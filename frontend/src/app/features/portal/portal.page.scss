@@ -139,15 +139,26 @@ button.primary:hover:not(:disabled) { background: var(--color-accent-hover, #625
 :host .order-review {
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 16px;
+  padding: 24px;
   margin: 20px 0;
 }
-.review-rating { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.order-review form { max-width: 640px; }
+.order-review textarea { min-height: 110px; resize: vertical; }
+.review-rating { border: 0; padding: 0; margin: 0; display: flex; gap: 4px; }
 .review-rating legend { margin-bottom: 8px; font-weight: 700; }
 .order-review .fields { grid-template-columns: 1fr; }
-.review-rating label { display: flex; flex-direction: row; align-items: center; gap: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
-.review-rating label.selected { border-color: var(--green); background: var(--color-accent-bg); }
-.review-rating input { width: 16px; height: 16px; padding: 0; margin: 0; accent-color: var(--green); }
-.rating-description { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.review-rating label { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; cursor: pointer; }
+.review-rating input { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip-path: inset(50%); }
+.rating-star { font-size: 36px; line-height: 1; color: var(--color-text-faint, #98a2b3); transition: color .15s; }
+.review-rating label.filled .rating-star { color: var(--green); }
+.review-rating input:focus-visible + .rating-star { outline: 2px solid var(--green); outline-offset: 4px; border-radius: 4px; }
+.review-rating:disabled { opacity: .6; }
+.rating-selection { margin: -4px 0 0; font-size: 13px; color: var(--muted); }
+.review-actions { display: flex; }
+@media (hover: hover) {
+  .review-rating:has(label:hover) .rating-star { color: var(--color-text-faint, #98a2b3); }
+  .review-rating label:hover .rating-star, .review-rating label:has(~ label:hover) .rating-star { color: var(--green); }
+}
+@media (max-width: 600px) { :host .order-review { padding: 16px; } }
 .review-score span { color: var(--green); }
 .review-comment { white-space: pre-wrap; overflow-wrap: anywhere; }

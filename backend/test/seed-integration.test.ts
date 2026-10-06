@@ -146,6 +146,36 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     const readBack = await call(`customer/orders/${reviewedOrder.id}`, reviewer);
     assert.equal(readBack.canReview, false);
     assert.equal(readBack.review.review, feedback.review.trim());
+    const adminOrder = await call(`orders/${reviewedOrder.id}`, staff.token);
+    assert.equal(adminOrder.review.review, feedback.review.trim());
+    assert.equal(adminOrder.review.agentId, reviewedOrder.agent_id);
+    const [creditedAgent] = await db.query("SELECT email FROM users WHERE id=?", [reviewedOrder.agent_id]);
+    const agentLogin = await call("auth/login", "", { email: creditedAgent[0].email, password: demoPassword });
+    assert.equal((await call(`orders/${reviewedOrder.id}`, agentLogin.token)).review, undefined);
+    await call(`customers/${reviewedOrder.customer_id}`, agentLogin.token, undefined, "GET", 403);
+    await call(`customers/${reviewedOrder.customer_id}`, reviewer, undefined, "GET", [401, 403]);
+    await call(`customers/${reviewedOrder.customer_id}`, "", undefined, "GET", 401);
+    await call("customers/invalid", staff.token, undefined, "GET", 400);
+    await call("customers/99999999", staff.token, undefined, "GET", 404);
+    for (const query of ["view=invalid", "page=0", "page=1.5", "limit=101", "limit=0"])
+      await call(`customers/${reviewedOrder.customer_id}?${query}`, staff.token, undefined, "GET", 400);
+    for (const [view, table, key] of [["orders", "orders", "orderCount"], ["requests", "customer_order_requests", "requestCount"], ["reviews", "order_reviews", "reviewCount"], ["followups", "order_followups", "followupCount"]]) {
+      // Exercise populated histories and make sure every row belongs to this customer.
+      const [owner] = await db.query(`SELECT customer_id FROM ${table} GROUP BY customer_id ORDER BY COUNT(*) DESC LIMIT 1`);
+      const ownerId = owner[0].customer_id;
+      const profile = await call(`customers/${ownerId}?view=${view}&limit=2`, staff.token);
+      assert.equal(profile.customer.id, ownerId);
+      const [rows] = await db.query(`SELECT ${view === "reviews" ? "order_id" : "id"} id FROM ${table} WHERE customer_id=?`, [ownerId]);
+      assert.equal(Number(profile.summary[key!]), rows.length);
+      assert.equal(profile.records.length, Math.min(2, rows.length));
+      assert(profile.records.every((r: any) => rows.some((row: any) => row.id === r.id)));
+      assert(!("password_hash" in profile.customer) && !("unsubscribe_token" in profile.customer));
+      if (view === "requests") assert(profile.records.every((r: any) => r.selections.length > 0 && r.total > 0));
+      if (rows.length > 2) {
+        const second = await call(`customers/${ownerId}?view=${view}&limit=2&page=2`, staff.token);
+        assert(second.records.every((r: any) => rows.some((row: any) => row.id === r.id) && !profile.records.some((first: any) => first.id === r.id)));
+      }
+    }
     await db.query("UPDATE customers SET assigned_agent_id=(SELECT id FROM users WHERE role='AGENT' AND id<>? LIMIT 1) WHERE id=?", [reviewedOrder.agent_id, reviewedOrder.customer_id]);
     const rated = await call(`performance?month=${data.periods.at(-1)}`, staff.token);
     assert.equal(rated.reviews.find((r: any) => r.orderId === reviewedOrder.id).agentId, reviewedOrder.agent_id);

@@ -219,7 +219,7 @@
                                           ? 'Products'
                                           : isInventoryPage()
                                             ? 'Inventory'
-                                            : isCustomersPage()
+                                            : isCustomersPage() || routedPath().startsWith('customers/')
                                               ? 'Customers'
                                               : routedPath() === 'packages'
                                                 ? 'Packages'

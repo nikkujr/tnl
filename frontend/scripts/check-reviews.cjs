@@ -50,7 +50,13 @@ const track = { state: 'STOPPED', serverTime: now, destination: null, position: 
       const submit = page.getByRole('button', { name: 'Submit review', exact: true });
       await submit.waitFor();
       assert(await submit.isDisabled());
-      await page.getByRole('radio', { name: '4 out of 5', exact: false }).check();
+      await page.getByTitle('4 out of 5 — Very good', { exact: true }).click();
+      await page.locator('.review-rating label.filled').nth(3).waitFor();
+      assert.equal(await page.locator('.review-rating label.filled').count(), 4);
+      await page.getByRole('radio', { name: '4 out of 5', exact: false }).press('ArrowLeft');
+      assert(await page.getByRole('radio', { name: '3 out of 5', exact: false }).isChecked());
+      await page.getByRole('radio', { name: '3 out of 5', exact: false }).press('ArrowRight');
+      assert(await page.getByRole('radio', { name: '4 out of 5', exact: false }).isChecked());
       await page.getByLabel('Review', { exact: true }).fill('=Test <script>alert("unsafe")</script> Helpful agent.');
       await submit.click();
       await page.locator('.order-review [role="alert"]').waitFor();

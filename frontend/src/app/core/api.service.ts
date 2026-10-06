@@ -116,6 +116,7 @@ export interface DeliveryEvent {
   occurredAt: string;
 }
 export interface OrderDetail extends Order {
+  review?: { rating: number; review: string; createdAt: string; agentId: number | null; agentName: string | null } | null;
   commission?: {
     amount: number;
     source: string;

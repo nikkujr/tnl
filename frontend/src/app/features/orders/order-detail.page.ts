@@ -1,7 +1,7 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, computed, DestroyRef, effect, inject, OnInit, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, OrderDetail, SessionUser } from '../../core/api.service';
 import { AppIconComponent, AppIconName } from '../../shared/app-icon.component';
 import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-dialog.component';
@@ -25,7 +25,7 @@ const HISTORY_ICONS: Record<string, AppIconName> = {
 
 @Component({
   selector: 'app-order-detail-page',
-  imports: [CurrencyPipe, DatePipe, AppIconComponent, ActionDialogComponent, BreadcrumbComponent, DeliveryPanelComponent],
+  imports: [CurrencyPipe, DatePipe, AppIconComponent, ActionDialogComponent, BreadcrumbComponent, DeliveryPanelComponent, RouterLink],
   templateUrl: './order-detail.page.html',
   styleUrls: ['./order-detail.page.scss'],
 })

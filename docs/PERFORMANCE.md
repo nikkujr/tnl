@@ -14,6 +14,8 @@ Open **Reports → Performance**, or **Agents → View team performance**. The m
 
 Customers open **My orders → Details and follow-up** in the portal to submit one 1–5 rating and a written review after delivery and full payment. Submitted reviews cannot be edited; retrying an identical submission safely returns the saved review. Customers can only see and review their own orders.
 
+The star picker supports pointer selection and keyboard arrows and displays a named score. Admins can also read the saved review in order details, or select **Customers → View → Reviews** for a customer's complete review history. The customer profile includes contact/account information, completed purchase count/value, and paginated orders, requests and follow-ups. Review cards retain original agent credit and link to the order; the current assigned agent is shown separately in contact information.
+
 The team leaderboard shows each agent's average rating and review count. **Customer feedback** shows comments, rating, customer, submission time and an order link, with filters for individual agents or office orders. The reporting month uses the review's submission date in Asia/Manila, including feedback about older purchases. Feedback stays credited to the agent on the order even when the customer is reassigned. Office orders have no agent and are excluded from agent averages. Ratings describe the purchase and service experience and do not change sales rankings, targets, commissions or awards. Agents without reviews display **No reviews**.
 
 ## Monthly targets and incentives
@@ -40,9 +42,11 @@ Backend integration tests use a disposable MySQL schema and cover mixed package/
 
 With the frontend running and Playwright/Chrome available, run `node frontend/scripts/check-performance.cjs`. `LAYOUT_URL` and `LAYOUT_OUTPUT` can override the development URL and screenshot directory. The script mocks all business APIs and covers navigation, charts and daily values, targets, incentives, bonus history/retry, empty months, and 320/390px layouts. It makes no database writes.
 
-Manual acceptance:
-
 With the frontend running and Playwright/Chrome available, run `node frontend/scripts/check-reviews.cjs` for customer eligibility, required inputs, retry and persistence, escaped comments, agent averages, feedback filters, CSV and print at desktop and 320/390px widths. All API calls use fixtures. Override the URL with `LAYOUT_URL` and optionally save screenshots with `LAYOUT_SCREENSHOT_DIR`. Backend review acceptance is included in `seed-integration.test.ts` and checks ownership, validation, workflow eligibility, concurrent submissions and agent attribution in a disposable schema.
+
+Run `node frontend/scripts/check-customer-detail.cjs` with the same environment for admin View navigation, contact/account details, each history tab, pagination, load retry, escaped review content, and customer/order links at desktop and mobile widths. The backend acceptance test also checks admin-only access, input validation and history ownership/pagination.
+
+Manual acceptance:
 
 1. Open Performance as an admin. Choose a month and compare completed sales with saved order totals; delivered unpaid orders must not count.
 2. Open daily figures and verify the date of a sale completed around midnight in Manila. Follow an agent link to their detail page.

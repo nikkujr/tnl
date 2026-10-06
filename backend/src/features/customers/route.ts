@@ -4,10 +4,14 @@ import { db } from "../../database/connection.js";
 import { authenticate, authorize } from "../../shared/auth.js";
 import { HttpError, validate } from "../../shared/http.js";
 import { normalizePhPhone } from "../../shared/phone.js";
-import { transaction } from "../../shared/transaction.js";
+import { transaction, jsonValue } from "../../shared/transaction.js";
 import { newPassword } from "../../shared/password.js";
 import { resetAccountPassword } from "../../shared/admin-password-reset.js";
 import { rateLimit } from "../../shared/rate-limit.js";
+import { saleTotalSql } from "../orders/queries.js";
+import { reportSaleSql } from "../reports/model.js";
+import { totalCents, type Sale } from "../orders/sales.js";
+import { pesos } from "../../shared/money.js";
 import {
   welcome,
   event,
@@ -95,6 +99,91 @@ router.get("/", async (req, res, next) => {
     next(error);
   }
 });
+
+router.get(
+  "/:id",
+  authorize("ADMIN"),
+  validate(z.object({
+    body: z.any(),
+    params: z.object({ id: z.coerce.number().int().positive() }),
+    query: z.object({
+      view: z.enum(["orders", "requests", "reviews", "followups"]).default("orders"),
+      page: z.coerce.number().int().positive().default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+    }),
+  })),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const view = String(req.query.view ?? "orders"), page = Number(req.query.page ?? 1), limit = Number(req.query.limit ?? 20);
+      const [contacts] = await db.query<any[]>(
+        `SELECT c.id,c.full_name fullName,c.email,c.phone,c.address,c.created_at createdAt,
+          c.marketing_opt_in marketingOptIn,c.marketing_opted_at marketingOptedAt,
+          c.assigned_agent_id assignedAgentId,u.full_name assignedAgentName,
+          ca.id IS NOT NULL portalAccountExists,
+          COALESCE(ca.active=TRUE AND ca.verified_at IS NOT NULL,FALSE) portalAccountActive,
+          ca.verified_at portalVerifiedAt
+         FROM customers c LEFT JOIN users u ON u.id=c.assigned_agent_id
+         LEFT JOIN customer_accounts ca ON ca.customer_id=c.id WHERE c.id=?`, [id],
+      );
+      if (!contacts.length) throw new HttpError(404, "Customer not found");
+      const [totals] = await db.query<any[]>(
+        `SELECT COUNT(*) orderCount,COALESCE(SUM(${reportSaleSql}),0) completedOrders,
+          COALESCE(SUM(IF(${reportSaleSql},${saleTotalSql("o")},0)),0) completedSpend
+         FROM orders o WHERE o.customer_id=?`, [id],
+      );
+      const [counts] = await db.query<any[]>(
+        `SELECT (SELECT COUNT(*) FROM customer_order_requests WHERE customer_id=?) requestCount,
+          (SELECT COUNT(*) FROM order_reviews WHERE customer_id=?) reviewCount,
+          (SELECT ROUND(AVG(rating),2) FROM order_reviews WHERE customer_id=?) averageRating,
+          (SELECT COUNT(*) FROM order_followups WHERE customer_id=?) followupCount`, [id, id, id, id],
+      );
+      const summary = { ...totals[0], ...counts[0] };
+      const args = [id, limit, (page - 1) * limit];
+      let records: any[];
+      if (view === "orders") {
+        [records] = await db.query<any[]>(
+          `SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,
+            o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,
+            o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName,
+            ${saleTotalSql("o")} total FROM orders o LEFT JOIN users u ON u.id=o.agent_id
+           WHERE o.customer_id=? ORDER BY o.created_at DESC,o.id DESC LIMIT ? OFFSET ?`, args,
+        );
+      } else if (view === "requests") {
+        const [rows] = await db.query<any[]>(
+          `SELECT r.id,r.status,r.delivery_address deliveryAddress,r.payment_method paymentMethod,
+            r.decline_reason declineReason,r.created_at createdAt,r.snapshot,r.order_id orderId,
+            o.tracking_number trackingNumber,u.full_name agentName
+           FROM customer_order_requests r LEFT JOIN users u ON u.id=r.agent_id
+           LEFT JOIN orders o ON o.id=r.order_id WHERE r.customer_id=?
+           ORDER BY r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`, args,
+        );
+        records = rows.map(({ snapshot, ...r }) => {
+          const sale = jsonValue<Sale>(snapshot);
+          return { ...r, total: pesos(totalCents(sale)),
+            selections: [...sale.items.map(i => ({ name: i.productName, quantity: i.quantity })),
+              ...sale.packages.map(p => ({ name: p.name, quantity: p.quantity }))] };
+        });
+      } else if (view === "reviews") {
+        [records] = await db.query<any[]>(
+          `SELECT r.order_id id,r.order_id orderId,o.tracking_number trackingNumber,
+            r.rating,r.review,r.created_at createdAt,r.agent_id agentId,u.full_name agentName
+           FROM order_reviews r JOIN orders o ON o.id=r.order_id LEFT JOIN users u ON u.id=r.agent_id
+           WHERE r.customer_id=? ORDER BY r.created_at DESC,r.order_id DESC LIMIT ? OFFSET ?`, args,
+        );
+      } else {
+        [records] = await db.query<any[]>(
+          `SELECT f.id,f.order_id orderId,o.tracking_number trackingNumber,f.message,f.reply,
+            f.created_at createdAt,f.replied_at repliedAt,u.full_name repliedBy
+           FROM order_followups f JOIN orders o ON o.id=f.order_id LEFT JOIN users u ON u.id=f.replied_by
+           WHERE f.customer_id=? ORDER BY f.created_at DESC,f.id DESC LIMIT ? OFFSET ?`, args,
+        );
+      }
+      const countKey = view === "orders" ? "orderCount" : view === "requests" ? "requestCount" : view === "reviews" ? "reviewCount" : "followupCount";
+      res.json({ data: { customer: contacts[0], summary, records }, meta: { page, limit, total: summary[countKey] } });
+    } catch (error) { next(error); }
+  },
+);
 
 const createSchema = z.object({
   body: z.object({

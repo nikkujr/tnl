@@ -221,6 +221,14 @@ router.get(
         [id],
       );
       const sale = await readSale(db, id);
+      let review = null;
+      if (req.user!.role === "ADMIN") {
+        const [reviews] = await db.query<any[]>(
+          `SELECT r.rating,r.review,r.created_at createdAt,r.agent_id agentId,u.full_name agentName
+           FROM order_reviews r LEFT JOIN users u ON u.id=r.agent_id WHERE r.order_id=?`, [id],
+        );
+        review = reviews[0] ?? null;
+      }
       const [commissions] = await db.query<any[]>(
         "SELECT amount,source,breakdown FROM commissions WHERE order_id=?",
         [id],
@@ -232,6 +240,7 @@ router.get(
           total: pesos(totalCents(sale)),
           history,
           deliveryEvents,
+          ...(req.user!.role === "ADMIN" ? { review } : {}),
           commission: commissions[0]
             ? {
                 ...commissions[0],
