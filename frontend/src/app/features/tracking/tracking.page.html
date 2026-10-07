@@ -24,6 +24,9 @@
         }}</span>
       </div>
       <div class="timeline">
+        @if (data.sla?.dueAt) {
+          <app-delivery-sla [sla]="data.sla" [customer]="true" />
+        }
         @if (data.deliveryStatus !== 'DELIVERED') {
           <p><strong>Estimated arrival:</strong> {{ data.estimatedDeliveryAt ? (data.estimatedDeliveryAt | date: 'MMM d, y, h:mm a' : '+0800') + ' (Philippine time)' : 'Awaiting a delivery schedule.' }}</p>
           @if (data.estimatedDeliveryAt) {

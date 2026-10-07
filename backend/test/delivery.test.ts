@@ -17,7 +17,16 @@ import mysql from "mysql2/promise";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import sharp from "sharp";
-import { positionState } from "../src/features/delivery/model.js";
+import { positionState, deliverySla } from "../src/features/delivery/model.js";
+test("delivery SLA uses the saved deadline, exact completion boundary, and server time", () => {
+  const due = new Date("2026-10-07T08:00:00Z"), now = due.getTime();
+  assert.equal(deliverySla(null, null, false, now).state, "NOT_SET");
+  assert.equal(deliverySla(due, null, true, now).state, "NOT_SET");
+  assert.equal(deliverySla(due, null, false, now).state, "ON_TRACK");
+  assert.equal(deliverySla(due, null, false, now + 1).state, "OVERDUE");
+  assert.equal(deliverySla(due, new Date(now), true, now + 60000).state, "MET");
+  assert.deepEqual(deliverySla(due, new Date(now + 90000), true, now + 3600000), { state: "BREACHED", dueAt: due, minutes: 2 });
+});
 test("position age uses both acquisition and receipt time", () => {
   const now = Date.now();
   assert.equal(positionState(new Date(now), new Date(now), now), "LIVE");
@@ -64,7 +73,7 @@ test(
         await db.query(statement);
       // Exercise an installed database's old enum as well as repeatable additive upgrades.
       await db.query(
-        "ALTER TABLE orders DROP COLUMN delivery_employee_id,DROP COLUMN delivery_assignment_version,DROP COLUMN destination_latitude,DROP COLUMN destination_longitude,DROP COLUMN estimated_delivery_at",
+        "ALTER TABLE orders DROP COLUMN delivery_employee_id,DROP COLUMN delivery_assignment_version,DROP COLUMN destination_latitude,DROP COLUMN destination_longitude,DROP COLUMN estimated_delivery_at,DROP COLUMN delivery_sla_due_at",
       );
       await db.query(
         "ALTER TABLE users MODIFY role ENUM('ADMIN','AGENT') NOT NULL",
@@ -257,6 +266,7 @@ test(
         const order = await create(false);
         const path = `orders/${order}/delivery-estimate`;
         assert.equal((await call(`customer/orders/${order}/delivery`, "GET", undefined, owner)).estimatedDeliveryAt, null);
+        assert.equal((await call(`customer/orders/${order}/delivery`, "GET", undefined, owner)).sla.state, "NOT_SET");
         await call(`orders/${order}/delivery-status`, "PATCH", { assignmentVersion: 0, deliveryStatus: "DISPATCHED" }, a, 400);
         await call(`orders/${order}/delivery-status`, "PATCH", { assignmentVersion: 0, deliveryStatus: "IN_TRANSIT" }, a, 400);
         await assign(order, 3);
@@ -269,18 +279,34 @@ test(
         await call(path, "PATCH", { assignmentVersion: 0, estimatedDeliveryAt: eta }, a, 409);
         const offsetEta = new Date(Date.parse(eta) + 8 * 3600000).toISOString().replace("Z", "+08:00");
         const started = await call(`delivery/orders/${order}/start`, "POST", { assignmentVersion: 1, estimatedDeliveryAt: offsetEta }, driver);
+        assert.equal((await call(`delivery/orders/${order}`, "GET", undefined, driver)).sla.dueAt, eta);
         assert.equal((await call(`customer/orders/${order}/delivery`, "GET", undefined, owner)).estimatedDeliveryAt, eta);
         const revised = new Date(Date.parse(eta) + 3600000).toISOString();
         await call(path, "PATCH", { assignmentVersion: 1, estimatedDeliveryAt: revised });
+        assert.equal((await call(`customer/orders/${order}/delivery-tracking`, "GET", undefined, owner)).sla.dueAt, eta);
         assert.equal((await call(`customer/orders/${order}/delivery-tracking`, "GET", undefined, owner)).estimatedDeliveryAt, revised);
         assert.equal((await call("tracking/" + (await call(`orders/${order}`)).trackingNumber, "GET", undefined, "")).estimatedDeliveryAt, revised);
         await call(`customer/orders/${order}/delivery`, "GET", undefined, customer(2), 404);
         await call(`customer/orders/${order}/delivery-tracking`, "GET", undefined, customer(2), 404);
         await call(`delivery/orders/${order}/pause`, "POST", { assignmentVersion: 1, attemptId: started.attemptId }, driver);
-        await call(`orders/${order}/delivery-status`, "PATCH", { assignmentVersion: 1, deliveryStatus: "DELIVERED", recipientName: "Customer", exceptionReason: "Office handoff without a camera" });
-        await call(path, "PATCH", { assignmentVersion: 1, estimatedDeliveryAt: futureEstimate() }, a, 409);
+        await assign(order, 4, 1);
+        await assign(order, 3, 2);
+        assert.equal((await call(`delivery/orders/${order}`, "GET", undefined, driver)).sla.dueAt, eta);
+        const overdue = new Date(Math.floor(Date.now() / 1000) * 1000 - 60000);
+        await db.execute("UPDATE orders SET delivery_sla_due_at=? WHERE id=?", [overdue, order]);
+        await call(path, "PATCH", { assignmentVersion: 3, estimatedDeliveryAt: futureEstimate() });
+        assert.equal((await call(`customer/orders/${order}/delivery-tracking`, "GET", undefined, owner)).sla.state, "OVERDUE");
+        assert.equal((await call("delivery/dispatch")).find((j: any) => j.id === order).sla.state, "OVERDUE");
+        await call(`orders/${order}/delivery-status`, "PATCH", { assignmentVersion: 3, deliveryStatus: "DELIVERED", recipientName: "Customer", exceptionReason: "Office handoff without a camera" });
+        const sla = (await call(`customer/orders/${order}/delivery`, "GET", undefined, owner)).sla;
+        assert.equal(sla.state, "BREACHED");
+        assert(sla.minutes >= 1);
+        assert.equal((await call("tracking/" + (await call(`orders/${order}`)).trackingNumber, "GET", undefined, "")).sla.state, "BREACHED");
+        await call(path, "PATCH", { assignmentVersion: 3, estimatedDeliveryAt: futureEstimate() }, a, 409);
         const [[audit]] = await db.query("SELECT COUNT(*) count FROM order_events WHERE order_id=? AND type='DELIVERY_ESTIMATE_UPDATED'", [order]);
-        assert.equal(audit.count, 2);
+        assert.equal(audit.count, 3);
+        const [[slaAudit]] = await db.query("SELECT COUNT(*) count FROM order_events WHERE order_id=? AND type='DELIVERY_SLA_STARTED'", [order]);
+        assert.equal(slaAudit.count, 1);
       });
       const o = await create(),
         o2 = await create();

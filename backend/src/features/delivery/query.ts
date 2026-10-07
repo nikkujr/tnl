@@ -1,12 +1,13 @@
 import { db } from "../../database/connection.js";
 import type { SessionUser } from "../../shared/auth.js";
 import { HttpError } from "../../shared/http.js";
-import { positionState } from "./model.js";
+import { positionState, deliverySla } from "./model.js";
 import type { PoolConnection } from "mysql2/promise";
 import { transaction, jsonValue } from "../../shared/transaction.js";
 import type { Component } from "../orders/sales.js";
 type Viewer = SessionUser | { role: "CUSTOMER"; customerId: number };
 type Reader = typeof db | PoolConnection;
+const completedAtSql = "COALESCE(dc.completed_at,(SELECT MAX(e.occurred_at) FROM delivery_events e WHERE e.order_id=o.id AND e.status='DELIVERED'))";
 export async function privateRead<T>(
   id: number,
   user: Viewer,
@@ -42,9 +43,10 @@ export async function tracking(id: number, c: Reader = db) {
   // One statement gives a consistent assignment/session/position view during reassignment.
   const [rows] = await c.query<any[]>(
     `SELECT o.destination_latitude latitude,o.destination_longitude longitude,
- o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,u.full_name employeeName,a.id attemptId,s.id sessionId,
+ o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,o.delivery_sla_due_at slaDueAt,${completedAtSql} completedAt,u.full_name employeeName,a.id attemptId,s.id sessionId,
  p.latitude positionLatitude,p.longitude positionLongitude,p.accuracy,p.observed_at observedAt,p.received_at receivedAt
  FROM orders o LEFT JOIN users u ON u.id=o.delivery_employee_id
+ LEFT JOIN delivery_completions dc ON dc.order_id=o.id
  LEFT JOIN delivery_active_jobs j ON j.order_id=o.id LEFT JOIN delivery_attempts a ON a.id=j.attempt_id
  LEFT JOIN delivery_location_sessions s ON s.attempt_id=a.id AND s.ended_at IS NULL AND s.expires_at>? AND s.token_version=u.token_version AND u.active=TRUE
  LEFT JOIN delivery_latest_positions p ON p.session_id=s.id WHERE o.id=?`,
@@ -62,6 +64,7 @@ export async function tracking(id: number, c: Reader = db) {
     serverTime: new Date(now).toISOString(),
     deliveryStatus: r?.deliveryStatus ?? null,
     estimatedDeliveryAt: r?.estimatedDeliveryAt ?? null,
+    sla: deliverySla(r?.slaDueAt ?? null, r?.completedAt ?? null, r?.deliveryStatus === "DELIVERED", now),
     employeeName: r?.employeeName ?? null,
     destination:
       r?.latitude != null
@@ -81,17 +84,20 @@ export async function tracking(id: number, c: Reader = db) {
 export async function orderList(user: SessionUser, page = 1) {
   const [rows] = await db.query<any[]>(
     `SELECT o.id,o.tracking_number trackingNumber,o.delivery_address address,
- o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,o.order_status orderStatus,o.delivery_employee_id employeeId,
+ o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,o.delivery_sla_due_at slaDueAt,${completedAtSql} completedAt,o.order_status orderStatus,o.delivery_employee_id employeeId,
  o.delivery_assignment_version assignmentVersion,o.destination_latitude latitude,o.destination_longitude longitude,
  c.full_name recipientName,c.phone recipientPhone,u.full_name employeeName,j.attempt_id attemptId,
  (SELECT COUNT(*) FROM delivery_issues i WHERE i.order_id=o.id AND i.resolved_at IS NULL) issueCount
  FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.delivery_employee_id
+ LEFT JOIN delivery_completions dc ON dc.order_id=o.id
  LEFT JOIN delivery_active_jobs j ON j.order_id=o.id
  WHERE o.origin='LIVE' AND o.order_status IN ('APPROVED','COMPLETED') ${user.role === "DELIVERY" ? "AND o.delivery_employee_id=?" : ""}
  ORDER BY (j.attempt_id IS NOT NULL) DESC,(o.delivery_status='DELIVERED'),o.approved_at DESC,o.id DESC LIMIT 100 OFFSET ?`,
     user.role === "DELIVERY" ? [user.id, (page - 1) * 100] : [(page - 1) * 100],
   );
-  return rows;
+  return rows.map(({ slaDueAt, completedAt, ...job }) => ({
+    ...job, sla: deliverySla(slaDueAt, completedAt, job.deliveryStatus === "DELIVERED"),
+  }));
 }
 export async function orderDetail(o: any, user: Viewer, c: Reader = db) {
   const [rows] = await c.query<any[]>(
@@ -127,6 +133,7 @@ export async function orderDetail(o: any, user: Viewer, c: Reader = db) {
     [o.id],
   );
   if (proof[0] && user.role !== "ADMIN") delete proof[0].exceptionReason;
+  const latestTracking = await tracking(o.id, c);
   const detail = {
     ...rows[0],
     items,
@@ -134,7 +141,8 @@ export async function orderDetail(o: any, user: Viewer, c: Reader = db) {
     history,
     issues,
     completion: proof[0] ?? null,
-    tracking: await tracking(o.id, c),
+    sla: latestTracking.sla,
+    tracking: latestTracking,
   };
   if (user.role === "CUSTOMER") {
     delete detail.recipientPhone;

@@ -39,3 +39,21 @@ export function positionState(
   );
   return age > 600000 ? "UNAVAILABLE" : age > 60000 ? "STALE" : "LIVE";
 }
+export function deliverySla(
+  dueAt: Date | string | null,
+  completedAt: Date | string | null,
+  delivered: boolean,
+  now = Date.now(),
+) {
+  const due = dueAt ? new Date(dueAt).getTime() : NaN;
+  const completed = completedAt ? new Date(completedAt).getTime() : NaN;
+  if (!Number.isFinite(due) || (delivered && !Number.isFinite(completed)))
+    return { state: "NOT_SET" as const, dueAt, minutes: null };
+  const difference = (delivered ? completed : now) - due;
+  return {
+    state: delivered ? (difference > 0 ? "BREACHED" as const : "MET" as const)
+      : (difference > 0 ? "OVERDUE" as const : "ON_TRACK" as const),
+    dueAt,
+    minutes: Math.ceil(Math.abs(difference) / 60000),
+  };
+}

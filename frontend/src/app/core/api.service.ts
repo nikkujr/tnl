@@ -130,6 +130,7 @@ export interface OrderDetail extends Order {
   deliveryEvents: DeliveryEvent[];
 }
 export interface TrackingResult {
+  sla: import('../features/delivery/delivery-api.service').DeliverySla;
   trackingNumber: string;
   orderStatus: string;
   deliveryStatus: string | null;

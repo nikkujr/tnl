@@ -8,6 +8,8 @@ numbers and street numbers are fictional; customer and lead emails use
 
 ## Load or reset
 
+Delivery SLA examples include deliveries on track, overdue deliveries with a revised ETA, on-time handoffs and late handoffs. The original deliver-by deadline stays independent of the customer-facing estimate.
+
 Dispatched demo orders include an estimated arrival: pending deliveries use a future date/time relative to seeding, and completed deliveries retain their historical estimate. The portal and tracking pages show estimates in Philippine time.
 
 Configure `backend/.env` for a dedicated demo database, then run from `backend/`:

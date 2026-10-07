@@ -46,6 +46,13 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
       assert.equal(await count("order_followups"), 16);
       assert.equal(await count("delivery_active_jobs"), 2);
       assert.equal(await count("delivery_completions"), 264);
+      const [slaStates] = await db.query(`SELECT
+        SUM(o.delivery_status='DELIVERED' AND dc.completed_at<=o.delivery_sla_due_at) met,
+        SUM(o.delivery_status='DELIVERED' AND dc.completed_at>o.delivery_sla_due_at) breached,
+        SUM(o.delivery_status<>'DELIVERED' AND o.delivery_sla_due_at<UTC_TIMESTAMP()) overdue,
+        SUM(o.delivery_status<>'DELIVERED' AND o.delivery_sla_due_at>UTC_TIMESTAMP()) onTrack
+        FROM orders o LEFT JOIN delivery_completions dc ON dc.order_id=o.id`);
+      for (const total of Object.values(slaStates[0])) assert(Number(total) > 0);
       const [unsafeRuns] = await db.query("SELECT id FROM automation_runs WHERE state IN ('PENDING','PROCESSING')");
       assert.equal(unsafeRuns.length, 0);
       const [enabled] = await db.query("SELECT workflow FROM automation_settings WHERE enabled=TRUE");

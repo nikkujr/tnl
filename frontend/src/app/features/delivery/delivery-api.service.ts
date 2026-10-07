@@ -6,7 +6,13 @@ export interface Coordinate {
   latitude: number;
   longitude: number;
 }
+export interface DeliverySla {
+  state: 'NOT_SET' | 'ON_TRACK' | 'OVERDUE' | 'MET' | 'BREACHED';
+  dueAt: string | null;
+  minutes: number | null;
+}
 export interface DeliveryTracking {
+  sla: DeliverySla;
   state: 'LIVE' | 'STALE' | 'UNAVAILABLE' | 'STOPPED';
   serverTime: string;
   employeeName: string | null;
@@ -23,6 +29,7 @@ export interface DeliveryEmployee {
   active: boolean;
 }
 export interface DeliveryJob {
+  sla: DeliverySla;
   id: number;
   trackingNumber: string;
   address: string;

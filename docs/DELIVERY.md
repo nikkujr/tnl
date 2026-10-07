@@ -6,6 +6,14 @@ Order details group employee assignment and milestone buttons under **Dispatch &
 
 ## Workflow and invariants
 
+### Delivery SLA and deliver-by promise
+
+The first move out of PREPARING into DISPATCHED (or a later traveling stage) saves the current estimate as the order's fixed **Deliver by** deadline. This is TNL's delivery SLA. The deadline survives estimate revisions, pauses, issues and employee reassignment. It is saved in the same transaction as dispatch and audited once; a failed dispatch saves neither the milestone nor the deadline.
+
+Staff queues/details, the customer portal and public tracking show **On track**, **Overdue**, **Delivered on time**, or **Delivered late**, with the original deadline in Philippine time. Open deliveries show minutes/hours remaining or overdue. Completion compares the recorded handoff time to the deadline; delivery exactly at the deadline meets the SLA. Completion freezes the result regardless of subsequent time or payment changes. Existing orders without a recorded SLA remain **Not measured**; migrations do not invent promises or delivery outcomes. Preparation and direct office handoffs are not measured by this dispatch SLA.
+
+Queue filters **Overdue** and **Delivered late** apply to the currently loaded page, like the existing delivery filters. Issues and pauses do not pause the deadline. Customer estimates can still be revised to explain the expected arrival without changing SLA performance. The demo seed includes all four measured outcomes. This feature tracks delivery commitments; it does not create compensation, vouchers or refunds.
+
 Dispatching requires a future **Estimated arrival** date and time. Admins enter it in dispatch controls or save/revise it with **Save estimate**; employees confirm it when starting a PREPARING order. The portal, tracking-number page, agent view and delivery queue show the estimate in Philippine time (UTC+08:00). Customers receive revisions through private tracking polling and see an explicit message when the estimate has passed. Estimates are guidance, not guarantees, and are stored in UTC separately from actual delivery completion. Existing unscheduled orders display **Awaiting a delivery schedule**; no arrival time is invented for them.
 
 Admins open **View proof of delivery** from completed dispatch cards or the completed order's action bar. Evidence appears above the map with recipient, completion time, employee and the authenticated photo. Expired photos, admin exceptions and older orders without recorded evidence have explicit messages.
@@ -21,6 +29,8 @@ Employee completion requires recipient name and a staged photo. Admins can uploa
 ## HTTP contract
 
 All paths below have `/api/v1` as their prefix, use bearer authentication, and wrap JSON in `data`. Private reads send `Cache-Control: no-store`. Binary reads return `image/jpeg`. General `/orders` remains restricted to ADMIN/AGENT.
+
+Delivery list/detail/tracking and public tracking include `sla: {state,dueAt,minutes}`. State is `NOT_SET`, `ON_TRACK`, `OVERDUE`, `MET` or `BREACHED`; dueAt is nullable UTC and minutes is nullable. Open deliveries measure time to/past the deadline; completed deliveries measure the difference between deadline and recorded completion. Private tracking also supplies serverTime; labels refresh through existing polling.
 
 | Endpoint | Audience and request |
 |---|---|

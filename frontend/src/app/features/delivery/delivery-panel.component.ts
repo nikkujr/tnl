@@ -22,9 +22,10 @@ import {
   Coordinate,
 } from './delivery-api.service';
 import { DeliveryMapComponent, MapPoint } from './delivery-map.component';
+import { DeliverySlaComponent } from './delivery-sla.component';
 @Component({
   selector: 'app-delivery-panel',
-  imports: [DatePipe, TitleCasePipe, FormsModule, DeliveryMapComponent],
+  imports: [DatePipe, TitleCasePipe, FormsModule, DeliveryMapComponent, DeliverySlaComponent],
   templateUrl: './delivery-panel.component.html',
   styleUrl: './delivery.scss',
 })

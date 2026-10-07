@@ -17,6 +17,9 @@
       <strong>{{ (d.deliveryStatus || 'Not started').replaceAll('_', ' ') | titlecase }}</strong
       ><span>Employee: {{ d.employeeName || 'Awaiting assignment' }}</span>
     </div>
+    @if (!customer || track()?.sla?.dueAt) {
+      <app-delivery-sla [sla]="track()?.sla ?? null" [customer]="customer" />
+    }
     @if (d.deliveryStatus !== 'DELIVERED') {
       <div class="delivery-estimate" aria-label="Delivery estimate">
         <span class="eyebrow">Estimated arrival</span>

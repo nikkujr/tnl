@@ -208,6 +208,20 @@ textarea {
 .delivery-card h3 {
   font-size: 18px;
 }
+.delivery-sla {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--color-border, #d8deea);
+  border-radius: 12px;
+  background: var(--color-surface-alt, #f3f5fa);
+}
+.delivery-sla p { margin: 0; font-size: 13px; line-height: 1.6; }
+.sla-status { justify-self: start; border-radius: 16px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
+.sla-status.on_track, .sla-status.met { background: var(--status-success-bg, #e2f1ea); color: var(--status-success-text, #2b654e); }
+.sla-status.overdue, .sla-status.breached { background: var(--status-danger-bg, #fff0f3); color: var(--status-danger-text, #a44355); }
+.sla-status.not_set { background: var(--color-border, #e2e7f0); color: var(--color-text, #1c2540); }
 .job-status {
   font-size: 12px;
   color: #465fff;

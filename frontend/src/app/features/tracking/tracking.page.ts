@@ -4,10 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, TrackingResult } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { DeliverySlaComponent } from '../delivery/delivery-sla.component';
 
 @Component({
   selector: 'app-tracking-page',
-  imports: [DatePipe, FormsModule, BreadcrumbComponent],
+  imports: [DatePipe, FormsModule, BreadcrumbComponent, DeliverySlaComponent],
   templateUrl: './tracking.page.html',
   styleUrl: './tracking.page.scss'
 })

@@ -23,6 +23,14 @@ async function main() {
     let destination = { latitude: 13.77, longitude: 122.98 };
     let milestone = 'PREPARING';
     let estimatedDeliveryAt = null;
+    let slaDueAt = null;
+    const sla = () => ({
+      state: !slaDueAt ? 'NOT_SET' : completed
+        ? (Date.now() > Date.parse(slaDueAt) ? 'BREACHED' : 'MET')
+        : (Date.now() > Date.parse(slaDueAt) ? 'OVERDUE' : 'ON_TRACK'),
+      dueAt: slaDueAt,
+      minutes: slaDueAt ? Math.ceil(Math.abs(Date.now() - Date.parse(slaDueAt)) / 60000) : null,
+    });
     const futureEstimate = () => new Date(Date.now() + 12 * 3600000).toISOString().slice(0, 16);
     let proofState = 'AVAILABLE',
       hasEvidence = true;
@@ -35,6 +43,7 @@ async function main() {
       recipientPhone: '09171234567',
       deliveryStatus: completed ? 'DELIVERED' : milestone,
       estimatedDeliveryAt,
+      sla: sla(),
       assignmentVersion: 1,
       employeeId: 3,
       employeeName: 'Delivery Employee',
@@ -44,6 +53,7 @@ async function main() {
     const tracking = () => ({
       state: shared ? (latest ? 'LIVE' : 'UNAVAILABLE') : 'STOPPED',
       serverTime: now(),
+      sla: sla(),
       deliveryStatus: job().deliveryStatus,
       estimatedDeliveryAt,
       employeeName: 'Delivery Employee',
@@ -237,11 +247,12 @@ async function main() {
         delete data.recipientPhone;
       }
       if (p === 'customer/orders/1/delivery-tracking') data = tracking();
-      if (p === 'tracking/TN-DELIVERY-001') data = { trackingNumber: job().trackingNumber, orderStatus: 'APPROVED', deliveryStatus: milestone, estimatedDeliveryAt, events: [] };
+      if (p === 'tracking/TN-DELIVERY-001') data = { trackingNumber: job().trackingNumber, orderStatus: 'APPROVED', deliveryStatus: milestone, estimatedDeliveryAt, sla: sla(), events: [] };
       if (p.endsWith('/start') && !p.endsWith('/tracking/start')) {
         if (milestone === 'PREPARING') {
           estimatedDeliveryAt = new Date(request.postDataJSON().estimatedDeliveryAt).toISOString();
           assert(Date.parse(estimatedDeliveryAt) > Date.now());
+          slaDueAt ||= estimatedDeliveryAt;
         }
         active = true;
         if (milestone === 'PREPARING') milestone = 'DISPATCHED';
@@ -295,6 +306,7 @@ async function main() {
         const body = request.postDataJSON();
         milestone = body.deliveryStatus;
         if (body.estimatedDeliveryAt) estimatedDeliveryAt = new Date(body.estimatedDeliveryAt).toISOString();
+        if (milestone === 'DISPATCHED') slaDueAt ||= estimatedDeliveryAt;
       }
       if (p === 'orders/1/delivery-estimate') estimatedDeliveryAt = new Date(request.postDataJSON().estimatedDeliveryAt).toISOString();
       if (p === 'delivery-employees')
@@ -366,6 +378,7 @@ async function main() {
     await page.getByLabel('Estimated arrival (Philippine time)', { exact: true }).fill(futureEstimate());
     await page.getByRole('button', { name: 'Start delivery', exact: true }).click();
     await page.getByRole('button', { name: 'Share live location', exact: true }).waitFor();
+    await page.getByText('On track', { exact: true }).waitFor();
     await page.evaluate(() => (window.fixtureDenied = true));
     await page.getByRole('button', { name: 'Share live location', exact: true }).click();
     await page
@@ -485,6 +498,7 @@ async function main() {
       { width: 320, height: 700 },
     ]) {
       milestone = 'PREPARING';
+      slaDueAt = null;
       await page.setViewportSize(viewport);
       await page.goto(base + '/orders/1');
       const map = page.locator('app-delivery-panel .leaflet-container');
@@ -606,9 +620,6 @@ async function main() {
       );
       assert(await page.getByRole('button', { name: 'Mark dispatched', exact: true }).isVisible());
       await page.getByLabel('Estimated arrival (Philippine time)', { exact: true }).fill(futureEstimate());
-      await page.getByRole('button', { name: 'Save estimate', exact: true }).click();
-      await page.getByText('Estimated delivery updated for the customer.', { exact: true }).waitFor();
-      assert(Date.parse(estimatedDeliveryAt) > Date.now());
       await page.getByRole('button', { name: 'Save estimate', exact: true }).click();
       await page.getByText('Estimated delivery updated for the customer.', { exact: true }).waitFor();
       assert(Date.parse(estimatedDeliveryAt) > Date.now());
@@ -776,17 +787,23 @@ async function main() {
     await page.locator('.location-status.live').waitFor();
     await page.locator('.leaflet-container').waitFor();
     const arrival = page.getByLabel('Delivery estimate', { exact: true });
+    const promise = page.getByLabel('Delivery SLA', { exact: true });
+    const promisedDate = await promise.locator('strong').textContent();
     assert((await arrival.textContent()).includes('Philippine time'));
     assert.equal(await page.getByLabel('Estimated arrival (Philippine time)', { exact: true }).count(), 0);
     estimatedDeliveryAt = new Date(Date.now() + 7 * 3600000).toISOString();
     await page.clock.runFor(11000);
     const expectedArrival = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(estimatedDeliveryAt)).replace(' at ', ', ');
     assert((await arrival.textContent()).includes(expectedArrival), 'Customer did not receive the revised arrival estimate');
-    if (process.env.LAYOUT_SCREENSHOT_DIR) await arrival.screenshot({ path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'customer-arrival.png') });
+    assert.equal(await promise.locator('strong').textContent(), promisedDate, 'ETA revision moved the SLA deadline');
     if (process.env.LAYOUT_SCREENSHOT_DIR) await arrival.screenshot({ path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'customer-arrival.png') });
     estimatedDeliveryAt = new Date(Date.now() - 60000).toISOString();
     await page.clock.runFor(11000);
     await page.getByText('The estimated arrival time has passed. Please contact us for an update.', { exact: true }).waitFor();
+    slaDueAt = new Date(Date.now() - 90 * 60000).toISOString();
+    await page.clock.runFor(11000);
+    await promise.getByText('Overdue', { exact: true }).waitFor();
+    if (process.env.LAYOUT_SCREENSHOT_DIR) await promise.screenshot({ path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'customer-sla-overdue.png') });
     assert.equal(
       await page.getByRole('button', { name: 'Place destination pin', exact: true }).count(),
       0,
@@ -801,6 +818,7 @@ async function main() {
     latest = null;
     await page.clock.runFor(11000);
     await page.getByRole('heading', { name: 'Delivery completed', exact: true }).waitFor();
+    await promise.getByText('Delivered late', { exact: true }).waitFor();
     const proof = page.locator('img[alt="Proof of delivery"]');
     await proof.waitFor();
     await page
@@ -827,6 +845,21 @@ async function main() {
         path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'customer-delivery-390.png'),
         fullPage: true,
       });
+    await page.evaluate(() => {
+      sessionStorage.setItem('tnl_access_token', 'admin-fixture');
+      sessionStorage.setItem('tnl_user', JSON.stringify({ id: 1, role: 'ADMIN', fullName: 'Admin', email: 'admin@example.test' }));
+    });
+    await page.setViewportSize({ width: 320, height: 700 });
+    await page.goto(base + '/dispatch');
+    await page.getByText('Delivered late', { exact: true }).first().waitFor();
+    await page.getByRole('button', { name: 'Overdue', exact: true }).click();
+    await page.locator('.delivery-card').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('.delivery-card').count(), 0);
+    await page.getByRole('button', { name: 'Delivered late', exact: true }).click();
+    await page.locator('.delivery-card').waitFor();
+    assert.equal(await page.locator('.delivery-card').count(), 1);
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'SLA filters overflow on mobile');
+    if (process.env.LAYOUT_SCREENSHOT_DIR) await page.locator('.delivery-card').screenshot({ path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'dispatch-sla-320.png') });
     assert.deepEqual(errors, []);
     console.log(
       'PASS: Delivery routing, no management prefetch (including edit links), responsive maps/fallback, denied GPS, hidden/resumed tracking, photo retry/completion, expired sessions, admin employee forms, visible dispatch refresh, and private customer location/proof.',

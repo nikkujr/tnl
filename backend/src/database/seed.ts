@@ -112,8 +112,12 @@ export async function seedDefenseData(data: DemoData, reset = false) {
       orderIds.set(o.id, id);
       if (o.deliveryStatus && o.deliveryStatus !== "PREPARING") {
         const estimate = o.deliveryStatus === "DELIVERED" ? o.deliveryChangedAt! : new Date(data.now.getTime() + (2 + o.id % 6) * 3600000);
-        await c.execute("UPDATE orders SET estimated_delivery_at=? WHERE id=?", [estimate, id]);
+        const due = o.deliveryStatus === "DELIVERED"
+          ? new Date(estimate.getTime() + (o.id % 4 === 0 ? -90 : 30) * 60000)
+          : o.id % 3 === 0 ? new Date(data.now.getTime() - (30 + o.id % 120) * 60000) : estimate;
+        await c.execute("UPDATE orders SET estimated_delivery_at=?,delivery_sla_due_at=? WHERE id=?", [estimate, due, id]);
         await orderEvent(id, adminId, "DELIVERY_ESTIMATE_UPDATED", `Estimated delivery set to ${estimate.toISOString()}.`, o.approvedAt!);
+        await orderEvent(id, adminId, "DELIVERY_SLA_STARTED", `Deliver by ${due.toISOString()}.`, o.approvedAt!);
       }
       await saveSale(c, id, s);
       // Staff product/mixed orders come from the office; agents may select packages only.

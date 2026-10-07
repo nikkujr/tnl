@@ -252,7 +252,7 @@ Team reports and reward management require an active Admin identity. Agents can 
 ### `GET /tracking/:trackingNumber`
 
 No authentication is required. Returns non-sensitive order status, delivery
-status, nullable `estimatedDeliveryAt` (UTC), and chronological stage timestamps. No full address, coordinates, internal notes, contact/payment information, or internal IDs are returned.
+status, nullable `estimatedDeliveryAt` (UTC), `sla: {state,dueAt,minutes}`, and chronological stage timestamps. SLA compares the original dispatch deadline with server time or recorded delivery completion; see [delivery SLA](DELIVERY.md#delivery-sla-and-deliver-by-promise). No full address, coordinates, internal notes, contact/payment information, or internal IDs are returned.
 
 ## Health
 

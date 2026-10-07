@@ -175,6 +175,10 @@ export async function advanceDelivery(
     if (body.estimatedDeliveryAt) await saveEstimate(c, o, body.estimatedDeliveryAt, user.id);
     if (o.delivery_status === "PREPARING" && (!o.estimated_delivery_at || new Date(o.estimated_delivery_at).getTime() <= Date.now()))
       throw new HttpError(400, "Set a future estimated delivery date and time before dispatching");
+    if (o.delivery_status === "PREPARING" && !o.delivery_sla_due_at) {
+      await c.execute("UPDATE orders SET delivery_sla_due_at=? WHERE id=?", [o.estimated_delivery_at, o.id]);
+      await audit(c, o.id, user.id, "DELIVERY_SLA_STARTED", `Deliver by ${new Date(o.estimated_delivery_at).toISOString()}.`);
+    }
   }
   if (body.deliveryStatus === "DELIVERED") {
     if (!body.recipientName)

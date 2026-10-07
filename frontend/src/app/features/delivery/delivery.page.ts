@@ -5,9 +5,10 @@ import { DeliveryApi, DeliveryJob } from './delivery-api.service';
 import { DeliveryPanelComponent } from './delivery-panel.component';
 import { DeliveryMapComponent, MapPoint } from './delivery-map.component';
 import { DatePipe } from '@angular/common';
+import { DeliverySlaComponent } from './delivery-sla.component';
 @Component({
   selector: 'app-delivery-page',
-  imports: [RouterLink, DeliveryPanelComponent, DeliveryMapComponent, DatePipe],
+  imports: [RouterLink, DeliveryPanelComponent, DeliveryMapComponent, DatePipe, DeliverySlaComponent],
   styleUrl: './delivery.scss',
   template: ` <header class="delivery-heading">
       <span class="eyebrow">TNL Track</span>
@@ -48,6 +49,7 @@ import { DatePipe } from '@angular/common';
             <h3>{{ j.trackingNumber }}</h3>
             <p>{{ j.recipientName }}</p>
             <p>{{ j.address }}</p>
+            <app-delivery-sla [sla]="j.sla" />
             @if (j.deliveryStatus !== 'DELIVERED') {
               <p>Estimated arrival: {{ j.estimatedDeliveryAt ? (j.estimatedDeliveryAt | date: 'MMM d, h:mm a' : '+0800') + ' (Philippine time)' : 'Awaiting schedule' }}</p>
             }
@@ -95,8 +97,8 @@ export class DeliveryPage implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly tabs = this.admin
-    ? ['All', 'Unassigned', 'Active', 'Issues', 'Completed']
-    : ['All', 'Active', 'Queued', 'Issues', 'Completed'];
+    ? ['All', 'Unassigned', 'Active', 'Overdue', 'Delivered late', 'Issues', 'Completed']
+    : ['All', 'Active', 'Queued', 'Overdue', 'Delivered late', 'Issues', 'Completed'];
   readonly visible = computed(() =>
     this.jobs().filter(
       (j) =>
@@ -108,6 +110,8 @@ export class DeliveryPage implements OnInit, OnDestroy {
           !j.issueCount &&
           j.deliveryStatus !== 'DELIVERED') ||
         (this.filter() === 'Issues' && j.issueCount > 0) ||
+        (this.filter() === 'Overdue' && j.sla?.state === 'OVERDUE') ||
+        (this.filter() === 'Delivered late' && j.sla?.state === 'BREACHED') ||
         (this.filter() === 'Completed' && j.deliveryStatus === 'DELIVERED'),
     ),
   );
