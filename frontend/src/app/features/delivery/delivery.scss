@@ -299,3 +299,10 @@ textarea {
   overflow-wrap: anywhere;
   min-height: 44px;
 }
+.sla-stages { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 12px; }
+.sla-stages li { border-left: 3px solid var(--line, #ded9ee); padding: 4px 0 4px 14px; }
+.sla-stages li.met { border-color: #2e8540; }
+.sla-stages li.overdue, .sla-stages li.breached { border-color: #c0392b; }
+.sla-stages li > div { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.sla-stages p { margin: 6px 0; }
+.sla-stages small { display: block; }

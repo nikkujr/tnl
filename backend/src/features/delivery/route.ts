@@ -44,6 +44,29 @@ deliveryRouter.use(
 );
 const admin = [authenticate, authorize("ADMIN")];
 const employee = authorize("DELIVERY");
+deliveryManagementRouter.patch("/:id/delivery-sla-policy", ...admin,
+  check(fence.omit({ attemptId: true }).extend({ region: z.enum(['BICOL','LUZON','VISAYAS','MINDANAO']), remoteDays: z.number().int().min(0).max(3) }).strict()),
+  async (req, res) => {
+    await transaction(async c => {
+      const o = await lockOrder(c, id(req.params.id), req.user!, req.body.assignmentVersion);
+      if (!['PENDING','APPROVED'].includes(o.order_status) || o.dispatched_at || (o.delivery_status && o.delivery_status !== 'PREPARING') || o.delivery_sla_due_at)
+        throw new HttpError(409, 'The delivery policy can only change before dispatch');
+      await c.execute('UPDATE orders SET sla_policy_version=1,delivery_region=?,delivery_remote_days=? WHERE id=?', [req.body.region, req.body.remoteDays, o.id]);
+      await audit(c, o.id, req.user!.id, 'DELIVERY_SLA_POLICY', `${req.body.region}; remote-area allowance: ${req.body.remoteDays} business day(s).`);
+    });
+    res.json({ data: { saved: true } });
+  },
+);
+deliveryManagementRouter.post("/:id/delivery-prepared", ...admin, check(fence.omit({ attemptId: true }).strict()), async (req, res) => {
+  await transaction(async c => {
+    const o = await lockOrder(c, id(req.params.id), req.user!, req.body.assignmentVersion);
+    if (o.order_status !== 'APPROVED' || o.delivery_status !== 'PREPARING') throw new HttpError(409, 'Only approved orders awaiting dispatch can be marked prepared');
+    if (o.prepared_at) return;
+    await c.execute('UPDATE orders SET prepared_at=UTC_TIMESTAMP() WHERE id=?', [o.id]);
+    await audit(c, o.id, req.user!.id, 'ORDER_PREPARED', 'Products checked, packed and ready for courier handover.');
+  });
+  res.json({ data: { prepared: true } });
+});
 deliveryRouter.get("/location-search", authorize("ADMIN"), rateLimit(30, 60000),
   validate(z.object({ body: z.any(), params: z.any(), query: z.object({ query: z.string().trim().min(3).max(200) }).strict() })),
   async (req, res) => { res.json({ data: await searchPlaces(String(req.query.query).trim(), config.GEOAPIFY_API_KEY) }); },

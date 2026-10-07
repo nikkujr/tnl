@@ -37,6 +37,7 @@ async function main() {
     const now = () => new Date().toISOString();
     const job = () => ({
       id: 1,
+      orderStatus: completed ? 'COMPLETED' : 'APPROVED',
       trackingNumber: 'TN-DELIVERY-001',
       address: 'San Juan Avenue, Sipocot, Camarines Sur',
       recipientName: 'Sample Customer',
@@ -802,7 +803,7 @@ async function main() {
     await page.getByText('The estimated arrival time has passed. Please contact us for an update.', { exact: true }).waitFor();
     slaDueAt = new Date(Date.now() - 90 * 60000).toISOString();
     await page.clock.runFor(11000);
-    await promise.getByText('Overdue', { exact: true }).waitFor();
+    await promise.getByText('Delayed', { exact: true }).waitFor();
     if (process.env.LAYOUT_SCREENSHOT_DIR) await promise.screenshot({ path: path.join(process.env.LAYOUT_SCREENSHOT_DIR, 'customer-sla-overdue.png') });
     assert.equal(
       await page.getByRole('button', { name: 'Place destination pin', exact: true }).count(),
@@ -824,7 +825,8 @@ async function main() {
     await page
       .getByText('DELIVERED · Payment: UNPAID · Agent: Sales Agent', { exact: true })
       .waitFor();
-    await page.getByText('DELIVERED · UNPAID ·', { exact: false }).waitFor();
+    assert.match(page.url(), /\/portal\/orders\/1$/);
+    assert.equal(await page.getByRole('heading', {name: 'My orders', exact: true}).count(), 0);
     assert(
       (await proof.getAttribute('src')).startsWith('blob:'),
       'Proof must use an authenticated blob',

@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { transitWindow } from "../features/delivery/model.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -110,15 +111,16 @@ export async function seedDefenseData(data: DemoData, reset = false) {
          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'LIVE','PACKAGE',?,?,?,?,?)`,
         [o.trackingNumber, customerIds.get(o.customerId), o.agentId ? userIds.get(o.agentId) : null, o.employeeId ? userIds.get(o.employeeId) : null, o.employeeId ? 1 : 0, o.approvedAt ? customer.latitude : null, o.approvedAt ? customer.longitude : null, customer.address, o.paymentMethod, o.paymentStatus, cashReceived, cashReceived === null ? null : pesos(Math.max(0, cents(cashReceived) - total)), o.orderStatus, o.deliveryStatus, o.approvedAt, o.deliveryChangedAt, o.saleCompletedAt, o.createdAt, o.updatedAt]);
       orderIds.set(o.id, id);
-      if (o.deliveryStatus && o.deliveryStatus !== "PREPARING") {
-        const estimate = o.deliveryStatus === "DELIVERED" ? o.deliveryChangedAt! : new Date(data.now.getTime() + (2 + o.id % 6) * 3600000);
-        const due = o.deliveryStatus === "DELIVERED"
-          ? new Date(estimate.getTime() + (o.id % 4 === 0 ? -90 : 30) * 60000)
-          : o.id % 3 === 0 ? new Date(data.now.getTime() - (30 + o.id % 120) * 60000) : estimate;
-        await c.execute("UPDATE orders SET estimated_delivery_at=?,delivery_sla_due_at=? WHERE id=?", [estimate, due, id]);
-        await orderEvent(id, adminId, "DELIVERY_ESTIMATE_UPDATED", `Estimated delivery set to ${estimate.toISOString()}.`, o.approvedAt!);
-        await orderEvent(id, adminId, "DELIVERY_SLA_STARTED", `Deliver by ${due.toISOString()}.`, o.approvedAt!);
-      }
+      // Regional promises use the sample customer address and actual milestone dates.
+      const remoteDays = customer.remoteDays;
+      const lastStage = ['PREPARING','DISPATCHED','IN_TRANSIT','OUT_FOR_DELIVERY','DELIVERED'].indexOf(o.deliveryStatus!);
+      const dispatchedAt = lastStage > 0 ? new Date(o.approvedAt!.getTime() + (o.deliveryChangedAt!.getTime() - o.approvedAt!.getTime()) / lastStage) : null;
+      const preparedAt = dispatchedAt ? new Date(o.approvedAt!.getTime() + (dispatchedAt.getTime() - o.approvedAt!.getTime()) / 2) : null;
+      const window = dispatchedAt ? transitWindow(dispatchedAt, customer.region, remoteDays) : null;
+      await c.execute('UPDATE orders SET delivery_region=?,delivery_remote_days=?,prepared_at=?,dispatched_at=?,delivery_sla_from_at=?,delivery_sla_due_at=?,estimated_delivery_at=? WHERE id=?',
+        [customer.region, remoteDays, preparedAt, dispatchedAt, window?.fromAt ?? null, window?.dueAt ?? null, window?.dueAt ?? null, id]);
+      if (preparedAt) await orderEvent(id, adminId, 'ORDER_PREPARED', 'Products checked and packed for handover.', preparedAt);
+      if (window) await orderEvent(id, adminId, 'DELIVERY_SLA_STARTED', `Regional delivery window saved at dispatch: ${customer.region}.`, dispatchedAt!);
       await saveSale(c, id, s);
       // Staff product/mixed orders come from the office; agents may select packages only.
       await orderEvent(id, s.items.length ? adminId : o.agentId ? userIds.get(o.agentId)! : adminId, "CREATED", `Order created totaling ₱${pesos(total).toFixed(2)}.`, o.createdAt);

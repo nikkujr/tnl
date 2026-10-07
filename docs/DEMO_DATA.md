@@ -1,16 +1,16 @@
 # Panel-defense data
 
 This dataset models TNL IT & Mobile Enterprises as an IT/mobile retailer serving
-households, students, remote workers and small shops in Metro Manila. Product
+households, students, remote workers and small shops in Luzon, Bicol, Visayas and Mindanao. Product
 configurations and PHP prices are illustrative retail examples. People, phone
 numbers and street numbers are fictional; customer and lead emails use
 `example.test`. They are demonstration records, not actual business results.
 
 ## Load or reset
 
-Delivery SLA examples include deliveries on track, overdue deliveries with a revised ETA, on-time handoffs and late handoffs. The original deliver-by deadline stays independent of the customer-facing estimate.
+Delivery SLA examples include all four regions, a remote-area allowance, deliveries on track, overdue deliveries, on-time handoffs and late handoffs. Preparation and dispatch timestamps agree with the delivery history. The original deliver-by deadline stays independent of the customer-facing estimate.
 
-Dispatched demo orders include an estimated arrival: pending deliveries use a future date/time relative to seeding, and completed deliveries retain their historical estimate. The portal and tracking pages show estimates in Philippine time.
+Dispatched demo orders include an estimated arrival calculated from their regional business-day window; overdue open orders keep their missed promise visible. The portal and tracking pages show estimates in Philippine time.
 
 Configure `backend/.env` for a dedicated demo database, then run from `backend/`:
 

@@ -71,15 +71,15 @@ const catalog: Array<[string, string, number, string]> = [
 
 const agentNames = ["Jamie Co", "Paolo Reyes", "Angela Dela Cruz", "Miguel Mendoza", "Bea Villanueva", "Carlo Navarro", "Rica Bautista", "Enzo Garcia"];
 const customerNames = ["Mara Santos", "Luis Ramos", "Aileen Cruz", "Ramon Flores", "Camille Torres", "Joel Mercado", "Patricia Lim", "Dennis Aquino", "Grace Soriano", "Mark Velasco", "Nina Castillo", "Allan Santiago", "Rose Fernandez", "Kevin Tan", "Dianne Valdez", "Roberto Salazar", "Joyce Manalo", "Adrian Lopez", "Kristine Uy", "Edwin Pineda", "Liza Pascual", "Marvin Dizon", "Sofia Gonzales", "Teresa Abad", "Cesar Enriquez", "Abigail Rivera", "Nathaniel Cortez", "Vivian Morales", "Christian Cabral", "Hannah Espiritu", "Noel De Leon", "Denise Macapagal", "Eric Alcantara", "Isabel Ignacio", "Wilson Cheng", "Karen Evangelista", "Albert Tolentino", "Trisha Magbanua", "Daniel Arce", "Felisa Miranda", "Richard Tuazon", "Janine Buenaventura", "Ronald Estrella", "Pauline Francisco", "Samuel Serrano", "Monica Andrada", "Alex Evangelio", "Clarissa Delos Santos", "Nestor Solis", "Andrea Yap", "Oscar Clemente", "Charlene David", "Philip Natividad", "Mariel Cordero", "Benedict Samson", "Elena Roman", "Ferdinand Palma", "Celine Roxas", "Juanito Jacinto", "Hazel Go"];
-const districts: Array<[string, number, number]> = [
-  ["Maginhawa Street, Teachers Village, Quezon City", 14.6478, 121.0606],
-  ["P. Tuazon Boulevard, Cubao, Quezon City", 14.6195, 121.0576],
-  ["Shaw Boulevard, Mandaluyong City", 14.5816, 121.0454],
-  ["San Rafael Street, Plainview, Mandaluyong City", 14.5794, 121.0306],
-  ["F. Manalo Street, San Juan City", 14.6048, 121.0304],
-  ["Ortigas Avenue Extension, Rosario, Pasig City", 14.5888, 121.0910],
-  ["J. P. Rizal Street, Concepcion Uno, Marikina City", 14.6507, 121.1040],
-  ["V. Luna Avenue, Sikatuna Village, Quezon City", 14.6376, 121.0567],
+const districts: Array<[string, number, number, 'BICOL' | 'LUZON' | 'VISAYAS' | 'MINDANAO', number]> = [
+  ['Maginhawa Street, Teachers Village, Quezon City', 14.6478, 121.0606, 'LUZON', 0],
+  ['P. Tuazon Boulevard, Cubao, Quezon City', 14.6195, 121.0576, 'LUZON', 0],
+  ['Peñafrancia Avenue, Naga City, Camarines Sur', 13.6256, 123.1948, 'BICOL', 0],
+  ['Rizal Street, Legazpi City, Albay', 13.1391, 123.7438, 'BICOL', 0],
+  ['Mabini Street, Cebu City, Cebu', 10.2985, 123.9039, 'VISAYAS', 0],
+  ['J. M. Basa Street, Iloilo City, Iloilo', 10.6951, 122.5688, 'VISAYAS', 0],
+  ['J. P. Laurel Avenue, Davao City', 7.1007, 125.6289, 'MINDANAO', 0],
+  ['Barangay Marilog, Marilog District, Davao City', 7.4491, 125.2528, 'MINDANAO', 2],
 ];
 
 export interface DemoOrder {
@@ -115,8 +115,8 @@ export function buildDemoData(now = new Date()) {
     ...["Arnel Castillo", "Jun Villanueva"].map((name, i) => ({ id: i + 10, name, email: `delivery${i + 1}@tnl.local`, role: "DELIVERY", createdAt: new Date(start.getTime() - 90 * DAY) })),
   ];
   const customers = customerNames.map((name, i) => {
-    const [street, latitude, longitude] = districts[i % districts.length]!;
-    return { id: i + 1, name, email: i === 0 ? "mara.santos@example.test" : `${name.toLowerCase().replaceAll(" ", ".")}@example.test`, phone: `0917${String(5550100 + i)}`, address: `${24 + i * 7} ${street}`, latitude, longitude, agentId: i < customerNames.length - 3 ? 2 + i % 7 : i < customerNames.length - 1 ? 9 : null, optedIn: i % 3 !== 2, createdAt: i < customerNames.length - 3 || i === customerNames.length - 1 ? new Date(start.getTime() - (80 - i) * DAY) : monthStart(0) };
+    const [street, latitude, longitude, region, remoteDays] = districts[i % districts.length]!;
+    return { id: i + 1, name, email: i === 0 ? "mara.santos@example.test" : `${name.toLowerCase().replaceAll(" ", ".")}@example.test`, phone: `0917${String(5550100 + i)}`, address: `${24 + i * 7} ${street}`, latitude, longitude, region, remoteDays, agentId: i < customerNames.length - 3 ? 2 + i % 7 : i < customerNames.length - 1 ? 9 : null, optedIn: i % 3 !== 2, createdAt: i < customerNames.length - 3 || i === customerNames.length - 1 ? new Date(start.getTime() - (80 - i) * DAY) : monthStart(0) };
   });
   const products = catalog.map(([category, name, price, description], i) => ({ id: i + 1, category, name, sku: `TNL-${String(i + 1).padStart(3, "0")}`, price, description, available: i === 44 ? 0 : i % 11 === 0 ? 2 : price >= 18000 ? 6 + i % 6 : 18 + i % 20, threshold: price >= 18000 ? 3 : 5, reorder: price >= 18000 ? 8 : 20 }));
   const component = (id: number, quantity = 1) => {

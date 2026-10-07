@@ -14,6 +14,7 @@ import {
 import { config } from "../../config.js";
 import { stat } from "node:fs/promises";
 import { photoPath } from "./storage.js";
+import { transitWindow } from "./model.js";
 export async function audit(
   c: PoolConnection,
   orderId: number,
@@ -172,12 +173,21 @@ export async function advanceDelivery(
   if (user.role === "DELIVERY")
     await requireAttempt(c, o, user, body.attemptId);
   if (body.deliveryStatus !== "DELIVERED") {
-    if (body.estimatedDeliveryAt) await saveEstimate(c, o, body.estimatedDeliveryAt, user.id);
-    if (o.delivery_status === "PREPARING" && (!o.estimated_delivery_at || new Date(o.estimated_delivery_at).getTime() <= Date.now()))
-      throw new HttpError(400, "Set a future estimated delivery date and time before dispatching");
-    if (o.delivery_status === "PREPARING" && !o.delivery_sla_due_at) {
-      await c.execute("UPDATE orders SET delivery_sla_due_at=? WHERE id=?", [o.estimated_delivery_at, o.id]);
-      await audit(c, o.id, user.id, "DELIVERY_SLA_STARTED", `Deliver by ${new Date(o.estimated_delivery_at).toISOString()}.`);
+    if (o.sla_policy_version && o.delivery_status === "PREPARING") {
+      if (!o.delivery_region || !o.prepared_at)
+        throw new HttpError(409, "Select the delivery region and mark the order prepared before dispatching");
+      const dispatched = new Date();
+      const window = transitWindow(dispatched, o.delivery_region, Number(o.delivery_remote_days));
+      await c.execute("UPDATE orders SET dispatched_at=?,delivery_sla_from_at=?,delivery_sla_due_at=?,estimated_delivery_at=? WHERE id=?", [dispatched, window.fromAt, window.dueAt, window.dueAt, o.id]);
+      await audit(c, o.id, user.id, "DELIVERY_SLA_STARTED", `${o.delivery_region}: ${window.fromAt.toISOString()} to ${window.dueAt.toISOString()}. Remote allowance: ${o.delivery_remote_days} business day(s).`);
+    } else {
+      if (body.estimatedDeliveryAt) await saveEstimate(c, o, body.estimatedDeliveryAt, user.id);
+      if (o.delivery_status === "PREPARING" && (!o.estimated_delivery_at || new Date(o.estimated_delivery_at).getTime() <= Date.now()))
+        throw new HttpError(400, "Set a future estimated delivery date and time before dispatching");
+      if (o.delivery_status === "PREPARING" && !o.delivery_sla_due_at) {
+        await c.execute("UPDATE orders SET delivery_sla_due_at=? WHERE id=?", [o.estimated_delivery_at, o.id]);
+        await audit(c, o.id, user.id, "DELIVERY_SLA_STARTED", `Deliver by ${new Date(o.estimated_delivery_at).toISOString()}.`);
+      }
     }
   }
   if (body.deliveryStatus === "DELIVERED") {

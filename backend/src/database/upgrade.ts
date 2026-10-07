@@ -12,6 +12,12 @@ export async function upgrade() {
       delivery_assignment_version: "INT UNSIGNED NOT NULL DEFAULT 0",
       estimated_delivery_at: "DATETIME NULL",
       delivery_sla_due_at: "DATETIME NULL",
+      sla_policy_version: "TINYINT NULL",
+      delivery_region: "ENUM('BICOL','LUZON','VISAYAS','MINDANAO') NULL",
+      delivery_remote_days: "TINYINT UNSIGNED NOT NULL DEFAULT 0",
+      prepared_at: "DATETIME NULL",
+      dispatched_at: "DATETIME NULL",
+      delivery_sla_from_at: "DATETIME NULL",
       destination_latitude: "DECIMAL(10,7) NULL",
       destination_longitude: "DECIMAL(10,7) NULL",
       sales_version: "ENUM('LEGACY','PACKAGE') NOT NULL DEFAULT 'LEGACY'",
@@ -46,6 +52,8 @@ export async function upgrade() {
         );
     }
   }
+  // Preserve old promises; only future orders opt into the regional policy.
+  await db.query("ALTER TABLE orders ALTER COLUMN sla_policy_version SET DEFAULT 1");
   const [roleColumns] = await db.query<any[]>("SELECT COLUMN_TYPE type FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='users' AND column_name='role'");
   if (!String(roleColumns[0]?.type).includes("DELIVERY")) await db.query("ALTER TABLE users MODIFY role ENUM('ADMIN','AGENT','DELIVERY') NOT NULL");
   const [deliveryKeys] = await db.query<any[]>("SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='orders' AND constraint_name='fk_order_delivery_employee'");

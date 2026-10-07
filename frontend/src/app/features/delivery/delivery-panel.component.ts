@@ -84,6 +84,12 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
   private polling = false;
   employeeId: number | null = null;
   estimate = '';
+  region: 'BICOL' | 'LUZON' | 'VISAYAS' | 'MINDANAO' | '' = '';
+  remoteDays = 0;
+  dispatchReady() {
+    const policy = this.detail()?.sla?.policy;
+    return policy ? !!policy.region && !!policy.preparedAt : this.estimateValid();
+  }
   estimateValid() {
     const estimate = Date.parse(this.estimate + '+08:00');
     return Number.isFinite(estimate) && estimate > this.clock() + this.offset;
@@ -190,6 +196,8 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
             this.detail.set(r.data);
             this.setTracking(r.data.tracking);
             this.employeeId = r.data.employeeId ?? null;
+            this.region = r.data.sla?.policy?.region ?? '';
+            this.remoteDays = r.data.sla?.policy?.remoteDays ?? 0;
             this.estimate = r.data.estimatedDeliveryAt
               ? new Date(new Date(r.data.estimatedDeliveryAt).getTime() + 8 * 3600000).toISOString().slice(0, 16)
               : '';
@@ -289,7 +297,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
       await firstValueFrom(
         this.api.post(`${this.base()}/start`, {
           assignmentVersion: this.detail()!.assignmentVersion,
-          ...(this.detail()!.deliveryStatus === 'PREPARING' ? { estimatedDeliveryAt: this.estimate + '+08:00' } : {}),
+          ...(this.detail()!.deliveryStatus === 'PREPARING' && !this.detail()!.sla?.policy ? { estimatedDeliveryAt: this.estimate + '+08:00' } : {}),
         }),
       );
     }, 'Delivery started. You can enable live location sharing.');
@@ -307,7 +315,7 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
           ? this.api.patch(`orders/${this.orderId}/delivery-status`, {
               assignmentVersion: this.detail()!.assignmentVersion,
               deliveryStatus: status,
-              ...(status === 'DISPATCHED' ? { estimatedDeliveryAt: this.estimate + '+08:00' } : {}),
+              ...(status === 'DISPATCHED' && !this.detail()!.sla?.policy ? { estimatedDeliveryAt: this.estimate + '+08:00' } : {}),
             })
           : this.api.patch(`${this.base()}/status`, { ...this.fence(), deliveryStatus: status }),
       );
@@ -329,6 +337,18 @@ export class DeliveryPanelComponent implements OnChanges, OnDestroy {
         estimatedDeliveryAt: this.estimate + '+08:00',
       }));
     }, 'Estimated delivery updated for the customer.');
+  }
+  savePolicy() {
+    void this.act(async () => {
+      await firstValueFrom(this.api.patch(`orders/${this.orderId}/delivery-sla-policy`, {
+        assignmentVersion: this.detail()!.assignmentVersion, region: this.region, remoteDays: this.remoteDays,
+      }));
+    }, 'Delivery region and allowance saved.');
+  }
+  markPrepared() {
+    void this.act(async () => {
+      await firstValueFrom(this.api.post(`orders/${this.orderId}/delivery-prepared`, { assignmentVersion: this.detail()!.assignmentVersion }));
+    }, 'Order marked prepared and ready for courier handover.');
   }
   assign() {
     void this.act(async () => {

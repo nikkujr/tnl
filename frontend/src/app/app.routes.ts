@@ -20,6 +20,11 @@ export const routes: Routes = [
   })),
   { path: 'reports', pathMatch: 'full', redirectTo: 'reports/daily' },
   {
+    path: 'portal/orders/:id',
+    canMatch: [roleGuard(['CUSTOMER'])],
+    loadComponent: () => import('./features/portal/customer-order-detail.page').then(m => m.CustomerOrderDetailPage),
+  },
+  {
     path: 'portal',
     loadComponent: () => import('./features/portal/portal.page').then((m) => m.PortalPage),
   },

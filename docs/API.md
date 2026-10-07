@@ -183,6 +183,8 @@ delivery, and records both the inventory movement and delivery event.
 
 - `PATCH /orders/:id/payment-status` — Admin payment-state update
 - `PATCH /orders/:id/delivery-status` — Admin only; requires assignmentVersion and deliveryStatus; forward event/status update; DELIVERED additionally requires recipientName and a staged photoId, or recipientName and exceptionReason. Agents have read-only delivery access.
+- `PATCH /orders/:id/delivery-sla-policy` — Admin only; `{assignmentVersion,region,remoteDays}`. Region is BICOL/LUZON/VISAYAS/MINDANAO; allowance is an integer 0–3. Pending/approved live orders only, before dispatch; locks and audits policy changes.
+- `POST /orders/:id/delivery-prepared` — Admin only; `{assignmentVersion}`. Idempotently records preparation of an approved order awaiting dispatch.
 - `DELETE /orders/:id` — delete Pending or Rejected orders that are not linked to a customer request
 
 Delivery completion deducts reserved component stock once. Commission posts once only when the whole order is DELIVERED and PAID, evaluated in payment and delivery transactions. A repeated stage is a no-op; backward stages fail with 409. New package commission uses saved fixed/percentage rules and per-line centavo rounding; standalone products earn no commission. Earned sales cannot downgrade payment. Outputs include packages, saved terms/components, total, and commission breakdown.
@@ -252,7 +254,7 @@ Team reports and reward management require an active Admin identity. Agents can 
 ### `GET /tracking/:trackingNumber`
 
 No authentication is required. Returns non-sensitive order status, delivery
-status, nullable `estimatedDeliveryAt` (UTC), `sla: {state,dueAt,minutes}`, and chronological stage timestamps. SLA compares the original dispatch deadline with server time or recorded delivery completion; see [delivery SLA](DELIVERY.md#delivery-sla-and-deliver-by-promise). No full address, coordinates, internal notes, contact/payment information, or internal IDs are returned.
+status, nullable `estimatedDeliveryAt` (UTC), `sla: {state,dueAt,minutes,policy?}`, and chronological stage timestamps. The optional regional policy includes region, remoteDays, preparedAt, dispatchedAt, completed, projected, fromAt, toAt and four stages (name, rule, state, dueAt, completedAt, minutes). SLA compares the original dispatch deadline with server time or recorded delivery completion; see [delivery SLA](DELIVERY.md#delivery-sla-and-deliver-by-promise). No full address, coordinates, internal notes, contact/payment information, or internal IDs are returned.
 
 ## Health
 

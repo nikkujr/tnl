@@ -49,7 +49,7 @@ import { DeliverySlaComponent } from './delivery-sla.component';
             <h3>{{ j.trackingNumber }}</h3>
             <p>{{ j.recipientName }}</p>
             <p>{{ j.address }}</p>
-            <app-delivery-sla [sla]="j.sla" />
+            <app-delivery-sla [sla]="j.sla" [compact]="true" />
             @if (j.deliveryStatus !== 'DELIVERED') {
               <p>Estimated arrival: {{ j.estimatedDeliveryAt ? (j.estimatedDeliveryAt | date: 'MMM d, h:mm a' : '+0800') + ' (Philippine time)' : 'Awaiting schedule' }}</p>
             }

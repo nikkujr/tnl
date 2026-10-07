@@ -17,7 +17,28 @@ import mysql from "mysql2/promise";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import sharp from "sharp";
-import { positionState, deliverySla } from "../src/features/delivery/model.js";
+import { positionState, deliverySla, businessDeadline, transitWindow, orderSla } from "../src/features/delivery/model.js";
+test('regional SLA skips weekends in Manila and measures preparation and transit separately', () => {
+  assert.equal(businessDeadline('2026-10-09T17:00:00+08:00', 1).toISOString(), '2026-10-12T15:59:59.000Z');
+  assert.equal(businessDeadline('2026-10-31T01:00:00+08:00', 2).toISOString(), '2026-11-03T15:59:59.000Z');
+  assert.equal(businessDeadline('2028-02-28T01:00:00+08:00', 1).toISOString(), '2028-02-29T15:59:59.000Z');
+  for (const [region, min, max] of [['BICOL',1,3],['LUZON',2,5],['VISAYAS',4,7],['MINDANAO',5,8]] as const) {
+    const window = transitWindow('2026-10-09T08:00:00Z', region, 3);
+    assert.deepEqual(window, {fromAt: businessDeadline('2026-10-09T08:00:00Z', min+3), dueAt: businessDeadline('2026-10-09T08:00:00Z', max+3)});
+  }
+  const window = transitWindow('2026-10-12T08:00:00Z', 'BICOL', 0);
+  const o = { origin: 'LIVE', sla_policy_version: 1, delivery_region: 'BICOL', delivery_remote_days: 0, order_status: 'APPROVED', created_at: '2026-10-08T08:00:00Z', approved_at: '2026-10-09T08:00:00Z', prepared_at: '2026-10-12T08:00:00Z', dispatched_at: '2026-10-12T08:00:00Z', delivery_sla_from_at: window.fromAt, delivery_sla_due_at: window.dueAt };
+  const result = orderSla(o, null, false, window.dueAt.getTime()+1);
+  assert.equal(result.state, 'OVERDUE');
+  assert('policy' in result);
+  assert.deepEqual(result.policy.stages.map(s => s.state), ['MET','MET','MET','OVERDUE']);
+  assert.equal(orderSla(o, window.dueAt, true).state, 'MET');
+  assert.equal(orderSla(o, new Date(window.dueAt.getTime()+1), true).state, 'BREACHED');
+  assert(!('policy' in orderSla({...o,sla_policy_version: null}, null, false)));
+  const handover = orderSla({...o,dispatched_at: null,delivery_sla_from_at: null,delivery_sla_due_at: null}, window.dueAt, true);
+  assert('policy' in handover);
+  assert.equal(handover.policy.fromAt, null, 'A completed direct handover must not show a future courier estimate');
+});
 test("delivery SLA uses the saved deadline, exact completion boundary, and server time", () => {
   const due = new Date("2026-10-07T08:00:00Z"), now = due.getTime();
   assert.equal(deliverySla(null, null, false, now).state, "NOT_SET");
@@ -73,7 +94,7 @@ test(
         await db.query(statement);
       // Exercise an installed database's old enum as well as repeatable additive upgrades.
       await db.query(
-        "ALTER TABLE orders DROP COLUMN delivery_employee_id,DROP COLUMN delivery_assignment_version,DROP COLUMN destination_latitude,DROP COLUMN destination_longitude,DROP COLUMN estimated_delivery_at,DROP COLUMN delivery_sla_due_at",
+        "ALTER TABLE orders DROP COLUMN delivery_employee_id,DROP COLUMN delivery_assignment_version,DROP COLUMN destination_latitude,DROP COLUMN destination_longitude,DROP COLUMN estimated_delivery_at,DROP COLUMN delivery_sla_due_at,DROP COLUMN sla_policy_version,DROP COLUMN delivery_region,DROP COLUMN delivery_remote_days,DROP COLUMN prepared_at,DROP COLUMN dispatched_at,DROP COLUMN delivery_sla_from_at",
       );
       await db.query(
         "ALTER TABLE users MODIFY role ENUM('ADMIN','AGENT') NOT NULL",
@@ -156,7 +177,7 @@ test(
         )
       ).id;
       const futureEstimate = () => new Date(Math.floor(Date.now() / 1000) * 1000 + 4 * 3600000).toISOString();
-      const create = async (withEstimate = true) => {
+      const create = async (withEstimate = true, regional = false) => {
         const o = await call(
           "orders",
           "POST",
@@ -172,10 +193,49 @@ test(
           a,
           201,
         );
+        // Keep the existing deadline/ETA regression cases on the legacy policy.
+        if (!regional) await db.execute('UPDATE orders SET sla_policy_version=NULL WHERE id=?', [o.id]);
         await call(`orders/${o.id}/decision`, "POST", { decision: "APPROVE" });
         if (withEstimate) await call(`orders/${o.id}/delivery-estimate`, "PATCH", { assignmentVersion: 0, estimatedDeliveryAt: futureEstimate() });
         return o.id;
       };
+      await t.test('regional policy requires preparation, freezes at dispatch and is visible only to its customer', async () => {
+        const order = await create(false, true);
+        const path = `orders/${order}`;
+        await call(`${path}/delivery-status`, 'PATCH', {assignmentVersion: 0, deliveryStatus: 'DISPATCHED'}, a, 409);
+        await call(`${path}/delivery-sla-policy`, 'PATCH', {assignmentVersion: 0, region: 'MINDANAO', remoteDays: 4}, a, 400);
+        await call(`${path}/delivery-sla-policy`, 'PATCH', {assignmentVersion: 0, region: 'VISAYAS', remoteDays: 2}, agent, 403);
+        await call(`${path}/delivery-sla-policy`, 'PATCH', {assignmentVersion: 0, region: 'VISAYAS', remoteDays: 2});
+        const pending = await call(`customer/orders/${order}/delivery`, 'GET', undefined, owner);
+        assert.equal(pending.sla.policy.projected, true);
+        assert.equal(pending.sla.policy.region, 'VISAYAS');
+        await call(`${path}/delivery-prepared`, 'POST', {assignmentVersion: 0});
+        await call(`${path}/delivery-prepared`, 'POST', {assignmentVersion: 0});
+        await call(`${path}/delivery-status`, 'PATCH', {assignmentVersion: 0, deliveryStatus: 'DISPATCHED'});
+        const first = await call(`customer/orders/${order}/delivery`, 'GET', undefined, owner);
+        assert.equal(first.sla.policy.projected, false);
+        assert.deepEqual(new Date(first.sla.dueAt), transitWindow(first.sla.policy.dispatchedAt, 'VISAYAS', 2).dueAt);
+        await call(`${path}/delivery-sla-policy`, 'PATCH', {assignmentVersion: 0, region: 'BICOL', remoteDays: 0}, a, 409);
+        await call(`${path}/delivery-estimate`, 'PATCH', {assignmentVersion: 0, estimatedDeliveryAt: futureEstimate()});
+        assert.equal((await call(`customer/orders/${order}/delivery`, 'GET', undefined, owner)).sla.dueAt, first.sla.dueAt);
+        await call(`customer/orders/${order}/delivery`, 'GET', undefined, customer(2), 404);
+        const publicData = await call(`tracking/${first.trackingNumber}`, 'GET', undefined, '');
+        assert.equal(publicData.sla.dueAt, first.sla.dueAt);
+        assert.equal(publicData.sla.policy.stages.length, 4);
+        assert(!('created_at' in publicData));
+        const employeeOrder = await create(false, true);
+        await call(`orders/${employeeOrder}/delivery-sla-policy`, 'PATCH', {assignmentVersion: 0, region: 'BICOL', remoteDays: 1});
+        await call(`orders/${employeeOrder}/delivery-assignment`, 'PATCH', {assignmentVersion: 0, employeeId: 3});
+        await call(`delivery/orders/${employeeOrder}/start`, 'POST', {assignmentVersion: 1}, driver, 409);
+        const [[active]] = await db.query('SELECT COUNT(*) count FROM delivery_active_jobs WHERE employee_id=3');
+        assert.equal(Number(active.count), 0, 'A failed start must roll back its active job');
+        await call(`orders/${employeeOrder}/delivery-prepared`, 'POST', {assignmentVersion: 1});
+        await call(`delivery/orders/${employeeOrder}/start`, 'POST', {assignmentVersion: 1}, driver);
+        const employeeDetail = await call(`delivery/orders/${employeeOrder}`, 'GET', undefined, driver);
+        assert.equal(employeeDetail.deliveryStatus, 'DISPATCHED');
+        assert.equal(employeeDetail.estimatedDeliveryAt, employeeDetail.sla.dueAt);
+        await call(`delivery/orders/${employeeOrder}/pause`, 'POST', {assignmentVersion: 1, attemptId: employeeDetail.attemptId}, driver);
+      });
       const assign = async (
         order: number,
         employeeId: number | null,

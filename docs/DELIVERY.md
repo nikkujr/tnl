@@ -8,13 +8,26 @@ Order details group employee assignment and milestone buttons under **Dispatch &
 
 ### Delivery SLA and deliver-by promise
 
-The first move out of PREPARING into DISPATCHED (or a later traveling stage) saves the current estimate as the order's fixed **Deliver by** deadline. This is TNL's delivery SLA. The deadline survives estimate revisions, pauses, issues and employee reassignment. It is saved in the same transaction as dispatch and audited once; a failed dispatch saves neither the milestone nor the deadline.
+New live orders use the panel-defense policy. Admin selects the delivery region and a remote-area allowance (0–3 business days), then marks an approved order **Prepared** after checking and packing it. Courier dispatch requires both the saved region and preparation timestamp. Admin dispatch and employee Start delivery use the same calculation.
 
-Staff queues/details, the customer portal and public tracking show **On track**, **Overdue**, **Delivered on time**, or **Delivered late**, with the original deadline in Philippine time. Open deliveries show minutes/hours remaining or overdue. Completion compares the recorded handoff time to the deadline; delivery exactly at the deadline meets the SLA. Completion freezes the result regardless of subsequent time or payment changes. Existing orders without a recorded SLA remain **Not measured**; migrations do not invent promises or delivery outcomes. Preparation and direct office handoffs are not measured by this dispatch SLA.
+| Stage | Deadline |
+| --- | --- |
+| Processing | 1 business day after order creation |
+| Preparation | 1 business day after confirmation |
+| Dispatch | 1–2 business days after confirmation |
+| Bicol transit | 1–3 business days after dispatch |
+| Other Luzon transit | 2–5 business days after dispatch |
+| Visayas transit | 4–7 business days after dispatch |
+| Mindanao transit | 5–8 business days after dispatch |
+| Remote area | Add the selected 1–3 business days to both transit bounds |
 
-Queue filters **Overdue** and **Delivered late** apply to the currently loaded page, like the existing delivery filters. Issues and pauses do not pause the deadline. Customer estimates can still be revised to explain the expected arrival without changing SLA performance. The demo seed includes all four measured outcomes. This feature tracks delivery commitments; it does not create compensation, vouchers or refunds.
+Business days mean Monday–Friday in Philippine time; public holidays are not excluded. Deadlines end at 11:59:59 PM on the last allowed day. Preparation runs within the dispatch window rather than adding another day to it. Before dispatch, delivery dates are provisional, based on the confirmation deadline (or actual confirmation) plus the 1–2 day dispatch window and regional transit. Actual dispatch saves the original transit window and sets its maximum as the initial arrival estimate. Changing ETA, pausing, retrying or reassigning never extends that saved promise.
 
-Dispatching requires a future **Estimated arrival** date and time. Admins enter it in dispatch controls or save/revise it with **Save estimate**; employees confirm it when starting a PREPARING order. The portal, tracking-number page, agent view and delivery queue show the estimate in Philippine time (UTC+08:00). Customers receive revisions through private tracking polling and see an explicit message when the estimate has passed. Estimates are guidance, not guarantees, and are stored in UTC separately from actual delivery completion. Existing unscheduled orders display **Awaiting a delivery schedule**; no arrival time is invented for them.
+Each measured stage compares its recorded completion with its deadline. Delivery shows **Delayed** after the maximum delivery date, **Delivered on time** for completion at or before the deadline, and **Delivered late** afterwards. Missing historical milestone timestamps are not invented. Existing dispatched orders retain their earlier saved deadline; existing orders awaiting dispatch can opt into the regional policy by saving a region.
+
+Customers open **Details and follow-up** (or **View order** from a request) at `/portal/orders/:id`. The dedicated page includes the SLA stages, arrival estimate, live tracking, proof, agent reviews and follow-ups. **Back to my orders** returns to the order list. All order and delivery endpoints still enforce ownership.
+
+Check calculations/dispatch/migration with the backend delivery tests and disposable MySQL integration suite. Run `frontend/scripts/check-regional-sla.cjs` against ng serve with Playwright available on NODE_PATH to check a 60-order list, direct detail refresh/back navigation, delayed SLA, inaccessible order, and desktop/mobile layouts.
 
 Admins open **View proof of delivery** from completed dispatch cards or the completed order's action bar. Evidence appears above the map with recipient, completion time, employee and the authenticated photo. Expired photos, admin exceptions and older orders without recorded evidence have explicit messages.
 
@@ -30,7 +43,7 @@ Employee completion requires recipient name and a staged photo. Admins can uploa
 
 All paths below have `/api/v1` as their prefix, use bearer authentication, and wrap JSON in `data`. Private reads send `Cache-Control: no-store`. Binary reads return `image/jpeg`. General `/orders` remains restricted to ADMIN/AGENT.
 
-Delivery list/detail/tracking and public tracking include `sla: {state,dueAt,minutes}`. State is `NOT_SET`, `ON_TRACK`, `OVERDUE`, `MET` or `BREACHED`; dueAt is nullable UTC and minutes is nullable. Open deliveries measure time to/past the deadline; completed deliveries measure the difference between deadline and recorded completion. Private tracking also supplies serverTime; labels refresh through existing polling.
+Delivery list/detail/tracking and public tracking include `sla: {state,dueAt,minutes,policy?}`. State is `NOT_SET`, `ON_TRACK`, `OVERDUE`, `MET` or `BREACHED`; dueAt is nullable UTC and minutes is nullable. Open deliveries measure time to/past the deadline; completed deliveries measure the difference between deadline and recorded completion. Private tracking also supplies serverTime; labels refresh through existing polling.
 
 | Endpoint | Audience and request |
 |---|---|
@@ -45,7 +58,7 @@ Delivery list/detail/tracking and public tracking include `sla: {state,dueAt,min
 | `POST /orders/:id/delivery-issues/:issueId/resolve` | Admin; `{resolution}` |
 | `GET /delivery/orders?page=1` | Delivery employee; up to 100 own assignments |
 | `GET /delivery/orders/:id` | Admin, owning sales agent, assigned employee; fulfillment details |
-| `POST /delivery/orders/:id/start` | Assigned employee; `{assignmentVersion,estimatedDeliveryAt?}`; starting PREPARING needs a future supplied/saved estimate; returns `{attemptId}`, repeated start reuses active attempt |
+| `POST /delivery/orders/:id/start` | Assigned employee; `{assignmentVersion,estimatedDeliveryAt?}`; starting PREPARING needs a saved region and preparation for new orders (a future supplied/saved estimate for earlier-policy orders); returns `{attemptId}`, repeated start reuses active attempt |
 | `POST /delivery/orders/:id/pause` | Assigned employee; `{assignmentVersion,attemptId}` |
 | `POST /delivery/orders/:id/issues` | Assigned employee; fence plus `{explanation}` |
 | `PATCH /delivery/orders/:id/status` | Assigned employee; fence plus `{deliveryStatus,notes?,recipientName?,photoId?}` |
@@ -60,7 +73,7 @@ Delivery list/detail/tracking and public tracking include `sla: {state,dueAt,min
 | `GET /customer/orders/:id/proof-photo` | Verified owning customer; authenticated binary |
 | `POST /auth/logout` | Active staff; invalidates staff sessions, stops employee location |
 
-The existing admin `PATCH /orders/:id/delivery-status` now takes `{assignmentVersion,deliveryStatus,estimatedDeliveryAt?,notes?,recipientName?,photoId?,exceptionReason?}`. Leaving PREPARING for a traveling stage requires a future supplied/saved estimate, including when skipping forward. DELIVERED requires evidence; without a photo, `recipientName` and `exceptionReason` are required. Sales agent mutation returns 403. Estimate revisions are audited and available as nullable `estimatedDeliveryAt` in private detail/tracking and delivery queues.
+The existing admin `PATCH /orders/:id/delivery-status` now takes `{assignmentVersion,deliveryStatus,estimatedDeliveryAt?,notes?,recipientName?,photoId?,exceptionReason?}`. Leaving PREPARING for a traveling stage requires a saved delivery region and preparation timestamp for new orders, or a future supplied/saved estimate for earlier-policy orders, including when skipping forward. DELIVERED requires evidence; without a photo, `recipientName` and `exceptionReason` are required. Sales agent mutation returns 403. Estimate revisions are audited and available as nullable `estimatedDeliveryAt` in private detail/tracking and delivery queues.
 
 Mutation authorization is rechecked inside the order transaction. Private detail/tracking/photo reads hold a shared order lock through ownership verification and retrieval, preventing audience changes midway through reassignment. The fulfillment DTO omits prices, commission terms, payment controls and unrelated customer data. Invalid assignments/attempts/session versions conflict instead of overwriting new state. Invalid images return 400, size overflow 413, expired committed photos 410, and unavailable proof storage 503.
 

@@ -10,6 +10,17 @@ export interface DeliverySla {
   state: 'NOT_SET' | 'ON_TRACK' | 'OVERDUE' | 'MET' | 'BREACHED';
   dueAt: string | null;
   minutes: number | null;
+  policy?: {
+    region: 'BICOL' | 'LUZON' | 'VISAYAS' | 'MINDANAO' | null;
+    remoteDays: number;
+    preparedAt: string | null;
+    dispatchedAt: string | null;
+    fromAt: string | null;
+    toAt: string | null;
+    projected: boolean;
+    completed: boolean;
+    stages: Array<DeliverySla & { name: string; rule: string; completedAt: string | null }>;
+  };
 }
 export interface DeliveryTracking {
   sla: DeliverySla;
@@ -47,6 +58,7 @@ export interface DeliveryJob {
   tracking?: DeliveryTracking;
 }
 export interface DeliveryDetail extends DeliveryJob {
+  orderStatus: string;
   items: Array<{ name: string; quantity: number }>;
   packages: Array<{
     name: string;

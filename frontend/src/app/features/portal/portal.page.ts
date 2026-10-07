@@ -18,11 +18,10 @@ import { BusinessApi, CatalogOffer } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
 import { GuidedChatComponent } from '../../shared/guided-chat.component';
 import { AppIconComponent } from '../../shared/app-icon.component';
-import { DeliveryPanelComponent } from '../delivery/delivery-panel.component';
 type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'reset';
 @Component({
   selector: 'app-customer-portal',
-  imports: [FormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink, DeliveryPanelComponent],
+  imports: [FormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
   templateUrl: './portal.page.html',
   styleUrls: ['../../shared/business.scss', './portal.page.scss'],
 })
@@ -69,7 +68,6 @@ export class PortalPage {
   private catalogRequest?: Subscription;
   readonly orders = signal<any[]>([]);
   readonly requests = signal<any[]>([]);
-  readonly detail = signal<any>(null);
   readonly profile = signal<any>(null);
   readonly cart = signal<Array<{ offer: CatalogOffer; quantity: number }>>([]);
   tab = 'catalog';
@@ -83,15 +81,6 @@ export class PortalPage {
   deliveryAddress = '';
   paymentMethod = 'Cash on delivery';
   search = '';
-  followupMessage = 'Please provide an update on my order.';
-  readonly reviewSaving = signal(false);
-  readonly reviewError = signal('');
-  readonly reviewNotice = signal('');
-  readonly ratingChoices = [1, 2, 3, 4, 5];
-  readonly ratingDescriptions = ['Select a rating', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
-  orderRating = 0;
-  orderReview = '';
-  private detailRequest = 0;
   private magic = '';
   unsubscribe = '';
   setMode(mode: AuthMode) {
@@ -123,6 +112,7 @@ export class PortalPage {
     this.magic = query.get('verify') ?? query.get('reset') ?? '';
     this.mode = query.has('verify') ? 'verify' : query.has('reset') ? 'reset' : 'login';
     this.unsubscribe = query.get('unsubscribe') ?? '';
+    if (query.get('tab') === 'orders') this.tab = 'orders';
     this.loadCatalog();
     if (this.session()?.role === 'CUSTOMER') this.load();
   }
@@ -304,61 +294,7 @@ export class PortalPage {
       });
   }
   view(id: number) {
-    const request = ++this.detailRequest;
-    this.reviewError.set('');
-    this.reviewNotice.set('');
-    this.api.get('customer/orders/' + id).subscribe({
-      next: (r) => {
-        if (request !== this.detailRequest) return;
-        this.orderRating = 0;
-        this.orderReview = '';
-        this.detail.set(r.data);
-        this.tab = 'orders';
-      },
-      error: (e) => this.fail(e),
-    });
-  }
-  deliveryChanged(id: number) {
-    this.view(id);
-    this.api.get<any[]>('customer/orders').subscribe({
-      next: (r) => this.orders.set(r.data),
-      error: (e) => this.fail(e),
-    });
-  }
-  followup() {
-    const order = this.detail();
-    if (!order) return;
-    this.api
-      .post(`customer/orders/${order.id}/followups`, { message: this.followupMessage })
-      .subscribe({
-        next: (r) => {
-          this.notice.set(
-            r.data.reused ? 'An update request is already open.' : 'Your agent has been notified.',
-          );
-          this.view(order.id);
-        },
-        error: (e) => this.fail(e),
-      });
-  }
-  submitReview() {
-    const order = this.detail();
-    if (!order?.canReview || this.reviewSaving() || this.orderRating < 1 || this.orderReview.trim().length < 2) return;
-    this.reviewSaving.set(true);
-    this.reviewError.set('');
-    this.reviewNotice.set('');
-    this.api.post(`customer/orders/${order.id}/review`, { rating: this.orderRating, review: this.orderReview.trim() }).subscribe({
-      next: (r) => {
-        this.reviewSaving.set(false);
-        if (this.detail()?.id !== order.id) return;
-        this.detail.update((current) => ({ ...current, review: r.data, canReview: false }));
-        this.reviewNotice.set('Thank you. Your review has been submitted.');
-      },
-      error: (e) => {
-        this.reviewSaving.set(false);
-        if (e.status === 401) this.fail(e);
-        else if (this.detail()?.id === order.id) this.reviewError.set(e.error?.error?.message ?? 'Unable to submit your review. Please try again.');
-      },
-    });
+    void this.router.navigate(['/portal/orders', id]);
   }
   preferences() {
     this.api.patch('customer/preferences', { marketingOptIn: this.marketingOptIn }).subscribe({
@@ -377,18 +313,12 @@ export class PortalPage {
     });
   }
   logout() {
-    ++this.detailRequest;
-    this.orderRating = 0;
-    this.orderReview = '';
-    this.reviewError.set('');
-    this.reviewNotice.set('');
     this.error.set('');
     this.notice.set('');
     this.sessionService.logout();
     this.profile.set(null);
     this.orders.set([]);
     this.requests.set([]);
-    this.detail.set(null);
     this.cart.set([]);
     this.mode = 'login';
     this.tab = 'catalog';

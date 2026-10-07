@@ -878,6 +878,8 @@ test(
           assert.equal(rows.length, 1);
           const stalled = await create([], [{ productId: 1, quantity: 1 }]);
           await approve(stalled.id);
+          await call(`orders/${stalled.id}/delivery-sla-policy`, 'PATCH', {assignmentVersion: 0, region: 'BICOL', remoteDays: 0});
+          await call(`orders/${stalled.id}/delivery-prepared`, 'POST', {assignmentVersion: 0});
           await db.query(
             "UPDATE orders SET delivery_changed_at=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 49 HOUR) WHERE id=?",
             [stalled.id],

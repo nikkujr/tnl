@@ -1,7 +1,7 @@
 import { db } from "../../database/connection.js";
 import type { SessionUser } from "../../shared/auth.js";
 import { HttpError } from "../../shared/http.js";
-import { positionState, deliverySla } from "./model.js";
+import { positionState, orderSla, slaColumns } from "./model.js";
 import type { PoolConnection } from "mysql2/promise";
 import { transaction, jsonValue } from "../../shared/transaction.js";
 import type { Component } from "../orders/sales.js";
@@ -42,7 +42,7 @@ export async function scopedOrder(
 export async function tracking(id: number, c: Reader = db) {
   // One statement gives a consistent assignment/session/position view during reassignment.
   const [rows] = await c.query<any[]>(
-    `SELECT o.destination_latitude latitude,o.destination_longitude longitude,
+    `SELECT ${slaColumns},o.destination_latitude latitude,o.destination_longitude longitude,
  o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,o.delivery_sla_due_at slaDueAt,${completedAtSql} completedAt,u.full_name employeeName,a.id attemptId,s.id sessionId,
  p.latitude positionLatitude,p.longitude positionLongitude,p.accuracy,p.observed_at observedAt,p.received_at receivedAt
  FROM orders o LEFT JOIN users u ON u.id=o.delivery_employee_id
@@ -64,7 +64,7 @@ export async function tracking(id: number, c: Reader = db) {
     serverTime: new Date(now).toISOString(),
     deliveryStatus: r?.deliveryStatus ?? null,
     estimatedDeliveryAt: r?.estimatedDeliveryAt ?? null,
-    sla: deliverySla(r?.slaDueAt ?? null, r?.completedAt ?? null, r?.deliveryStatus === "DELIVERED", now),
+    sla: orderSla(r, r?.completedAt ?? null, r?.deliveryStatus === "DELIVERED", now),
     employeeName: r?.employeeName ?? null,
     destination:
       r?.latitude != null
@@ -83,7 +83,7 @@ export async function tracking(id: number, c: Reader = db) {
 }
 export async function orderList(user: SessionUser, page = 1) {
   const [rows] = await db.query<any[]>(
-    `SELECT o.id,o.tracking_number trackingNumber,o.delivery_address address,
+    `SELECT ${slaColumns},o.id,o.tracking_number trackingNumber,o.delivery_address address,
  o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,o.delivery_sla_due_at slaDueAt,${completedAtSql} completedAt,o.order_status orderStatus,o.delivery_employee_id employeeId,
  o.delivery_assignment_version assignmentVersion,o.destination_latitude latitude,o.destination_longitude longitude,
  c.full_name recipientName,c.phone recipientPhone,u.full_name employeeName,j.attempt_id attemptId,
@@ -96,12 +96,12 @@ export async function orderList(user: SessionUser, page = 1) {
     user.role === "DELIVERY" ? [user.id, (page - 1) * 100] : [(page - 1) * 100],
   );
   return rows.map(({ slaDueAt, completedAt, ...job }) => ({
-    ...job, sla: deliverySla(slaDueAt, completedAt, job.deliveryStatus === "DELIVERED"),
+    ...job, sla: orderSla(job, completedAt, job.deliveryStatus === "DELIVERED"),
   }));
 }
 export async function orderDetail(o: any, user: Viewer, c: Reader = db) {
   const [rows] = await c.query<any[]>(
-    `SELECT o.id,o.tracking_number trackingNumber,o.delivery_address address,o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,
+    `SELECT o.order_status orderStatus,o.id,o.tracking_number trackingNumber,o.delivery_address address,o.delivery_status deliveryStatus,o.estimated_delivery_at estimatedDeliveryAt,
  o.delivery_assignment_version assignmentVersion,o.delivery_employee_id employeeId,c.full_name recipientName,c.phone recipientPhone,
  u.full_name employeeName,j.attempt_id attemptId FROM orders o JOIN customers c ON c.id=o.customer_id
  LEFT JOIN users u ON u.id=o.delivery_employee_id LEFT JOIN delivery_active_jobs j ON j.order_id=o.id WHERE o.id=?`,
