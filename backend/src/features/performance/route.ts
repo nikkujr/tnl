@@ -74,7 +74,7 @@ router.get(
         `SELECT r.order_id orderId,o.tracking_number trackingNumber,c.full_name customerName,
           r.agent_id agentId,u.full_name agentName,r.rating,r.review,r.created_at createdAt
          FROM order_reviews r JOIN orders o ON o.id=r.order_id JOIN customers c ON c.id=r.customer_id
-         LEFT JOIN users u ON u.id=r.agent_id WHERE r.created_at>=? AND r.created_at<?
+         LEFT JOIN users u ON u.id=r.agent_id WHERE r.agent_id IS NOT NULL AND r.created_at>=? AND r.created_at<?
          ORDER BY r.created_at DESC,r.order_id DESC`, [start, end],
       );
       const trend = Array.from({ length: days }, (_, i) => {

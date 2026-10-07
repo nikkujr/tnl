@@ -99,12 +99,12 @@ const track = { state: 'STOPPED', serverTime: now, destination: null, position: 
     assert.match(await page.locator('tbody').innerText(), /4\.0 \/ 5/);
     await page.getByRole('button', { name: 'Customer feedback', exact: true }).click();
     await page.locator('.feedback-card').first().waitFor();
-    assert.equal(await page.locator('.feedback-card').count(), 2);
+    assert.equal(await page.locator('.feedback-card').count(), 1);
+    assert.equal(await page.locator('.feedback-filter option[value="office"]').count(), 0);
+    assert.equal(await page.locator('.feedback-filter option[value="all"]').textContent(), 'All agents');
     assert.deepEqual(adminErrors, []);
     await page.getByLabel('Agent', { exact: true }).selectOption('2');
     assert.equal(await page.locator('.feedback-card').count(), 1);
-    await page.getByLabel('Agent', { exact: true }).selectOption('office');
-    assert.match(await page.locator('.feedback-card').innerText(), /Office — no agent/);
     await page.getByLabel('Agent', { exact: true }).selectOption('all');
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 950 });
@@ -117,10 +117,11 @@ const track = { state: 'STOPPED', serverTime: now, destination: null, position: 
     const file = await download;
     const csv = fs.readFileSync(await file.path(), 'utf8');
     assert.match(csv, /Customer feedback/);
+    assert(!csv.includes('The office could provide clearer updates.'));
     assert.match(csv, /"\t=Test/);
     await page.emulateMedia({ media: 'print' });
     assert.equal(await page.locator('.feedback-filter').isVisible(), false);
-    assert.equal(await page.locator('.feedback-card').count(), 2);
+    assert.equal(await page.locator('.feedback-card').count(), 1);
     console.log('PASS: Customer review eligibility, validation, retry, persistence, escaping; admin averages, filtering, CSV and print at desktop/mobile widths.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

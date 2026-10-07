@@ -86,8 +86,9 @@ export class PerformancePage implements OnInit {
   readonly success = signal('');
   readonly tab = signal<'overview' | 'targets' | 'rewards' | 'feedback'>('overview');
   readonly feedbackAgent = signal('all');
-  readonly visibleReviews = computed(() => (this.report()?.reviews ?? []).filter((review) =>
-    this.feedbackAgent() === 'all' || (this.feedbackAgent() === 'office' ? review.agentId === null : String(review.agentId) === this.feedbackAgent()),
+  readonly agentReviews = computed(() => (this.report()?.reviews ?? []).filter(review => review.agentId !== null));
+  readonly visibleReviews = computed(() => this.agentReviews().filter((review) =>
+    this.feedbackAgent() === 'all' || String(review.agentId) === this.feedbackAgent(),
   ));
   readonly editing = signal<PerformanceAgent | null>(null);
   readonly bonusOpen = signal(false);
@@ -242,7 +243,7 @@ export class PerformancePage implements OnInit {
       ...data.agents.map((row) => ({ section: 'Agents and targets', ...row })),
       ...data.trend.map((row) => ({ section: 'Daily completed sales', ...row })),
       ...data.rewards.map((row) => ({ section: 'Approved rewards (not payouts)', ...row })),
-      ...(data.reviews ?? []).map((row) => ({ section: 'Customer feedback', ...row })),
+      ...this.agentReviews().map((row) => ({ section: 'Customer feedback', ...row })),
     ];
     downloadCsv(
       `tnl-performance-${data.period}.csv`,

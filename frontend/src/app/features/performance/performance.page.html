@@ -278,8 +278,7 @@
           <div><h3>Customer feedback</h3><p>Reviews submitted during {{ data.period }} · Ratings assess agent communication, recommendations, and support. Agent averages appear in the team leaderboard.</p></div>
           <label class="feedback-filter">Agent
             <select aria-label="Agent" [ngModel]="feedbackAgent()" (ngModelChange)="feedbackAgent.set($event)">
-              <option value="all">All agents and office orders</option>
-              <option value="office">Office orders</option>
+              <option value="all">All agents</option>
               @for (agent of data.agents; track agent.id) { <option [value]="agent.id">{{ agent.fullName }}</option> }
             </select>
           </label>
@@ -290,7 +289,7 @@
             <article class="feedback-card">
               <div class="feedback-heading"><strong>{{ review.rating }} / 5 <span aria-hidden="true">{{ '★'.repeat(review.rating) }}</span></strong><small>{{ review.createdAt | date: 'medium' : '+0800' }} (UTC+8)</small></div>
               <p class="feedback-comment">{{ review.review }}</p>
-              <p>{{ review.customerName }} · {{ review.agentName || 'Office — no agent' }} · <a [routerLink]="['/orders', review.orderId]">{{ review.trackingNumber }}</a></p>
+              <p>{{ review.customerName }} · {{ review.agentName || 'Agent' }} · <a [routerLink]="['/orders', review.orderId]">{{ review.trackingNumber }}</a></p>
             </article>
           } @empty { <p class="empty">No customer reviews for this selection. Customers can review their own orders after delivery and full payment.</p> }
         </div>

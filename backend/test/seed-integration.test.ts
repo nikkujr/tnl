@@ -141,6 +141,7 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     assert.equal((await call(`customer/orders/${office.id}`, officeToken)).review, null);
     await call(`customer/orders/${office.id}/review`, officeToken, { rating: 3, review: "Historical office purchase feedback" }, "POST", 409);
     assert.equal((await call(`orders/${office.id}`, staff.token)).review.review, "Historical office purchase feedback");
+    assert((await call("performance", staff.token)).reviews.every((review: any) => review.agentId !== null));
     await db.query("DELETE FROM order_reviews WHERE order_id=?", [office.id]);
     // Historical store/import attribution is not a field agent to be rated.
     await db.query("UPDATE orders SET agent_id=(SELECT id FROM users WHERE email='historical-import@tnl.local') WHERE id=?", [office.id]);
