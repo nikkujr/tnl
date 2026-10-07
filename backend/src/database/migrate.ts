@@ -36,6 +36,7 @@ export async function migrate() {
     },
     { name: "cash_change", definition: "DECIMAL(12,2) NULL AFTER cash_received" },
     { name: "amount_paid", definition: "DECIMAL(12,2) NULL AFTER cash_change" },
+    { name: "payment_reference", definition: "VARCHAR(120) NULL AFTER amount_paid" },
   ]) {
     const [columns] = await db.query<any[]>(
       `SELECT COUNT(*) columnCount FROM information_schema.columns

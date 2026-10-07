@@ -90,7 +90,7 @@ router.get("/", async (req, res, next) => {
       `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,o.origin origin,
        c.full_name customerName,o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
-       o.cash_change cashChange,o.amount_paid amountPaid,o.delivery_address deliveryAddress,
+       o.cash_change cashChange,o.amount_paid amountPaid,o.payment_reference paymentReference,o.delivery_address deliveryAddress,
        o.created_at createdAt,u.full_name agentName
        FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id${where}
        ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
@@ -199,7 +199,7 @@ router.get(
        c.full_name customerName,c.email customerEmail,c.phone customerPhone,
        o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
-       o.cash_change cashChange,o.amount_paid amountPaid,o.delivery_address deliveryAddress,
+       o.cash_change cashChange,o.amount_paid amountPaid,o.payment_reference paymentReference,o.delivery_address deliveryAddress,
        o.created_at createdAt,o.updated_at updatedAt,u.full_name agentName,u.email agentEmail
        FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id
        WHERE o.id=?${scope}`,
@@ -363,7 +363,7 @@ router.put(
           samePayment ? o.cash_received ?? o.amount_paid ?? undefined : undefined,
         );
         await c.execute(
-          "UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,payment_method=?,payment_status=?,cash_received=?,cash_change=?,amount_paid=? WHERE id=?",
+          "UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,payment_method=?,payment_status=?,cash_received=?,cash_change=?,amount_paid=?,payment_reference=? WHERE id=?",
           [
             req.body.customerId,
             agentId,
@@ -373,6 +373,7 @@ router.put(
             payment.cashReceived,
             payment.cashChange,
             payment.amountPaid,
+            samePayment ? o.payment_reference : null,
             id,
           ],
         );
@@ -493,6 +494,7 @@ router.patch(
         ]),
         cashReceived: z.number().min(0).nullable(),
         amountPaid: z.number().min(0).max(9999999999).optional(),
+        paymentReference: z.string().trim().max(120).nullable().optional(),
       }),
       query: z.any(),
       params: z.object({ id: z.coerce.number().int().positive() }),
@@ -528,19 +530,25 @@ router.patch(
           req.body.amountPaid ?? (req.body.paymentMethod === o.payment_method && req.body.paymentStatus === o.payment_status
             ? o.cash_received ?? o.amount_paid ?? undefined : undefined),
         );
+        const referenceMethod = req.body.paymentMethod === "Bank transfer" || req.body.paymentMethod === "Card";
+        const paymentReference = referenceMethod && payment.paymentStatus !== "UNPAID"
+          ? (req.body.paymentReference ?? (req.body.paymentMethod === o.payment_method ? o.payment_reference : null))?.trim() || null : null;
+        if (referenceMethod && payment.paymentStatus !== "UNPAID" && !paymentReference)
+          throw new HttpError(400, "Transaction reference number is required for bank transfer and card payments", { issues: [{ path: ["body", "paymentReference"], message: "Enter the transaction reference number for this payment." }] });
         if (
           o.payment_status !== payment.paymentStatus ||
           o.payment_method !== req.body.paymentMethod ||
-          o.cash_received !== payment.cashReceived || o.amount_paid !== payment.amountPaid
+          o.cash_received !== payment.cashReceived || o.amount_paid !== payment.amountPaid || o.payment_reference !== paymentReference
         ) {
           await c.execute(
-            "UPDATE orders SET payment_status=?,payment_method=?,cash_received=?,cash_change=?,amount_paid=? WHERE id=?",
+            "UPDATE orders SET payment_status=?,payment_method=?,cash_received=?,cash_change=?,amount_paid=?,payment_reference=? WHERE id=?",
             [
               payment.paymentStatus,
               req.body.paymentMethod,
               payment.cashReceived,
               payment.cashChange,
               payment.amountPaid,
+              paymentReference,
               id,
             ],
           );
@@ -549,7 +557,7 @@ router.patch(
             id,
             req.user!.id,
             "PAYMENT_UPDATED",
-            `Payment marked ${payment.paymentStatus}${payment.amountPaid === null ? '' : `; total amount paid ₱${payment.amountPaid.toFixed(2)}`}.`,
+            `Payment marked ${payment.paymentStatus}${payment.amountPaid === null ? '' : `; total amount paid ₱${payment.amountPaid.toFixed(2)}`}${paymentReference ? `; reference ${paymentReference}` : ''}.`,
           );
           await event(
             c,
@@ -562,7 +570,7 @@ router.patch(
         }
         await paymentEpisode(c, id);
         await completeSale(c, id, req.user!.id);
-        return { id, ...payment, paymentMethod: req.body.paymentMethod };
+        return { id, ...payment, paymentMethod: req.body.paymentMethod, paymentReference };
       });
       res.json({ data });
     } catch (e) {

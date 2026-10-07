@@ -134,7 +134,8 @@ export class OrderDetailPage implements OnInit {
           return;
         }
         this.loading.set(true);
-        this.api.updatePaymentStatus(order.id, status, method, cashReceived, amountReceived).subscribe({
+        const paymentReference = method === 'Bank transfer' || method === 'Card' ? String(values['paymentReference'] ?? '').trim() : null;
+        this.api.updatePaymentStatus(order.id, status, method, cashReceived, amountReceived, paymentReference).subscribe({
           next: () => {
             this.showSuccess('Payment details updated.');
             this.load(order.id);

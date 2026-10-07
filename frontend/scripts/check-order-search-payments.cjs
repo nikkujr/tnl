@@ -62,12 +62,25 @@ const base = process.env.LAYOUT_URL || 'http://127.0.0.1:4200';
     for (const method of ['Bank transfer', 'Card', 'Cash on delivery', 'Cash']) {
       await page.getByRole('button', { name: 'Payment status', exact: true }).click();
       await page.locator('app-action-dialog select[data-validation-field="method"]').selectOption(method);
+      assert.equal(await page.locator('app-action-dialog input[data-validation-field="cashReceived"]').inputValue(), '100');
       await page.locator('app-action-dialog input[data-validation-field="cashReceived"]').fill('25');
       await page.locator('app-action-dialog select[data-validation-field="status"]').selectOption('PARTIALLY_PAID');
+      const reference = page.locator('app-action-dialog input[data-validation-field="paymentReference"]');
+      const electronic = method === 'Bank transfer' || method === 'Card';
+      assert.equal(await reference.count(), electronic ? 1 : 0);
+      if (electronic) {
+        await reference.fill('');
+        const before = payments.length;
+        await page.getByRole('button', { name: 'Update payment', exact: true }).click();
+        assert.equal(payments.length, before, 'Missing reference must prevent submission');
+        await reference.fill(`REF-${method}-123`);
+      }
       await page.getByRole('button', { name: 'Update payment', exact: true }).click();
       await page.getByText('Amount paid ₱25.00 · Balance ₱75.00', { exact: true }).waitFor();
       assert.equal(payments.at(-1).amountPaid, 25);
       assert.equal(payments.at(-1).paymentMethod, method);
+      assert.equal(payments.at(-1).paymentReference, electronic ? `REF-${method}-123` : null);
+      if (electronic) await page.getByText(`Reference: REF-${method}-123`, {exact: true}).waitFor();
     }
     assert.deepEqual(errors, []);
     console.log('Customer search, filters, pagination, return navigation, responsive layout and all-method payment entry passed.');

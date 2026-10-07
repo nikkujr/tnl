@@ -19,10 +19,11 @@ export interface ActionDialogField {
   currentValue?: string;
   min?: number;
   max?: number;
+  maxLength?: number;
   step?: number;
   validate?: (values: Record<string, string | number>) => string | null;
   required?: boolean;
-  visibleWhen?: { key: string; value: string | number };
+  visibleWhen?: { key: string; value: string | number | Array<string | number> };
 }
 
 export interface ActionDialogConfig {
@@ -56,7 +57,8 @@ export class ActionDialogComponent {
 
   isVisible(field: ActionDialogField): boolean {
     if (!field.visibleWhen) return true;
-    return this.config.fields?.find((candidate) => candidate.key === field.visibleWhen!.key)?.value === field.visibleWhen.value;
+    const selected = this.config.fields?.find((candidate) => candidate.key === field.visibleWhen!.key)?.value;
+    return Array.isArray(field.visibleWhen.value) ? field.visibleWhen.value.includes(selected!) : selected === field.visibleWhen.value;
   }
 
   selectStep(field: ActionDialogField, value: string): void {

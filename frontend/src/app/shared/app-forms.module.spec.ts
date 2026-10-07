@@ -108,8 +108,13 @@ describe('app-wide field validation', () => {
     const fields = buildPaymentDialogFields({ paymentMethod: 'Cash', paymentStatus: 'PAID', cashReceived: 0, total: 10.25 });
     const cash = fields.find(field => field.key === 'cashReceived')!;
     expect(cash.step).toBe(0.01);
+    expect(cash.value).toBe(10.25);
     expect(cash.validate!({ method: 'Cash', status: 'PAID', cashReceived: 1 })).toBeTruthy();
     expect(cash.validate!({ method: 'Cash', status: 'PAID', cashReceived: 10.25 })).toBeNull();
+    const reference = fields.find(field => field.key === 'paymentReference')!;
+    expect(reference.validate!({ method: 'Card', status: 'PAID', paymentReference: ' ' })).toBeTruthy();
+    expect(reference.validate!({ method: 'Card', status: 'PAID', paymentReference: 'REF-123' })).toBeNull();
+    expect(reference.validate!({ method: 'Card', status: 'UNPAID', paymentReference: '' })).toBeNull();
   });
 
   it('keeps field errors out of toasts while preserving operational errors', async () => {

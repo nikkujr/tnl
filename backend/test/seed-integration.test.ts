@@ -150,13 +150,19 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     const paymentOrder = await call(`orders/${pending[0].id}`, staff.token);
     for (const method of ['Cash', 'Cash on delivery', 'Bank transfer', 'Card']) {
       const cash = method === 'Cash' || method === 'Cash on delivery';
-      await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PARTIALLY_PAID', cashReceived: cash ? 10 : null, amountPaid: 10 }, 'PATCH');
+      const paymentReference = cash ? null : `REF-${method}-123`;
+      if (!cash) {
+        for (const reference of [undefined, '   ', 'x'.repeat(121)]) await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PARTIALLY_PAID', cashReceived: null, amountPaid: 10, paymentReference: reference }, 'PATCH', 400);
+      }
+      await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PARTIALLY_PAID', cashReceived: cash ? 10 : null, amountPaid: 10, paymentReference: paymentReference ? `  ${paymentReference}  ` : null }, 'PATCH');
       assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).amountPaid, 10);
+      assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).paymentReference, paymentReference);
       const edit = { customerId: paymentOrder.customerId, agentId: paymentOrder.agentId, deliveryAddress: paymentOrder.deliveryAddress,
         paymentMethod: method, cashReceived: cash ? 10 : null, items: paymentOrder.items.map((i: any) => ({ productId: i.productId, quantity: i.quantity })),
         packages: paymentOrder.packages.map((p: any) => ({ packageId: p.packageId, quantity: p.quantity })) };
       await call(`orders/${paymentOrder.id}`, staff.token, edit, 'PUT');
       assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).amountPaid, 10);
+      assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).paymentReference, paymentReference);
       await call(`orders/${paymentOrder.id}`, staff.token, { ...edit, paymentMethod: method === 'Cash' ? 'Card' : 'Cash' }, 'PUT', 409);
       await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PARTIALLY_PAID', cashReceived: cash ? 10 : null }, 'PATCH');
       assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).amountPaid, 10);
@@ -164,9 +170,12 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
       const paid = await call(`orders/${paymentOrder.id}`, staff.token);
       assert.equal(paid.amountPaid, paymentOrder.total);
       assert.equal(paid.cashChange, cash ? 20 : null);
+      assert.equal(paid.paymentReference, paymentReference);
+      if (paymentReference) assert(paid.history.some((e: any) => e.message.includes(paymentReference)));
       await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PAID', cashReceived: cash ? 1 : null, amountPaid: 1 }, 'PATCH', 400);
     }
     await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: paymentOrder.paymentMethod, paymentStatus: 'UNPAID', cashReceived: 0, amountPaid: 0 }, 'PATCH');
+    assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).paymentReference, null);
     const { signCustomer } = await import("../src/features/customer-auth/session.js");
     const tokenFor = async (customerId: number) => {
       const [rows] = await db.query("SELECT ca.id,ca.customer_id customerId,ca.token_version tokenVersion,c.full_name fullName,c.email FROM customer_accounts ca JOIN customers c ON c.id=ca.customer_id WHERE ca.customer_id=?", [customerId]);

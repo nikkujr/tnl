@@ -3,10 +3,11 @@ import { formatMoney } from './money';
 
 export type PaymentStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
 
-export function buildPaymentDialogFields(order: { paymentMethod: string; paymentStatus: string; cashReceived: number | null; amountPaid?: number | null; total: number }): ActionDialogField[] {
+export function buildPaymentDialogFields(order: { paymentMethod: string; paymentStatus: string; cashReceived: number | null; amountPaid?: number | null; paymentReference?: string | null; total: number }): ActionDialogField[] {
   return [
     { key: 'method', label: 'Payment method', type: 'select', value: order.paymentMethod, options: ['Cash', 'Cash on delivery', 'Bank transfer', 'Card'], required: true },
-    { key: 'cashReceived', label: 'Total amount received (PHP)', type: 'number', value: order.cashReceived ?? order.amountPaid ?? 0, min: 0, step: 0.01, required: true, validate: values => validateCashPayment(String(values['method']), values['status'] as PaymentStatus, Number(values['cashReceived']), order.total) },
+    { key: 'cashReceived', label: 'Total amount received (PHP)', type: 'number', value: order.total, min: 0, step: 0.01, required: true, validate: values => validateCashPayment(String(values['method']), values['status'] as PaymentStatus, Number(values['cashReceived']), order.total) },
+    { key: 'paymentReference', label: 'Transaction reference number', type: 'text', value: order.paymentReference ?? '', maxLength: 120, visibleWhen: { key: 'method', value: ['Bank transfer', 'Card'] }, validate: values => values['status'] !== 'UNPAID' && !String(values['paymentReference'] ?? '').trim() ? 'Enter the transaction reference number for this payment.' : null },
     { key: 'status', label: 'Payment status', type: 'select', value: order.paymentStatus, options: ['UNPAID', 'PARTIALLY_PAID', 'PAID'], required: true }
   ];
 }
