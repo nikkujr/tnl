@@ -1,5 +1,5 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Agent, ApiService, Customer } from '../../core/api.service';
 import { BusinessApi } from '../../core/business-api.service';
@@ -17,7 +17,7 @@ import {
 @Component({
   selector: 'app-customers-page',
   imports: [
-    FormsModule,
+    AppFormsModule,
     RouterLink,
     ActionDialogComponent,
     AppIconComponent,

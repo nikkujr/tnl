@@ -1,12 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { Router } from '@angular/router';
 import { BusinessApi } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
 @Component({
   selector: 'app-requests',
-  imports: [FormsModule, CurrencyPipe, DatePipe],
+  imports: [AppFormsModule, CurrencyPipe, DatePipe],
   templateUrl: './requests.page.html',
   styleUrl: '../../shared/business.scss',
 })

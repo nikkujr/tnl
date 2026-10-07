@@ -70,7 +70,7 @@
               }
               <div class="fields">
                 <label class="wide"
-                  >Full name<input
+                  >Full name<input data-validation-field="fullName"
                     name="fullName"
                     [(ngModel)]="fullName"
                     autocomplete="name"
@@ -91,7 +91,7 @@
                 >
                 <label
                   >Phone number {{ data.role === 'ADMIN' ? '(optional)' : ''
-                  }}<input
+                  }}<input data-validation-field="phone"
                     name="phone"
                     type="tel"
                     [(ngModel)]="phone"
@@ -104,7 +104,7 @@
                 >
                 @if (data.role === 'CUSTOMER') {
                   <label class="wide"
-                    >Address<textarea
+                    >Address<textarea data-validation-field="address"
                       name="address"
                       [(ngModel)]="address"
                       autocomplete="street-address"
@@ -124,7 +124,7 @@
                 <button
                   class="primary"
                   type="submit"
-                  [disabled]="saving() !== null || profileForm.invalid"
+                  [disabled]="saving() !== null"
                 >
                   {{ saving() === 'profile' ? 'Saving…' : 'Save profile' }}
                 </button>
@@ -148,7 +148,7 @@
               }
               <div class="fields">
                 <label class="wide"
-                  >Current password<input
+                  >Current password<input data-validation-field="currentPassword"
                     name="currentPassword"
                     type="password"
                     [(ngModel)]="currentPassword"
@@ -158,7 +158,7 @@
                     [disabled]="saving() !== null"
                 /></label>
                 <label
-                  >New password<input
+                  >New password<input data-validation-field="newPassword" [attr.data-validation-error]="newPasswordBytes() > 72 ? 'Use no more than 72 UTF-8 bytes.' : null"
                     name="newPassword"
                     aria-label="New password"
                     aria-describedby="account-password-help"
@@ -172,7 +172,7 @@
                   /><small id="account-password-help">Use at least 8 characters.</small></label
                 >
                 <label
-                  >Confirm new password<input
+                  >Confirm new password<input data-validation-field="confirmPassword" [attr.data-validation-error]="confirmPassword !== newPassword ? 'New passwords do not match.' : null"
                     name="confirmPassword"
                     aria-label="Confirm new password"
                     [attr.aria-invalid]="
@@ -206,7 +206,7 @@
                   class="primary"
                   type="submit"
                   [disabled]="
-                    saving() !== null || passwordForm.invalid || newPassword !== confirmPassword
+                    saving() !== null
                   "
                 >
                   {{ saving() === 'password' ? 'Changing…' : 'Change password' }}

@@ -1,7 +1,7 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { combineLatest } from 'rxjs';
 import { BusinessApi } from '../../core/business-api.service';
@@ -13,7 +13,7 @@ import { BusinessReport, fillTrend, ReportPeriod } from './reports.model';
 @Component({
   selector: 'app-reports-page',
   imports: [
-    FormsModule,
+    AppFormsModule,
     CurrencyPipe,
     DatePipe,
     DecimalPipe,

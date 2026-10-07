@@ -1,6 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { Agent, ApiService, Customer, Product, SessionUser } from '../../core/api.service';
@@ -13,7 +13,7 @@ import { BusinessApi, SalesPackage } from '../../core/business-api.service';
   selector: 'app-new-order-page',
   imports: [
     CurrencyPipe,
-    FormsModule,
+    AppFormsModule,
     AppIconComponent,
     ActionDialogComponent,
     BreadcrumbComponent,
@@ -59,6 +59,7 @@ export class NewOrderPage implements OnInit {
   readonly products = signal<Product[]>([]);
   readonly agents = signal<Agent[]>([]);
   readonly loading = signal(true);
+  readonly saving = signal(false);
   readonly error = signal('');
   readonly itemModalOpen = signal(false);
   readonly customerModalOpen = signal(false);
@@ -275,6 +276,7 @@ export class NewOrderPage implements OnInit {
   }
 
   submit(): void {
+    if (this.saving()) return;
     if (this.session().role === 'AGENT' && this.items().length) {
       this.error.set('Agents can only add packages to new orders.');
       return;
@@ -300,7 +302,7 @@ export class NewOrderPage implements OnInit {
       );
       return;
     }
-    this.loading.set(true);
+    this.saving.set(true);
     this.error.set('');
     this.api
       .createOrder({
@@ -324,7 +326,7 @@ export class NewOrderPage implements OnInit {
           this.router.navigateByUrl('/orders');
         },
         error: (error) => {
-          this.loading.set(false);
+          this.saving.set(false);
           this.error.set(error.error?.error?.message ?? 'Unable to create order.');
         },
       });

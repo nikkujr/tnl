@@ -1,7 +1,7 @@
 import { LowerCasePipe } from '@angular/common';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-dialog.component';
@@ -17,7 +17,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 @Component({
   selector: 'app-import-review-page',
-  imports: [LowerCasePipe, FormsModule, ActionDialogComponent, BreadcrumbComponent],
+  imports: [LowerCasePipe, AppFormsModule, ActionDialogComponent, BreadcrumbComponent],
   templateUrl: './import-review.page.html',
   styleUrls: ['./import-review.page.scss']
 })

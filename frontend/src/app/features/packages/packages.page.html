@@ -56,9 +56,9 @@
     >
       <h3>{{ editing ? 'Edit package' : 'Create package' }}</h3>
       <div class="fields">
-        <label>Name<input name="name" [(ngModel)]="form.name" required minlength="2" /></label
+        <label>Name<input data-validation-field="name" name="name" [(ngModel)]="form.name" required minlength="2" /></label
         ><label
-          >Selling price<input
+          >Selling price<input data-validation-field="sellingPrice"
             name="price"
             type="number"
             min="0.01"
@@ -66,12 +66,12 @@
             [(ngModel)]="form.sellingPrice"
             required /></label
         ><label
-          >Commission type<select name="type" [(ngModel)]="form.commissionType">
+          >Commission type<select data-validation-field="commissionType" name="type" [(ngModel)]="form.commissionType">
             <option value="FIXED">Fixed peso amount</option>
             <option value="PERCENTAGE">Percentage of package price</option>
           </select></label
         ><label
-          >Commission value<input
+          >Commission value<input data-validation-field="commissionValue"
             name="commission"
             type="number"
             min="0"
@@ -80,10 +80,10 @@
             [(ngModel)]="form.commissionValue"
             required /></label
         ><label class="wide"
-          >Description<textarea name="description" [(ngModel)]="form.description"></textarea>
+          >Description<textarea data-validation-field="description" name="description" [(ngModel)]="form.description"></textarea>
         </label>
       </div>
-      <label><input name="active" type="checkbox" [(ngModel)]="form.active" />Active offer</label>
+      <label><input data-validation-field="active" name="active" type="checkbox" [(ngModel)]="form.active" />Active offer</label>
       <div class="components-heading">
         <div>
           <h3>Components</h3>
@@ -91,7 +91,7 @@
         </div>
         <button
           type="button"
-          class="add-component"
+          class="add-component" data-validation-field="components" [attr.data-validation-error]="!form.components.length ? 'Add at least one component.' : null"
           [disabled]="busy() || form.components.length >= 50"
           (click)="openComponentPicker()"
         >
@@ -113,7 +113,7 @@
             </button>
           </div>
           <label
-            >Units per package<input
+            >Units per package<input [attr.data-validation-field]="'components.' + i + '.quantity'"
               [name]="'quantity' + i"
               type="number"
               min="1"
@@ -132,7 +132,7 @@
         </div>
       }
       <div class="actions package-form-actions">
-        <button class="primary" [disabled]="busy() || packageForm.invalid || !componentsValid()">
+        <button class="primary" [disabled]="busy()">
           Save package
         </button>
       </div>
@@ -268,7 +268,7 @@
           ><strong>{{ selectedProduct()?.name || 'Choose a product above' }}</strong>
         </div>
         <label class="field"
-          >Units per package<input
+          >Units per package<input data-validation-field="componentQuantity"
             type="number"
             name="componentQuantity"
             [(ngModel)]="componentQuantity"
@@ -283,7 +283,7 @@
         <button
           class="primary"
           [disabled]="
-            !selectedProduct() || componentForm.invalid || !validQuantity(componentQuantity)
+            !selectedProduct()
           "
         >
           {{ componentIndex === null ? 'Add to package' : 'Apply changes' }}

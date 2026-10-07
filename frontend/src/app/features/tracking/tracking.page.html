@@ -6,13 +6,13 @@
     <p>Enter a tracking number to see the latest verified delivery events.</p>
   </div>
   <article class="tracking-card">
-    <label class="tracking-search"
-      ><input
+    <form (ngSubmit)="track()"><label class="tracking-search"
+      ><input data-validation-field="trackingNumber" name="trackingNumber" required
         [(ngModel)]="trackingNumber"
         placeholder="Enter tracking number"
-        (keyup.enter)="track()"
-      /><button (click)="track()" [disabled]="loading()">Track order</button></label
+      /><button type="submit" [disabled]="loading()">Track order</button></label
     >
+    </form>
     @if (result(); as data) {
       <div class="tracking-summary">
         <div>

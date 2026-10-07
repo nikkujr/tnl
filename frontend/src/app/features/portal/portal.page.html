@@ -108,7 +108,7 @@
           <div class="fields auth-fields" [class.registration]="mode === 'register'">
             @if (['login', 'register', 'forgot'].includes(mode)) {
               <label class="wide"
-                >Email<input
+                >Email<input data-validation-field="email"
                   name="email"
                   type="email"
                   [(ngModel)]="email"
@@ -123,7 +123,7 @@
                   mode === 'verify'
                     ? 'Password for an invitation (leave blank for a registration link)'
                     : 'Password'
-                }}<input
+                }}<input data-validation-field="password"
                   name="password"
                   type="password"
                   [(ngModel)]="password"
@@ -138,7 +138,7 @@
             }
             @if (mode === 'register') {
               <label
-                >Full name<input
+                >Full name<input data-validation-field="fullName"
                   name="fullName"
                   [(ngModel)]="fullName"
                   autocomplete="name"
@@ -146,7 +146,7 @@
                   required
                   minlength="2" /></label
               ><label
-                >PH mobile number<input
+                >PH mobile number<input data-validation-field="phone"
                   name="phone"
                   type="tel"
                   autocomplete="tel"
@@ -154,7 +154,7 @@
                   placeholder="09XXXXXXXXX"
                   required /></label
               ><label class="wide"
-                >Address<textarea
+                >Address<textarea data-validation-field="address"
                   name="address"
                   [(ngModel)]="address"
                   autocomplete="street-address"
@@ -165,7 +165,7 @@
                 ></textarea></label
               ><label class="wide consent"
                 ><span
-                  ><input type="checkbox" name="optin" [(ngModel)]="marketingOptIn" />I would like
+                  ><input data-validation-field="marketingOptIn" type="checkbox" name="optin" [(ngModel)]="marketingOptIn" />I would like
                   promotional campaigns, welcome emails, and purchase follow-ups.</span
                 ></label
               >
@@ -178,7 +178,7 @@
               </button>
             </div>
           }
-          <button class="primary auth-submit" [disabled]="busy() || authForm.invalid">
+          <button class="primary auth-submit" [disabled]="busy()">
             {{
               busy()
                 ? 'Working…'
@@ -253,7 +253,7 @@
       <section class="panel catalog-search">
         <form class="fields" (ngSubmit)="loadCatalog()">
           <label
-            >Search products and packages<input
+            >Search products and packages<input data-validation-field="search"
               #catalogSearchInput
               name="search"
               [(ngModel)]="search"
@@ -364,7 +364,7 @@
               ><small>{{ l.offer.price | currency: 'PHP' : 'symbol-narrow' }} each</small>
             </div>
             <label
-              >Quantity<input
+              >Quantity<input [attr.data-validation-field]="(l.offer.kind === 'PRODUCT' ? 'items.' : 'packages.') + requestLineIndex(i) + '.quantity'"
                 [name]="'quantity' + i"
                 type="number"
                 min="1"
@@ -387,7 +387,7 @@
         <strong>Total: {{ total() | currency: 'PHP' : 'symbol-narrow' }}</strong>
         <div class="fields">
           <label
-            >Delivery address<textarea
+            >Delivery address<textarea data-validation-field="deliveryAddress"
               name="delivery"
               [(ngModel)]="deliveryAddress"
               required
@@ -395,7 +395,7 @@
               maxlength="500"
             ></textarea></label
           ><label
-            >Payment method<select name="payment" [(ngModel)]="paymentMethod">
+            >Payment method<select data-validation-field="paymentMethod" name="payment" [(ngModel)]="paymentMethod">
               <option>Cash on delivery</option>
               <option>Bank transfer</option>
               <option>Card</option>
@@ -466,7 +466,7 @@
       <form class="panel" (ngSubmit)="preferences()">
         <h3>Email preferences</h3>
         <label
-          ><input type="checkbox" name="marketing" [(ngModel)]="marketingOptIn" />Receive
+          ><input data-validation-field="marketingOptIn" type="checkbox" name="marketing" [(ngModel)]="marketingOptIn" />Receive
           promotional campaigns, welcome emails, and purchase follow-ups.</label
         >
         <p>Order updates and account emails remain enabled.</p>

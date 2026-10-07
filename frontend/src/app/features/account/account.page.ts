@@ -1,6 +1,6 @@
 import { Component, DestroyRef, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { RouterLink } from '@angular/router';
 import { BusinessApi } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
@@ -23,7 +23,7 @@ interface AccountUpdate {
 }
 @Component({
   selector: 'app-account-page',
-  imports: [FormsModule, RouterLink, BreadcrumbComponent, AppIconComponent],
+  imports: [AppFormsModule, RouterLink, BreadcrumbComponent, AppIconComponent],
   templateUrl: './account.page.html',
   styleUrl: './account.page.scss',
 })
@@ -108,6 +108,7 @@ export class AccountPage implements OnInit, OnDestroy {
         },
       });
   }
+  newPasswordBytes() { return new TextEncoder().encode(this.newPassword).length; }
   changePassword() {
     if (this.saving()) return;
     this.passwordError.set('');

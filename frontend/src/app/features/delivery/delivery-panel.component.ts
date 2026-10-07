@@ -11,7 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { Subscription, firstValueFrom, timeout } from 'rxjs';
 import { SessionService } from '../../core/session.service';
 import {
@@ -25,7 +25,7 @@ import { DeliveryMapComponent, MapPoint } from './delivery-map.component';
 import { DeliverySlaComponent } from './delivery-sla.component';
 @Component({
   selector: 'app-delivery-panel',
-  imports: [DatePipe, TitleCasePipe, FormsModule, DeliveryMapComponent, DeliverySlaComponent],
+  imports: [DatePipe, TitleCasePipe, AppFormsModule, DeliveryMapComponent, DeliverySlaComponent],
   templateUrl: './delivery-panel.component.html',
   styleUrl: './delivery.scss',
 })

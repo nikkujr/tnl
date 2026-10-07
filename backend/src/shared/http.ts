@@ -15,7 +15,7 @@ export const validate = (schema: ZodType): RequestHandler => (req, _res, next) =
       return field ? `${field}: ${issue.message}` : issue.message;
     });
     const summary = messages.length ? `Validation failed — ${messages.join("; ")}` : "Validation failed";
-    return next(new HttpError(400, summary, result.error.flatten()));
+    return next(new HttpError(400, summary, { ...result.error.flatten(), issues: result.error.issues.map(({ path, message }) => ({ path, message })) }));
   }
   const validated = result.data as { body?: unknown };
   if (validated.body !== undefined) req.body = validated.body;

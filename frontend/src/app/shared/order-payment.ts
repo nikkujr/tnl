@@ -3,10 +3,10 @@ import { formatMoney } from './money';
 
 export type PaymentStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
 
-export function buildPaymentDialogFields(order: { paymentMethod: string; paymentStatus: string; cashReceived: number | null }): ActionDialogField[] {
+export function buildPaymentDialogFields(order: { paymentMethod: string; paymentStatus: string; cashReceived: number | null; total: number }): ActionDialogField[] {
   return [
     { key: 'method', label: 'Payment method', type: 'select', value: order.paymentMethod, options: ['Cash', 'Cash on delivery', 'Bank transfer', 'Card'], required: true },
-    { key: 'cashReceived', label: 'Cash received', type: 'number', value: order.cashReceived ?? 0, min: 0, required: true, visibleWhen: { key: 'method', value: 'Cash' } },
+    { key: 'cashReceived', label: 'Cash received', type: 'number', value: order.cashReceived ?? 0, min: 0, step: 0.01, required: true, visibleWhen: { key: 'method', value: 'Cash' }, validate: values => validateCashPayment(String(values['method']), values['status'] as PaymentStatus, Number(values['cashReceived']), order.total) },
     { key: 'status', label: 'Payment status', type: 'select', value: order.paymentStatus, options: ['UNPAID', 'PARTIALLY_PAID', 'PAID'], required: true }
   ];
 }

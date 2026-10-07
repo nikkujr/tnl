@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService, Product } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
@@ -11,7 +11,7 @@ const HEALTH_BATCH_LIMIT = 100;
 
 @Component({
   selector: 'app-inventory-page',
-  imports: [FormsModule, ActionDialogComponent, BreadcrumbComponent],
+  imports: [AppFormsModule, ActionDialogComponent, BreadcrumbComponent],
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss'
 })

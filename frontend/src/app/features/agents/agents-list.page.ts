@@ -1,5 +1,5 @@
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService, Agent } from '../../core/api.service';
@@ -16,7 +16,7 @@ import {
 @Component({
   selector: 'app-agents-list-page',
   imports: [
-    FormsModule,
+    AppFormsModule,
     CurrencyPipe,
     DecimalPipe,
     RouterLink,

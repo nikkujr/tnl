@@ -363,7 +363,7 @@
       <form class="completion-form" [id]="'delivery-completion-' + orderId" (ngSubmit)="complete()">
         <h4>Complete delivery</h4>
         <label
-          >Received by<input
+          >Received by<input data-validation-field="recipientName"
             name="recipient"
             [(ngModel)]="recipientName"
             minlength="2"
@@ -371,7 +371,7 @@
             required /></label
         ><label
           >Proof photo<input
-            type="file"
+            name="proofPhoto" data-validation-field="proofPhotoId" [required]="!isAdmin() && !file" type="file"
             accept="image/jpeg,image/png,image/webp"
             capture="environment"
             (change)="choosePhoto($event)" /></label
@@ -384,7 +384,7 @@
         }
         @if (isAdmin() && !file) {
           <label
-            >Reason for completing without a photo<textarea
+            >Reason for completing without a photo<textarea data-validation-field="exceptionReason"
               name="exception"
               [(ngModel)]="exceptionReason"
               minlength="5"
@@ -396,9 +396,7 @@
         <button
           class="primary"
           [disabled]="
-            busy() ||
-            recipientName.trim().length < 2 ||
-            (!file && (!isAdmin() || exceptionReason.trim().length < 5))
+            busy()
           "
         >
           {{ busy() ? 'Saving…' : 'Confirm delivered' }}

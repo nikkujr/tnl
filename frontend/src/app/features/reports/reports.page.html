@@ -17,7 +17,7 @@
       <form class="period-picker" (ngSubmit)="apply()">
         @if (period() === 'daily') {
           <label
-            >Report date<input
+            >Report date<input data-validation-field="date"
               type="date"
               name="date"
               [(ngModel)]="date"
@@ -27,7 +27,7 @@
           /></label>
         } @else {
           <label
-            >Report month<input
+            >Report month<input data-validation-field="month"
               type="month"
               name="month"
               [(ngModel)]="month"

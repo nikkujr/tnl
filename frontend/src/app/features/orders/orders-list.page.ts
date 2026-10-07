@@ -1,6 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService, Order, OrderStats, SessionUser } from '../../core/api.service';
 import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-dialog.component';
@@ -31,7 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
   selector: 'app-orders-list-page',
   imports: [
     CurrencyPipe,
-    FormsModule,
+    AppFormsModule,
     ActionDialogComponent,
     AppIconComponent,
     BreadcrumbComponent,

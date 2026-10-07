@@ -1,6 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ApiService, Category, Product } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
 import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
@@ -10,7 +10,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 
 @Component({
   selector: 'app-products-page',
-  imports: [CurrencyPipe, FormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent],
+  imports: [CurrencyPipe, AppFormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent],
   templateUrl: './products.page.html',
   styleUrl: './products.page.scss'
 })

@@ -12,7 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BusinessApi, CatalogOffer } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
@@ -21,7 +21,7 @@ import { AppIconComponent } from '../../shared/app-icon.component';
 type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'reset';
 @Component({
   selector: 'app-customer-portal',
-  imports: [FormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
+  imports: [AppFormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
   templateUrl: './portal.page.html',
   styleUrls: ['../../shared/business.scss', './portal.page.scss'],
 })
@@ -257,6 +257,10 @@ export class PortalPage {
   }
   remove(index: number) {
     this.cart.update((lines) => lines.filter((_, i) => i !== index));
+  }
+  requestLineIndex(index: number): number {
+    const lines = this.cart();
+    return lines.slice(0, index).filter(line => line.offer.kind === lines[index].offer.kind).length;
   }
   total() {
     return this.cart().reduce((s, l) => s + l.offer.price * l.quantity, 0);

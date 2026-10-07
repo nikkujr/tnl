@@ -1,5 +1,5 @@
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ApiService, Category } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
 import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
@@ -9,7 +9,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 
 @Component({
   selector: 'app-categories-page',
-  imports: [FormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent],
+  imports: [AppFormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent],
   templateUrl: './categories.page.html',
   styleUrl: './categories.page.scss'
 })

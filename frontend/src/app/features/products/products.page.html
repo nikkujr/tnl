@@ -38,11 +38,11 @@
       <div class="modal-title"><div><span class="eyebrow">Catalog</span><h2>{{ editingId ? 'Edit product' : 'New product' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
       <form (ngSubmit)="save()">
         <div class="form-grid">
-          <label>Product name<input name="productName" [(ngModel)]="form.name" required></label>
-          <label>SKU<input name="sku" [(ngModel)]="form.sku" required></label>
-          <label>Category<select name="categoryId" [(ngModel)]="form.categoryId">@for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }</select></label>
-          <label>Price<input name="price" type="number" min="0.01" step="0.01" [(ngModel)]="form.price" required></label>
-          <label class="wide">Description<textarea name="productDescription" [(ngModel)]="form.description" rows="4"></textarea></label>
+          <label>Product name<input data-validation-field="name" name="productName" [(ngModel)]="form.name" required></label>
+          <label>SKU<input data-validation-field="sku" name="sku" [(ngModel)]="form.sku" required></label>
+          <label>Category<select data-validation-field="categoryId" name="categoryId" [(ngModel)]="form.categoryId">@for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }</select></label>
+          <label>Price<input data-validation-field="price" name="price" type="number" min="0.01" step="0.01" [(ngModel)]="form.price" required></label>
+          <label class="wide">Description<textarea data-validation-field="description" name="productDescription" [(ngModel)]="form.description" rows="4"></textarea></label>
         </div>
         <p class="form-note">Stock quantities are managed only through Inventory Management.</p>
         <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save product</button></footer>

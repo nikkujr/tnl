@@ -24,7 +24,7 @@
   <div class="modal-backdrop" (click)="showForm.set(false)">
     <section class="modal compact" (click)="$event.stopPropagation()">
       <div class="modal-title"><div><span class="eyebrow">Catalog</span><h2>{{ editingId ? 'Edit category' : 'New category' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
-      <form (ngSubmit)="save()"><div class="form-grid one-column"><label>Category name<input name="categoryName" [(ngModel)]="form.name" required></label><label>Description<textarea name="categoryDescription" [(ngModel)]="form.description" rows="4"></textarea></label></div><footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save category</button></footer></form>
+      <form (ngSubmit)="save()"><div class="form-grid one-column"><label>Category name<input data-validation-field="name" name="categoryName" [(ngModel)]="form.name" required></label><label>Description<textarea data-validation-field="description" name="categoryDescription" [(ngModel)]="form.description" rows="4"></textarea></label></div><footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save category</button></footer></form>
     </section>
   </div>
 }

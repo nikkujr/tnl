@@ -367,7 +367,7 @@
           <p>{{ data.period }} · Sales include delivered, fully paid orders.</p>
           <form (ngSubmit)="saveTarget()">
             <label
-              >Sales target (₱)<input
+              >Sales target (₱)<input data-validation-field="salesTarget"
                 name="salesTarget"
                 type="number"
                 [(ngModel)]="salesTarget"
@@ -376,7 +376,7 @@
                 step="0.01"
                 required /></label
             ><label
-              >Incentive for reaching target (₱)<input
+              >Incentive for reaching target (₱)<input data-validation-field="incentiveAmount"
                 name="incentiveAmount"
                 type="number"
                 [(ngModel)]="incentiveAmount"
@@ -463,7 +463,7 @@
           <p>The award will be recorded for {{ data.period }} with your admin approval.</p>
           <form (ngSubmit)="saveBonus()">
             <label
-              >Agent<select name="bonusAgent" [(ngModel)]="bonusAgentId" required>
+              >Agent<select data-validation-field="agentId" name="bonusAgent" [(ngModel)]="bonusAgentId" required>
                 @for (agent of data.agents; track agent.id) {
                   <option [ngValue]="agent.id">
                     {{ agent.fullName }}{{ agent.active ? '' : ' (inactive)' }}
@@ -471,7 +471,7 @@
                 }
               </select></label
             ><label
-              >Bonus amount (₱)<input
+              >Bonus amount (₱)<input data-validation-field="amount"
                 name="bonusAmount"
                 type="number"
                 [(ngModel)]="bonusAmount"
@@ -480,7 +480,7 @@
                 step="0.01"
                 required /></label
             ><label class="wide"
-              >Reason<textarea
+              >Reason<textarea data-validation-field="reason"
                 name="bonusReason"
                 [(ngModel)]="bonusReason"
                 minlength="3"

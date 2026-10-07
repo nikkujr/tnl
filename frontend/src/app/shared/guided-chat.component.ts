@@ -11,7 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from './app-forms.module';
 import { Router } from '@angular/router';
 import { BusinessApi, CatalogOffer } from '../core/business-api.service';
 import { SessionService } from '../core/session.service';
@@ -19,7 +19,7 @@ import { AppIconComponent, AppIconName } from './app-icon.component';
 let nextAssistantId = 0;
 @Component({
   selector: 'app-guided-chat',
-  imports: [FormsModule, CurrencyPipe, DatePipe, AppIconComponent],
+  imports: [AppFormsModule, CurrencyPipe, DatePipe, AppIconComponent],
   templateUrl: './guided-chat.component.html',
   styleUrls: ['./business.scss', './guided-chat.component.scss'],
 })

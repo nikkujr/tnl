@@ -186,9 +186,9 @@ router.patch(
             account.passwordHash,
           ))
         )
-          throw new HttpError(400, "Current password is incorrect");
+          throw new HttpError(400, "Current password is incorrect", { issues: [{ path: ["body", "currentPassword"], message: "Current password is incorrect" }] });
         if (await bcrypt.compare(req.body.newPassword, account.passwordHash))
-          throw new HttpError(400, "Choose a different new password");
+          throw new HttpError(400, "Choose a different new password", { issues: [{ path: ["body", "newPassword"], message: "Choose a different new password" }] });
         const hash = await bcrypt.hash(req.body.newPassword, 12);
         if (account.role === "DELIVERY") await stopEmployeeLocations(c, account.id);
         await c.execute(

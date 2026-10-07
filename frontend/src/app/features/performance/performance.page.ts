@@ -8,7 +8,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { RouterLink } from '@angular/router';
 import { BusinessApi } from '../../core/business-api.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -63,7 +63,7 @@ interface PerformanceReport {
 
 @Component({
   selector: 'app-performance-page',
-  imports: [FormsModule, CurrencyPipe, DatePipe, DecimalPipe, RouterLink, BreadcrumbComponent],
+  imports: [AppFormsModule, CurrencyPipe, DatePipe, DecimalPipe, RouterLink, BreadcrumbComponent],
   templateUrl: './performance.page.html',
   styleUrl: './performance.page.scss',
 })

@@ -1,6 +1,6 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from './app-forms.module';
 import { RouterLink } from '@angular/router';
 import { BusinessApi } from '../core/business-api.service';
 
@@ -26,7 +26,7 @@ interface AgentRewards {
 
 @Component({
   selector: 'app-agent-rewards',
-  imports: [CurrencyPipe, DatePipe, DecimalPipe, FormsModule, RouterLink],
+  imports: [CurrencyPipe, DatePipe, DecimalPipe, AppFormsModule, RouterLink],
   templateUrl: './agent-rewards.component.html',
   styleUrl: './agent-rewards.component.scss',
 })

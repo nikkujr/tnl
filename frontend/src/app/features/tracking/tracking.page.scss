@@ -7,7 +7,8 @@
 .page-intro p { margin: 0; color: var(--muted, #667085); font-size: 14px; }
 
 .tracking-card { max-width: 850px; overflow: hidden; border: 1px solid var(--line, #e4e7ec); border-radius: 14px; background: var(--color-surface, #fff); box-shadow: var(--shadow-sm, 0 1px 3px rgba(16, 24, 40, .04)); }
-.tracking-search { display: flex; gap: 9px; padding: 22px; background: var(--green, #7167c9); }
+.tracking-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; padding: 22px; background: var(--color-accent-bg, #ded9ff); }
+.tracking-search button { grid-column: 2; grid-row: 1; }
 .tracking-search input { flex: 1; min-height: 46px; padding: 13px; border: 0; border-radius: 9px; background: var(--color-surface, #fff); color: var(--ink, #1d2939); font-size: 13px; }
 .tracking-search button { min-height: 46px; padding: 0 18px; border: 0; border-radius: 9px; color: var(--color-accent-hover, #4d458f); background: var(--color-accent-bg, #ded9ff); font-size: 10px; font-weight: 800; }
 

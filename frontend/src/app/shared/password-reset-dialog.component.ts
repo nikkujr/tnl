@@ -11,7 +11,7 @@ import {
   signal,
   DestroyRef,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from './app-forms.module';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BusinessApi } from '../core/business-api.service';
 import { ToastService } from './toast.service';
@@ -25,7 +25,7 @@ export interface PasswordResetTarget {
 
 @Component({
   selector: 'app-password-reset-dialog',
-  imports: [FormsModule],
+  imports: [AppFormsModule],
   templateUrl: './password-reset-dialog.component.html',
   styleUrl: './password-reset-dialog.component.scss',
 })
@@ -58,6 +58,7 @@ export class PasswordResetDialogComponent implements AfterViewInit, OnDestroy {
       this.closed.emit();
     }
   }
+  passwordBytes() { return new TextEncoder().encode(this.password).length; }
   valid() {
     return (
       this.password.length >= 8 &&

@@ -11,7 +11,7 @@ import {
   signal,
   ViewChild,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from './shared/app-forms.module';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { forkJoin } from 'rxjs';
@@ -42,7 +42,7 @@ import {
   selector: 'app-root',
   imports: [
     DatePipe,
-    FormsModule,
+    AppFormsModule,
     RouterOutlet,
     ActionDialogComponent,
     AppIconComponent,

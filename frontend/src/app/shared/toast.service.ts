@@ -22,7 +22,7 @@ export class ToastService {
   /** Legacy alias, kept for the many existing call sites: pushes a success toast. */
   success(message: string): void { this.push('success', message); }
   /** Legacy alias, kept for the many existing call sites: pushes an error toast. */
-  fail(message: string): void { this.push('error', message); }
+  fail(message: string): void { if (message) this.push('error', message); }
   info(message: string): void { this.push('info', message); }
   warn(message: string): void { this.push('warning', message); }
 

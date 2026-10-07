@@ -32,7 +32,7 @@
           </div>
           <div class="fields">
             <label
-              >Customer<button type="button" class="lookup-field" (click)="openCustomerModal()">
+              >Customer<button type="button" class="lookup-field" data-validation-field="customerId" [attr.data-validation-error]="!customerId ? 'Select a customer.' : null" (click)="openCustomerModal()">
                 @if (selectedCustomer(); as customer) {
                   <span class="lookup-avatar">{{
                     customer.fullName.slice(0, 2).toUpperCase()
@@ -87,7 +87,7 @@
                   <p>Add each product through the catalog selector.</p>
                 </div>
               </div>
-              <button type="button" class="brand-button icon-button" (click)="openItemModal()">
+              <button type="button" class="brand-button icon-button" data-validation-field="items" [attr.data-validation-error]="!items().length && !packageLines().length ? 'Add at least one item or package.' : null" (click)="openItemModal()">
                 <app-icon name="plus" />Add item
               </button>
             </div>
@@ -96,14 +96,14 @@
                 <span>Product</span><span>Price</span><span>Quantity</span><span>Subtotal</span
                 ><span></span>
               </div>
-              @for (item of items(); track item.product.id) {
+              @for (item of items(); track item.product.id; let i = $index) {
                 <div class="item-row">
                   <span
                     ><strong>{{ item.product.name }}</strong
                     ><small>{{ item.product.sku }} · {{ item.product.category }}</small></span
                   ><span>{{ item.product.price | currency: 'PHP' : 'symbol-narrow' }}</span
                   ><span
-                    ><input
+                    ><input [attr.data-validation-field]="'items.' + i + '.quantity'"
                       class="line-quantity"
                       type="number"
                       min="1"
@@ -134,7 +134,7 @@
                   <p>Choose the packages your customer would like to order.</p>
                 </div>
               </div>
-              <button type="button" class="brand-button icon-button" (click)="openPackageModal()">
+              <button type="button" class="brand-button icon-button" data-validation-field="packages" [attr.data-validation-error]="!packageLines().length ? 'Add at least one package.' : null" (click)="openPackageModal()">
                 <app-icon name="plus" />Add package
               </button>
             </div>
@@ -143,13 +143,13 @@
                 <span>Package</span><span>Price</span><span>Quantity</span><span>Subtotal</span
                 ><span></span>
               </div>
-              @for (line of packageLines(); track line.package.id) {
+              @for (line of packageLines(); track line.package.id; let i = $index) {
                 <div class="item-row">
                   <span
                     ><strong>{{ line.package.name }}</strong
                     ><small>{{ line.package.components.length }} component products</small></span
                   ><span>{{ line.package.sellingPrice | currency: 'PHP' : 'symbol-narrow' }}</span
-                  ><input
+                  ><input [attr.data-validation-field]="'packages.' + i + '.quantity'"
                     class="line-quantity"
                     type="number"
                     min="1"
@@ -183,7 +183,7 @@
           </div>
           <div class="fields">
             <label
-              >Payment method<select name="payment" [(ngModel)]="paymentMethod">
+              >Payment method<select data-validation-field="paymentMethod" name="payment" [(ngModel)]="paymentMethod">
                 <option>Cash</option>
                 <option>Cash on delivery</option>
                 <option>Bank transfer</option>
@@ -192,7 +192,7 @@
             >
             @if (paymentMethod === 'Cash') {
               <label
-                >Cash received<input
+                >Cash received<input data-validation-field="cashReceived" [min]="total()" required
                   name="cashReceived"
                   type="number"
                   min="0"
@@ -211,7 +211,7 @@
               </div>
             }
             <label class="wide"
-              >Delivery address<textarea
+              >Delivery address<textarea data-validation-field="deliveryAddress"
                 name="address"
                 [(ngModel)]="deliveryAddress"
                 rows="3"
@@ -228,7 +228,7 @@
             </div>
             <div class="fields">
               <label
-                >Package<select name="package" [(ngModel)]="selectedPackageId">
+                >Package<select data-validation-field="selectedPackageId" name="package" [(ngModel)]="selectedPackageId">
                   @for (p of packages(); track p.id) {
                     <option [ngValue]="p.id">
                       {{ p.name }} · {{ p.sellingPrice | currency: 'PHP' : 'symbol-narrow' }} ·
@@ -237,7 +237,7 @@
                   }
                 </select></label
               ><label
-                >Package quantity<input
+                >Package quantity<input data-validation-field="packageQuantity"
                   name="packageQuantity"
                   type="number"
                   min="1"
@@ -300,7 +300,7 @@
           </section>
         }
         <p>Inventory is verified again by the API. A tracking number is generated automatically.</p>
-        <button class="submit-button" [disabled]="!items().length && !packageLines().length">
+        <button class="submit-button" [disabled]="saving()">
           Create order
         </button>
         <button type="button" class="cancel-button" (click)="cancel()">Cancel</button>

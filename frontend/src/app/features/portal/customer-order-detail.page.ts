@@ -1,6 +1,6 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
@@ -10,7 +10,7 @@ import { DeliveryPanelComponent } from '../delivery/delivery-panel.component';
 
 @Component({
   selector: 'app-customer-order-detail',
-  imports: [CurrencyPipe, DatePipe, FormsModule, RouterLink, DeliveryPanelComponent],
+  imports: [CurrencyPipe, DatePipe, AppFormsModule, RouterLink, DeliveryPanelComponent],
   templateUrl: './customer-order-detail.page.html',
   styleUrls: ['../../shared/business.scss', './portal.page.scss'],
 })

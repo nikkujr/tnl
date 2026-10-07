@@ -98,9 +98,9 @@
     </p>
     <div class="fields">
       <label
-        >Customer ID<input type="number" min="1" name="inviteId" [(ngModel)]="inviteId" required
+        >Customer ID<input data-validation-field="customerId" type="number" min="1" name="inviteId" [(ngModel)]="inviteId" required
       /></label>
     </div>
-    <button [disabled]="inviteId < 1 || busy()">Queue account invitation</button>
+    <button [disabled]="busy()">Queue account invitation</button>
   </form>
 </div>

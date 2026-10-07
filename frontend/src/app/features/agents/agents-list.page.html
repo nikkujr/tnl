@@ -73,12 +73,12 @@
       </div>
       <form (ngSubmit)="save()">
         <div class="form-grid">
-          <label>Full name<input name="agentName" [(ngModel)]="form.fullName" required /></label>
+          <label>Full name<input data-validation-field="fullName" name="agentName" [(ngModel)]="form.fullName" required /></label>
           <label
-            >Email<input name="agentEmail" type="email" [(ngModel)]="form.email" required
+            >Email<input data-validation-field="email" name="agentEmail" type="email" [(ngModel)]="form.email" required
           /></label>
           <label
-            >Phone<input
+            >Phone<input data-validation-field="phone"
               name="agentPhone"
               [(ngModel)]="form.phone"
               required
@@ -87,7 +87,7 @@
               placeholder="09XXXXXXXXX"
           /></label>
           <label
-            >Legacy rate (%)<input
+            >Legacy rate (%)<input data-validation-field="commissionRate"
               name="commissionRate"
               type="number"
               min="0"
@@ -98,7 +98,7 @@
           /></label>
           @if (!editingId) {
             <label class="wide"
-              >Password<input
+              >Password<input data-validation-field="password"
                 name="agentPassword"
                 type="password"
                 minlength="8"

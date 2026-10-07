@@ -102,13 +102,13 @@
       <form (ngSubmit)="save()">
         <div class="form-grid">
           <label
-            >Full name<input name="customerName" [(ngModel)]="form.fullName" required minlength="2"
+            >Full name<input data-validation-field="fullName" name="customerName" [(ngModel)]="form.fullName" required minlength="2"
           /></label>
           <label
-            >Email<input name="customerEmail" type="email" [(ngModel)]="form.email" required
+            >Email<input data-validation-field="email" name="customerEmail" type="email" [(ngModel)]="form.email" required
           /></label>
           <label
-            >Phone<input
+            >Phone<input data-validation-field="phone"
               name="customerPhone"
               [(ngModel)]="form.phone"
               required
@@ -118,7 +118,7 @@
           /></label>
           @if (session()!.role === 'ADMIN') {
             <label
-              >Assigned agent<select name="customerAgent" [(ngModel)]="form.assignedAgentId">
+              >Assigned agent<select data-validation-field="assignedAgentId" name="customerAgent" [(ngModel)]="form.assignedAgentId">
                 <option [ngValue]="null">Unassigned</option>
                 @for (agent of activeAgents(); track agent.id) {
                   <option [ngValue]="agent.id">{{ agent.fullName }}</option>
@@ -128,12 +128,12 @@
           }
           <label class="wide"
             ><span
-              ><input name="marketingOptIn" type="checkbox" [(ngModel)]="form.marketingOptIn" />
+              ><input data-validation-field="marketingOptIn" name="marketingOptIn" type="checkbox" [(ngModel)]="form.marketingOptIn" />
               Customer explicitly agreed to marketing emails</span
             ></label
           >
           <label class="wide"
-            >Address<textarea
+            >Address<textarea data-validation-field="address"
               name="customerAddress"
               [(ngModel)]="form.address"
               rows="4"

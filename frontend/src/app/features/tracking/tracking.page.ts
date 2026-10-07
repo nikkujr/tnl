@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ApiService, TrackingResult } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -8,7 +8,7 @@ import { DeliverySlaComponent } from '../delivery/delivery-sla.component';
 
 @Component({
   selector: 'app-tracking-page',
-  imports: [DatePipe, FormsModule, BreadcrumbComponent, DeliverySlaComponent],
+  imports: [DatePipe, AppFormsModule, BreadcrumbComponent, DeliverySlaComponent],
   templateUrl: './tracking.page.html',
   styleUrl: './tracking.page.scss'
 })

@@ -131,9 +131,9 @@
       </div>
       <form (ngSubmit)="save()">
         <div class="grid">
-          <label>Name<input name="name" [(ngModel)]="form.name" required minlength="2" /></label
+          <label>Name<input data-validation-field="name" name="name" [(ngModel)]="form.name" required minlength="2" /></label
           ><label
-            >Audience<select
+            >Audience<select data-validation-field="audienceType"
               name="audience"
               [(ngModel)]="form.audienceType"
               (ngModelChange)="$event === 'SELECTED' && openCustomerPicker()"
@@ -142,20 +142,20 @@
               <option value="SELECTED">Selected customers</option>
             </select></label
           ><label
-            >Start date<input
+            >Start date<input data-validation-field="startDate"
               type="date"
               name="start"
               [(ngModel)]="form.startDate"
               required /></label
           ><label
-            >End date<input type="date" name="end" [(ngModel)]="form.endDate" required /></label
+            >End date<input data-validation-field="endDate" type="date" name="end" [(ngModel)]="form.endDate" required /></label
           ><label
-            >Status<select name="status" [(ngModel)]="form.status">
+            >Status<select data-validation-field="status" name="status" [(ngModel)]="form.status">
               <option value="DRAFT">Draft</option>
               <option value="SCHEDULED">Scheduled</option>
             </select></label
           ><label
-            >Send at (Manila)<input
+            >Send at (Manila)<input data-validation-field="scheduledAt"
               type="datetime-local"
               name="sendAt"
               [(ngModel)]="form.scheduledAt"

@@ -1,9 +1,9 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { DeliveryApi, DeliveryEmployee } from './delivery-api.service';
 @Component({
   selector: 'app-delivery-employees',
-  imports: [FormsModule],
+  imports: [AppFormsModule],
   styleUrl: './delivery.scss',
   template: ` <header class="delivery-heading">
       <span class="eyebrow">Administration</span>
@@ -22,15 +22,15 @@ import { DeliveryApi, DeliveryEmployee } from './delivery-api.service';
         <h3>{{ editingId ? 'Edit employee' : 'Create employee' }}</h3>
         <div class="form-grid">
           <label
-            >Full name<input
+            >Full name<input data-validation-field="fullName"
               name="name"
               [(ngModel)]="fullName"
               required
               minlength="2"
               maxlength="160" /></label
-          ><label>Email<input name="email" type="email" [(ngModel)]="email" required /></label
+          ><label>Email<input data-validation-field="email" name="email" type="email" [(ngModel)]="email" required /></label
           ><label
-            >PH mobile number<input
+            >PH mobile number<input data-validation-field="phone"
               name="phone"
               [(ngModel)]="phone"
               required
@@ -38,7 +38,7 @@ import { DeliveryApi, DeliveryEmployee } from './delivery-api.service';
           /></label>
           @if (!editingId) {
             <label
-              >Initial password<input
+              >Initial password<input data-validation-field="password"
                 name="password"
                 type="password"
                 [(ngModel)]="password"
@@ -49,13 +49,13 @@ import { DeliveryApi, DeliveryEmployee } from './delivery-api.service';
             /></label>
           } @else {
             <label
-              ><span>Account active</span><input name="active" type="checkbox" [(ngModel)]="active"
+              ><span>Account active</span><input data-validation-field="active" name="active" type="checkbox" [(ngModel)]="active"
             /></label>
           }
         </div>
         <p class="muted">Reassign unfinished deliveries before deactivating an employee.</p>
         <div class="actions">
-          <button class="primary" [disabled]="busy() || form.invalid">Save employee</button
+          <button class="primary" [disabled]="busy()">Save employee</button
           ><button type="button" (click)="close()" [disabled]="busy()">Cancel</button>
         </div>
       </form>
@@ -65,7 +65,7 @@ import { DeliveryApi, DeliveryEmployee } from './delivery-api.service';
         <h3>Reset password for {{ resetTarget.fullName }}</h3>
         <p>{{ resetTarget.email }} · Existing sessions and live sharing will be invalidated.</p>
         <label
-          >New password<input
+          >New password<input data-validation-field="password"
             name="newPassword"
             type="password"
             [(ngModel)]="password"
@@ -74,7 +74,7 @@ import { DeliveryApi, DeliveryEmployee } from './delivery-api.service';
             maxlength="72"
             autocomplete="new-password" /></label
         ><label
-          >Confirm password<input
+          >Confirm password<input data-validation-field="confirmation" [attr.data-validation-error]="password !== confirmation ? 'Passwords do not match.' : null"
             name="confirmation"
             type="password"
             [(ngModel)]="confirmation"
@@ -84,7 +84,7 @@ import { DeliveryApi, DeliveryEmployee } from './delivery-api.service';
         <div class="actions">
           <button
             class="primary"
-            [disabled]="busy() || resetForm.invalid || password !== confirmation"
+            [disabled]="busy()"
           >
             Confirm password reset</button
           ><button type="button" (click)="close()" [disabled]="busy()">Cancel</button>

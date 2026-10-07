@@ -10,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { Subscription } from 'rxjs';
 import { BusinessApi } from '../../core/business-api.service';
 import { Campaign, Customer } from '../../core/api.service';
@@ -18,7 +18,7 @@ import { RichTextEditorComponent } from '../../shared/rich-text-editor.component
 import { AppIconComponent } from '../../shared/app-icon.component';
 @Component({
   selector: 'app-campaigns-page',
-  imports: [DatePipe, JsonPipe, FormsModule, RichTextEditorComponent, AppIconComponent],
+  imports: [DatePipe, JsonPipe, AppFormsModule, RichTextEditorComponent, AppIconComponent],
   templateUrl: './campaigns.page.html',
   styleUrls: ['../../shared/business.scss', './campaigns.page.scss'],
 })

@@ -43,16 +43,16 @@
                   <legend>Rating</legend>
                   @for (rating of ratingChoices; track rating) {
                     <label [class.filled]="orderRating >= rating" [attr.title]="rating + ' out of 5 — ' + ratingDescriptions[rating]">
-                      <input type="radio" name="orderRating" [value]="rating" [(ngModel)]="orderRating" [attr.aria-label]="rating + ' out of 5 — ' + ratingDescriptions[rating]" required />
+                      <input data-validation-field="rating" [attr.data-validation-error]="orderRating < 1 ? 'Select a rating.' : null" type="radio" name="orderRating" [value]="rating" [(ngModel)]="orderRating" [attr.aria-label]="rating + ' out of 5 — ' + ratingDescriptions[rating]" required />
                       <span class="rating-star" aria-hidden="true">★</span>
                     </label>
                   }
                 </fieldset>
                 <p id="rating-selection" class="rating-selection" aria-live="polite">{{ orderRating ? orderRating + ' out of 5 · ' + ratingDescriptions[orderRating] : 'Select a rating' }}</p>
-                <label>Review<textarea name="orderReview" [(ngModel)]="orderReview" required minlength="2" maxlength="2000" [disabled]="reviewSaving()" placeholder="Tell us about the support you received from your agent."></textarea></label>
+                <label>Review<textarea data-validation-field="review" name="orderReview" [(ngModel)]="orderReview" required minlength="2" maxlength="2000" [disabled]="reviewSaving()" placeholder="Tell us about the support you received from your agent."></textarea></label>
                 <small>This rating is for your agent. Your feedback is shared with the admin to assess agent performance. Submitted reviews cannot be edited.</small>
                 @if (reviewError()) { <p class="error" role="alert">{{ reviewError() }}</p> }
-                <div class="review-actions"><button class="primary" type="submit" [disabled]="reviewSaving() || reviewForm.invalid || orderRating < 1 || orderReview.trim().length < 2">{{ reviewSaving() ? 'Submitting…' : 'Submit review' }}</button></div>
+                <div class="review-actions"><button class="primary" type="submit" [disabled]="reviewSaving()">{{ reviewSaving() ? 'Submitting…' : 'Submit review' }}</button></div>
               </form>
             } @else { <p>You can rate your agent after your order is delivered and fully paid.</p> }
           </section>
@@ -82,7 +82,7 @@
           }
           <form class="fields" (ngSubmit)="followup()">
             <label
-              >Ask for an update<textarea
+              >Ask for an update<textarea data-validation-field="message"
                 name="followup"
                 [(ngModel)]="followupMessage"
                 minlength="2"

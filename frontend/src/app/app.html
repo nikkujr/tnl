@@ -52,7 +52,7 @@
           <label
             >Tracking number
             <div>
-              <input
+              <input data-validation-field="trackingNumber"
                 name="publicTracking"
                 [(ngModel)]="trackingNumber"
                 placeholder="e.g. TNL-ABC123-4F2A"
@@ -107,9 +107,9 @@
           <div class="error-banner">{{ loginError() }}</div>
         }
         <form (ngSubmit)="login()">
-          <label>Email<input type="email" name="email" [(ngModel)]="loginEmail" required /></label
+          <label>Email<input data-validation-field="loginEmail" type="email" name="email" [(ngModel)]="loginEmail" required /></label
           ><label
-            >Password<input
+            >Password<input data-validation-field="loginPassword"
               type="password"
               name="password"
               [(ngModel)]="loginPassword"
@@ -401,7 +401,7 @@
         <form (ngSubmit)="submitOrder()">
           <div class="form-grid">
             <label
-              >Customer<select name="customer" [(ngModel)]="newOrder.customerId">
+              >Customer<select data-validation-field="customerId" name="customer" [(ngModel)]="newOrder.customerId">
                 @for (customer of customers(); track customer.id) {
                   <option [ngValue]="customer.id">{{ customer.fullName }}</option>
                 }
@@ -409,7 +409,7 @@
             >
             @if (session()!.role === 'ADMIN') {
               <label
-                >Assigned agent (optional)<select name="agent" [(ngModel)]="newOrder.agentId">
+                >Assigned agent (optional)<select data-validation-field="agentId" name="agent" [(ngModel)]="newOrder.agentId">
                   <option [ngValue]="0">Office order — no agent</option>
                   @for (agent of activeAgents(); track agent.id) {
                     <option [ngValue]="agent.id">{{ agent.fullName }}</option>
@@ -418,7 +418,7 @@
               >
             }
             <label
-              >Payment method<select name="payment" [(ngModel)]="newOrder.paymentMethod">
+              >Payment method<select data-validation-field="paymentMethod" name="payment" [(ngModel)]="newOrder.paymentMethod">
                 <option>Cash</option>
                 <option>Cash on delivery</option>
                 <option>Bank transfer</option>
@@ -427,7 +427,7 @@
             >
             @if (newOrder.paymentMethod === 'Cash') {
               <label
-                >Cash received<input
+                >Cash received<input data-validation-field="cashReceived"
                   name="cashReceived"
                   type="number"
                   min="0"
@@ -439,7 +439,7 @@
             @for (p of newOrder.packages; track p.packageId) {
               <label
                 >Package: {{ editingPackageNames[p.packageId]
-                }}<input
+                }}<input data-validation-field="quantity"
                   [name]="'pack' + p.packageId"
                   type="number"
                   min="1"
@@ -460,7 +460,7 @@
                 </div>
                 @for (item of newOrder.items; track $index; let index = $index) {
                   <div class="line-item-row">
-                    <select
+                    <select data-validation-field="productId"
                       [name]="'product' + index"
                       [(ngModel)]="item.productId"
                       [disabled]="session()?.role !== 'ADMIN'"
@@ -471,7 +471,7 @@
                           {{ product.stockOnHand - product.stockReserved }} available
                         </option>
                       }</select
-                    ><input
+                    ><input data-validation-field="quantity"
                       [name]="'quantity' + index"
                       type="number"
                       min="1"
@@ -489,7 +489,7 @@
               </div>
             }
             <label class="wide"
-              >Delivery address<input name="address" [(ngModel)]="newOrder.deliveryAddress"
+              >Delivery address<input data-validation-field="deliveryAddress" name="address" [(ngModel)]="newOrder.deliveryAddress"
             /></label>
           </div>
           <p class="form-note">

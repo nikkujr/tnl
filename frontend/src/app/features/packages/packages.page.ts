@@ -1,13 +1,13 @@
 import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { forkJoin } from 'rxjs';
 import { BusinessApi, CatalogOffer, SalesPackage } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
 import { AppIconComponent } from '../../shared/app-icon.component';
 @Component({
   selector: 'app-packages',
-  imports: [FormsModule, CurrencyPipe, AppIconComponent],
+  imports: [AppFormsModule, CurrencyPipe, AppIconComponent],
   templateUrl: './packages.page.html',
   styleUrls: ['../../shared/business.scss', './packages.page.scss'],
 })

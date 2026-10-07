@@ -82,7 +82,7 @@
         @if (topic() === 'catalog' || (topic() === 'request' && session()?.role === 'CUSTOMER')) {
           <form class="fields" (ngSubmit)="browse()">
             <label
-              >What offer are you looking for?<input
+              >What offer are you looking for?<input data-validation-field="search"
                 name="search"
                 [(ngModel)]="search"
                 placeholder="Product or package name" /></label
@@ -92,14 +92,14 @@
         @if (topic() === 'recommend') {
           <form class="fields" (ngSubmit)="recommend()">
             <label
-              >Which category?<select name="category" [(ngModel)]="categoryId">
+              >Which category?<select data-validation-field="categoryId" name="category" [(ngModel)]="categoryId">
                 <option [ngValue]="0">Any category</option>
                 @for (c of categories(); track c.id) {
                   <option [ngValue]="c.id">{{ c.name }}</option>
                 }
               </select></label
             ><label
-              >Maximum budget in pesos<input
+              >Maximum budget in pesos<input data-validation-field="budget"
                 name="budget"
                 type="number"
                 min="0.01"
@@ -112,7 +112,7 @@
         @if (topic() === 'track') {
           <form class="fields" (ngSubmit)="track()">
             <label
-              >What is your tracking number?<input
+              >What is your tracking number?<input data-validation-field="trackingNumber"
                 name="tracking"
                 [(ngModel)]="trackingNumber"
                 required
@@ -167,7 +167,7 @@
               <label class="followup-field"
                 >Which order?
                 <span class="followup-select">
-                  <select
+                  <select data-validation-field="orderId"
                     name="order"
                     [(ngModel)]="orderId"
                     (ngModelChange)="viewOrder(orderId)"
@@ -184,7 +184,7 @@
               </label>
               <label class="followup-field"
                 >What update do you need?
-                <textarea
+                <textarea data-validation-field="message"
                   name="message"
                   [(ngModel)]="message"
                   minlength="2"
@@ -204,7 +204,7 @@
                 <p><app-icon name="info" />Your agent’s reply will appear in your order details.</p>
                 <button
                   class="primary followup-submit"
-                  [disabled]="!orderId || busy() || followupForm.invalid"
+                  [disabled]="!orderId || busy()"
                 >
                   <app-icon name="bell" />{{ busy() ? 'Sending…' : 'Notify my agent' }}
                 </button>

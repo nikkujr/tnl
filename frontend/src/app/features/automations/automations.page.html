@@ -173,7 +173,7 @@
                               <label class="delay-field"
                                 >Remind after
                                 <div class="number-unit">
-                                  <input
+                                  <input data-validation-field="hours"
                                     type="number"
                                     min="1"
                                     max="8760"
@@ -190,7 +190,7 @@
                               <label class="delay-field"
                                 >Send after
                                 <div class="number-unit">
-                                  <input
+                                  <input data-validation-field="delayDays"
                                     type="number"
                                     min="0"
                                     max="365"
@@ -205,14 +205,14 @@
                             }
                             @if (d.config.subject !== undefined) {
                               <label
-                                >Email subject<input
+                                >Email subject<input data-validation-field="subject"
                                   name="subject"
                                   [(ngModel)]="d.config.subject"
                                   maxlength="180"
                                   required
                               /></label>
                               <label
-                                >Email message<textarea
+                                >Email message<textarea data-validation-field="template"
                                   name="template"
                                   aria-describedby="email-message-help"
                                   [(ngModel)]="d.config.template"
@@ -284,7 +284,7 @@
                               Cancel</button
                             ><button
                               class="primary"
-                              [disabled]="settingsForm.invalid || !!saving()"
+                              [disabled]="!!saving()"
                             >
                               {{ saving() === s.workflow ? 'Saving…' : 'Save changes' }}
                             </button>

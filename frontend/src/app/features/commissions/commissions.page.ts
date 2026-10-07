@@ -1,13 +1,13 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AppFormsModule } from '../../shared/app-forms.module';
 import { ApiService, Commission } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 
 @Component({
   selector: 'app-commissions-page',
-  imports: [CurrencyPipe, FormsModule, BreadcrumbComponent],
+  imports: [CurrencyPipe, AppFormsModule, BreadcrumbComponent],
   templateUrl: './commissions.page.html',
   styleUrl: './commissions.page.scss'
 })
