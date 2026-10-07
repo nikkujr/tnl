@@ -65,11 +65,36 @@ customerRouter.patch(
     }
   },
 );
-customerRouter.get("/orders", async (req, res, next) => {
+const orderFilters = z.object({
+  search: z.string().trim().max(120).default(""),
+  orderStatus: z.enum(["", "PENDING", "APPROVED", "COMPLETED", "REJECTED", "CANCELLED"]).default(""),
+  deliveryStatus: z.enum(["", "PREPARING", "DISPATCHED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"]).default(""),
+  paymentStatus: z.enum(["", "UNPAID", "PARTIALLY_PAID", "PAID"]).default(""),
+  page: z.coerce.number().int().min(1).max(1000000).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+customerRouter.get("/orders", validate(z.object({ query: orderFilters, body: z.any(), params: z.any() })), async (req, res, next) => {
   try {
+    const filters = orderFilters.parse(req.query);
+    const where = ["o.customer_id=?"];
+    const args: unknown[] = [req.customer!.customerId];
+    for (const [column, value] of [["order_status", filters.orderStatus], ["delivery_status", filters.deliveryStatus], ["payment_status", filters.paymentStatus]]) {
+      if (value) { where.push(`o.${column}=?`); args.push(value); }
+    }
+    if (filters.search) {
+      where.push(`(LOCATE(?,o.tracking_number)>0 OR LOCATE(?,u.full_name)>0 OR LOCATE(?,o.delivery_address)>0
+        OR EXISTS(SELECT 1 FROM order_items i WHERE i.order_id=o.id AND LOCATE(?,i.product_name)>0)
+        OR EXISTS(SELECT 1 FROM order_packages p WHERE p.order_id=o.id AND LOCATE(?,p.name)>0))`);
+      args.push(...Array(5).fill(filters.search));
+    }
+    const from = `FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE ${where.join(" AND ")}`;
+    const [counts] = await db.query<any[]>(`SELECT COUNT(*) total ${from}`, args);
+    const total = Number(counts[0].total);
+    const totalPages = Math.max(1, Math.ceil(total / filters.limit));
+    const page = Math.min(filters.page, totalPages);
     const [rows] = await db.query<any[]>(
-      "SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.customer_id=? ORDER BY o.created_at DESC,o.id DESC LIMIT 200",
-      [req.customer!.customerId],
+      `SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName ${from} ORDER BY o.created_at DESC,o.id DESC LIMIT ? OFFSET ?`,
+      [...args, filters.limit, (page - 1) * filters.limit],
     );
     res.json({
       data: await Promise.all(
@@ -78,6 +103,7 @@ customerRouter.get("/orders", async (req, res, next) => {
           ...customerSale(await readSale(db, o.id)),
         })),
       ),
+      meta: { total, page, limit: filters.limit },
     });
   } catch (e) {
     next(e);

@@ -162,3 +162,6 @@ button.primary:hover:not(:disabled) { background: var(--color-accent-hover, #625
 @media (max-width: 600px) { :host .order-review { padding: 16px; } }
 .review-score span { color: var(--green); }
 .review-comment { white-space: pre-wrap; overflow-wrap: anywhere; }
+.order-filters .fields { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.order-filters label { display: grid; gap: 8px; }
+.order-pagination { flex-wrap: wrap; align-items: center; margin-top: 20px; }

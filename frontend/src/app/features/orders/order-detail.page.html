@@ -101,7 +101,10 @@
               <strong
                 >{{ titleCase(data.paymentMethod) }} · {{ titleCase(data.paymentStatus) }}</strong
               >
-              @if (data.paymentMethod === 'Cash' && data.cashReceived !== null) {
+              @if (data.amountPaid !== null && data.amountPaid !== undefined) {
+                <span>Amount paid {{ data.amountPaid | currency: 'PHP' : 'symbol-narrow' }} · Balance {{ orderTotal() - data.amountPaid | currency: 'PHP' : 'symbol-narrow' }}</span>
+              }
+              @if ((data.paymentMethod === 'Cash' || data.paymentMethod === 'Cash on delivery') && data.cashReceived !== null) {
                 <span
                   >Received {{ data.cashReceived | currency: 'PHP' : 'symbol-narrow' }} · Change
                   {{ data.cashChange | currency: 'PHP' : 'symbol-narrow' }}</span

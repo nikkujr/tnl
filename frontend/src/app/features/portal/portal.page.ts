@@ -67,6 +67,19 @@ export class PortalPage {
   private readonly destroyRef = inject(DestroyRef);
   private catalogRequest?: Subscription;
   readonly orders = signal<any[]>([]);
+  readonly ordersLoading = signal(false);
+  readonly ordersError = signal('');
+  readonly orderTotal = signal(0);
+  readonly orderPage = signal(1);
+  readonly orderLimit = signal(10);
+  readonly orderPageCount = computed(() => Math.max(1, Math.ceil(this.orderTotal() / this.orderLimit())));
+  orderSearch = '';
+  orderStatus = '';
+  deliveryStatus = '';
+  orderPaymentStatus = '';
+  private orderRequest?: Subscription;
+  private readonly ordersSummary = viewChild<ElementRef<HTMLElement>>('ordersSummary');
+  private appliedOrderQuery: Record<string, string | number | null> = { tab: 'orders' };
   readonly requests = signal<any[]>([]);
   readonly profile = signal<any>(null);
   readonly cart = signal<Array<{ offer: CatalogOffer; quantity: number }>>([]);
@@ -113,6 +126,12 @@ export class PortalPage {
     this.mode = query.has('verify') ? 'verify' : query.has('reset') ? 'reset' : 'login';
     this.unsubscribe = query.get('unsubscribe') ?? '';
     if (query.get('tab') === 'orders') this.tab = 'orders';
+    this.orderSearch = query.get('orderSearch') ?? '';
+    this.orderStatus = query.get('orderStatus') ?? '';
+    this.deliveryStatus = query.get('deliveryStatus') ?? '';
+    this.orderPaymentStatus = query.get('orderPaymentStatus') ?? '';
+    this.orderPage.set(Math.max(1, Number(query.get('orderPage')) || 1));
+    this.orderLimit.set([10, 20, 50].includes(Number(query.get('orderLimit'))) ? Number(query.get('orderLimit')) : 10);
     this.loadCatalog();
     if (this.session()?.role === 'CUSTOMER') this.load();
   }
@@ -174,12 +193,53 @@ export class PortalPage {
       },
       error: (e) => this.fail(e),
     });
-    this.api
-      .get<any[]>('customer/orders')
-      .subscribe({ next: (r) => this.orders.set(r.data), error: (e) => this.fail(e) });
+    this.loadOrders();
     this.api
       .get<any[]>('customer/requests')
       .subscribe({ next: (r) => this.requests.set(r.data), error: (e) => this.fail(e) });
+  }
+  orderListQuery() {
+    return { tab: 'orders', orderSearch: this.orderSearch || null, orderStatus: this.orderStatus || null,
+      deliveryStatus: this.deliveryStatus || null, orderPaymentStatus: this.orderPaymentStatus || null,
+      orderPage: this.orderPage(), orderLimit: this.orderLimit() };
+  }
+  loadOrders() {
+    this.orderRequest?.unsubscribe();
+    this.ordersLoading.set(true);
+    this.ordersError.set('');
+    const listQuery = this.orderListQuery();
+    this.orderRequest = this.api.get<any[]>('customer/orders', {
+      search: this.orderSearch, orderStatus: this.orderStatus, deliveryStatus: this.deliveryStatus,
+      paymentStatus: this.orderPaymentStatus, page: this.orderPage(), limit: this.orderLimit(),
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: r => {
+        this.orders.set(r.data);
+        this.orderTotal.set(r.meta?.total ?? r.data.length);
+        this.orderPage.set(r.meta?.page ?? 1);
+        this.ordersLoading.set(false);
+        this.appliedOrderQuery = { ...listQuery, orderPage: this.orderPage() };
+        if (this.tab === 'orders') void this.router.navigate([], { relativeTo: this.route, queryParams: this.appliedOrderQuery, queryParamsHandling: 'merge', replaceUrl: true });
+      },
+      error: e => {
+        this.orders.set([]);
+        this.ordersLoading.set(false);
+        this.ordersError.set(e.error?.error?.message ?? 'Unable to load orders. Please try again.');
+        if (e.status === 401) this.fail(e);
+      },
+    });
+  }
+  filterOrders() { this.orderPage.set(1); this.loadOrders(); }
+  clearOrderFilters() {
+    this.orderSearch = this.orderStatus = this.deliveryStatus = this.orderPaymentStatus = '';
+    this.filterOrders();
+  }
+  changeOrderPage(page: number) {
+    if (page < 1 || page > this.orderPageCount() || this.ordersLoading()) return;
+    this.orderPage.set(page);
+    this.loadOrders();
+    const summary = this.ordersSummary()?.nativeElement;
+    summary?.focus({ preventScroll: true });
+    summary?.scrollIntoView({ block: 'start' });
   }
   auth() {
     this.error.set('');
@@ -298,7 +358,7 @@ export class PortalPage {
       });
   }
   view(id: number) {
-    void this.router.navigate(['/portal/orders', id]);
+    void this.router.navigate(['/portal/orders', id], { queryParams: this.appliedOrderQuery });
   }
   preferences() {
     this.api.patch('customer/preferences', { marketingOptIn: this.marketingOptIn }).subscribe({
@@ -320,6 +380,7 @@ export class PortalPage {
     this.error.set('');
     this.notice.set('');
     this.sessionService.logout();
+    this.orderRequest?.unsubscribe();
     this.profile.set(null);
     this.orders.set([]);
     this.requests.set([]);

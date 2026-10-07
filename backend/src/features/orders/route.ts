@@ -90,7 +90,7 @@ router.get("/", async (req, res, next) => {
       `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,o.origin origin,
        c.full_name customerName,o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
-       o.cash_change cashChange,o.delivery_address deliveryAddress,
+       o.cash_change cashChange,o.amount_paid amountPaid,o.delivery_address deliveryAddress,
        o.created_at createdAt,u.full_name agentName
        FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id${where}
        ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
@@ -199,7 +199,7 @@ router.get(
        c.full_name customerName,c.email customerEmail,c.phone customerPhone,
        o.order_status orderStatus,o.delivery_status deliveryStatus,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
-       o.cash_change cashChange,o.delivery_address deliveryAddress,
+       o.cash_change cashChange,o.amount_paid amountPaid,o.delivery_address deliveryAddress,
        o.created_at createdAt,o.updated_at updatedAt,u.full_name agentName,u.email agentEmail
        FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id
        WHERE o.id=?${scope}`,
@@ -351,19 +351,19 @@ router.put(
           return old ? { ...old, quantity: i.quantity } : i;
         });
         await checkStock(c, fresh);
+        if (Number(o.amount_paid ?? 0) > 0 && (req.body.paymentMethod !== o.payment_method || totalCents(fresh) !== totalCents(previous)))
+          throw new HttpError(409, "Orders with recorded payments cannot change their total or payment method through editing. Update payment first.");
+        const samePayment = req.body.paymentMethod === o.payment_method && totalCents(fresh) === totalCents(previous)
+          && (req.body.paymentMethod !== "Cash" || req.body.cashReceived === o.cash_received);
         const payment = cashPayment(
           totalCents(fresh),
           req.body.paymentMethod,
           req.body.cashReceived,
-          req.body.paymentMethod === "Cash"
-            ? undefined
-            : req.body.paymentMethod === o.payment_method &&
-                totalCents(fresh) === totalCents(previous)
-              ? o.payment_status
-              : "UNPAID",
+          samePayment ? o.payment_status : req.body.paymentMethod === "Cash" ? undefined : "UNPAID",
+          samePayment ? o.cash_received ?? o.amount_paid ?? undefined : undefined,
         );
         await c.execute(
-          "UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,payment_method=?,payment_status=?,cash_received=?,cash_change=? WHERE id=?",
+          "UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,payment_method=?,payment_status=?,cash_received=?,cash_change=?,amount_paid=? WHERE id=?",
           [
             req.body.customerId,
             agentId,
@@ -372,6 +372,7 @@ router.put(
             payment.paymentStatus,
             payment.cashReceived,
             payment.cashChange,
+            payment.amountPaid,
             id,
           ],
         );
@@ -491,6 +492,7 @@ router.patch(
           "Card",
         ]),
         cashReceived: z.number().min(0).nullable(),
+        amountPaid: z.number().min(0).max(9999999999).optional(),
       }),
       query: z.any(),
       params: z.object({ id: z.coerce.number().int().positive() }),
@@ -523,19 +525,22 @@ router.patch(
           req.body.paymentMethod,
           req.body.cashReceived,
           req.body.paymentStatus,
+          req.body.amountPaid ?? (req.body.paymentMethod === o.payment_method && req.body.paymentStatus === o.payment_status
+            ? o.cash_received ?? o.amount_paid ?? undefined : undefined),
         );
         if (
           o.payment_status !== payment.paymentStatus ||
           o.payment_method !== req.body.paymentMethod ||
-          o.cash_received !== payment.cashReceived
+          o.cash_received !== payment.cashReceived || o.amount_paid !== payment.amountPaid
         ) {
           await c.execute(
-            "UPDATE orders SET payment_status=?,payment_method=?,cash_received=?,cash_change=? WHERE id=?",
+            "UPDATE orders SET payment_status=?,payment_method=?,cash_received=?,cash_change=?,amount_paid=? WHERE id=?",
             [
               payment.paymentStatus,
               req.body.paymentMethod,
               payment.cashReceived,
               payment.cashChange,
+              payment.amountPaid,
               id,
             ],
           );
@@ -544,7 +549,7 @@ router.patch(
             id,
             req.user!.id,
             "PAYMENT_UPDATED",
-            `Payment marked ${payment.paymentStatus}.`,
+            `Payment marked ${payment.paymentStatus}${payment.amountPaid === null ? '' : `; total amount paid ₱${payment.amountPaid.toFixed(2)}`}.`,
           );
           await event(
             c,

@@ -179,36 +179,42 @@ export function cashPayment(
   method: string,
   received?: number | null,
   status?: string,
+  amountPaid?: number,
 ) {
-  if (method !== "Cash")
+  if (method !== "Cash" && amountPaid === undefined)
     return {
       paymentStatus: status ?? "UNPAID",
       cashReceived: null,
       cashChange: null,
+      amountPaid: null,
     };
-  if (received == null) throw new HttpError(400, "Cash received is required");
+  const cash = method === "Cash" || method === "Cash on delivery";
+  const receivedAmount = method === "Cash" ? received : amountPaid;
+  if (receivedAmount == null) throw new HttpError(400, "Amount received is required");
   let amount: number;
   try {
-    amount = cents(received);
+    amount = cents(receivedAmount);
   } catch {
-    throw new HttpError(400, "Cash received must have at most two decimals");
+    throw new HttpError(400, "Amount received must have at most two decimals");
   }
+  if (amount > 999999999999) throw new HttpError(400, "Amount received exceeds the supported range");
   const paymentStatus = status ?? "PAID";
   const valid =
     paymentStatus === "UNPAID"
       ? amount === 0
       : paymentStatus === "PARTIALLY_PAID"
         ? amount > 0 && amount < total
-        : amount >= total;
+        : cash ? amount >= total : amount === total;
   if (!valid)
     throw new HttpError(
       400,
-      "Cash received does not match the order total/payment status",
+      "Amount received does not match the order total/payment status",
     );
   return {
     paymentStatus,
-    cashReceived: received,
-    cashChange: pesos(Math.max(0, amount - total)),
+    cashReceived: cash ? receivedAmount : null,
+    cashChange: cash ? pesos(Math.max(0, amount - total)) : null,
+    amountPaid: pesos(Math.min(amount, total)),
   };
 }
 export async function createSale(
@@ -247,7 +253,7 @@ export async function createSale(
     trackingNumber = `TNL-${randomBytes(10).toString("hex").toUpperCase()}`;
     try {
       const [r] = await c.execute<any>(
-        "INSERT INTO orders(tracking_number,customer_id,agent_id,delivery_address,payment_method,payment_status,cash_received,cash_change,sales_version) VALUES(?,?,?,?,?,?,?,?,'PACKAGE')",
+        "INSERT INTO orders(tracking_number,customer_id,agent_id,delivery_address,payment_method,payment_status,cash_received,cash_change,amount_paid,sales_version) VALUES(?,?,?,?,?,?,?,?,?,'PACKAGE')",
         [
           trackingNumber,
           input.customerId,
@@ -257,6 +263,7 @@ export async function createSale(
           payment.paymentStatus,
           payment.cashReceived,
           payment.cashChange,
+          payment.amountPaid,
         ],
       );
       id = r.insertId;

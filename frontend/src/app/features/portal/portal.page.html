@@ -443,6 +443,19 @@
     @if (tab === 'orders') {
       <section class="panel">
         <h3>My orders</h3>
+        <form (ngSubmit)="filterOrders()" class="order-filters">
+          <label>Search orders<input name="orderSearch" [(ngModel)]="orderSearch" maxlength="120" placeholder="Order number, product, package, agent or address" type="search" /></label>
+          <div class="fields">
+            <label>Order status<select name="orderStatus" [(ngModel)]="orderStatus" (ngModelChange)="filterOrders()"><option value="">All orders</option>@for (status of ['PENDING', 'APPROVED', 'COMPLETED', 'REJECTED', 'CANCELLED']; track status) {<option [value]="status">{{ status.replaceAll('_', ' ') }}</option>}</select></label>
+            <label>Delivery status<select name="deliveryStatus" [(ngModel)]="deliveryStatus" (ngModelChange)="filterOrders()"><option value="">All deliveries</option>@for (status of ['PREPARING', 'DISPATCHED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED']; track status) {<option [value]="status">{{ status.replaceAll('_', ' ') }}</option>}</select></label>
+            <label>Payment status<select name="orderPaymentStatus" [(ngModel)]="orderPaymentStatus" (ngModelChange)="filterOrders()"><option value="">All payments</option>@for (status of ['UNPAID', 'PARTIALLY_PAID', 'PAID']; track status) {<option [value]="status">{{ status.replaceAll('_', ' ') }}</option>}</select></label>
+            <label>Orders per page<select name="orderLimit" [ngModel]="orderLimit()" (ngModelChange)="orderLimit.set(+$event); filterOrders()">@for (size of [10, 20, 50]; track size) {<option [ngValue]="size">{{ size }}</option>}</select></label>
+          </div>
+          <div class="actions"><button type="submit">Search</button><button type="button" (click)="clearOrderFilters()">Clear filters</button></div>
+        </form>
+        <p #ordersSummary tabindex="-1" aria-live="polite">@if (ordersLoading()) {Loading orders…} @else if (!ordersError()) {Showing {{ orderTotal() ? (orderPage() - 1) * orderLimit() + 1 : 0 }}–{{ (orderPage() - 1) * orderLimit() + orders().length }} of {{ orderTotal() }} orders}</p>
+        @if (ordersError()) {<p role="alert">{{ ordersError() }}</p><button (click)="loadOrders()">Retry</button>}
+        @if (!ordersLoading() && !ordersError()) {
         @for (o of orders(); track o.id) {
           <div class="row">
             <div>
@@ -458,8 +471,16 @@
             </div>
           </div>
         } @empty {
-          <p>No orders recorded yet.</p>
+          <p>{{ orderSearch || orderStatus || deliveryStatus || orderPaymentStatus ? 'No orders match your filters.' : 'No orders recorded yet.' }}</p>
         }
+        }
+        <nav class="order-pagination actions" aria-label="Orders pagination">
+          <button (click)="changeOrderPage(1)" [disabled]="ordersLoading() || orderPage() === 1">First</button>
+          <button (click)="changeOrderPage(orderPage() - 1)" [disabled]="ordersLoading() || orderPage() === 1">Previous</button>
+          <span>Page {{ orderPage() }} of {{ orderPageCount() }}</span>
+          <button (click)="changeOrderPage(orderPage() + 1)" [disabled]="ordersLoading() || orderPage() >= orderPageCount()">Next</button>
+          <button (click)="changeOrderPage(orderPageCount())" [disabled]="ordersLoading() || orderPage() >= orderPageCount()">Last</button>
+        </nav>
       </section>
     }
     @if (tab === 'preferences') {

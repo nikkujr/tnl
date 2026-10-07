@@ -125,15 +125,16 @@ export class OrderDetailPage implements OnInit {
       (values) => {
         const status = String(values['status']) as PaymentStatus;
         const method = String(values['method']);
-        const cashReceived = method === 'Cash' ? Number(values['cashReceived']) : null;
+        const amountReceived = Number(values['cashReceived']);
+        const cashReceived = method === 'Cash' || method === 'Cash on delivery' ? amountReceived : null;
         const total = this.orderTotal();
-        const validationError = validateCashPayment(method, status, cashReceived, total);
+        const validationError = validateCashPayment(method, status, amountReceived, total);
         if (validationError) {
           this.setError(validationError);
           return;
         }
         this.loading.set(true);
-        this.api.updatePaymentStatus(order.id, status, method, cashReceived).subscribe({
+        this.api.updatePaymentStatus(order.id, status, method, cashReceived, amountReceived).subscribe({
           next: () => {
             this.showSuccess('Payment details updated.');
             this.load(order.id);

@@ -1,7 +1,7 @@
 <main class="business-page portal-page">
   <header class="portal-header bar">
     <a class="portal-brand" routerLink="/portal"><span class="brand-mark">T</span><strong>TNL TRACK</strong></a>
-    <a class="portal-link" routerLink="/portal" [queryParams]="{tab: 'orders'}">← Back to my orders</a>
+    <a class="portal-link" routerLink="/portal" [queryParams]="{tab: 'orders'}" queryParamsHandling="merge">← Back to my orders</a>
   </header>
   <div class="portal-welcome"><span class="eyebrow">My order</span><h1>Order details</h1></div>
   @if (error()) { <p class="error" role="alert">{{ error() }}</p><button (click)="load()">Retry</button> }

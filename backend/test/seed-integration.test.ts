@@ -121,6 +121,52 @@ test("seed/reset persists report-ready data, rolls back failures and remains usa
     assert(performance.agents.some((a: any) => a.sales === 0));
     const customer = await call("customer-auth/login", "", { email: "mara.santos@example.test", password: demoPassword });
     assert((await call("customer/orders", customer.token)).length > 0);
+    // Enough orders to exercise paging beyond the previous 200-order cutoff.
+    const [owners] = await db.query("SELECT id FROM customers WHERE email='mara.santos@example.test'");
+    const ownerId = owners[0].id;
+    await db.query(`INSERT INTO orders(tracking_number,customer_id,delivery_address,payment_method) VALUES ${Array(205).fill("(?,?,'Pagination test address','Cash on delivery')").join(',')}`,
+      Array.from({ length: 205 }, (_, i) => [`TEST-PAGING-${String(i).padStart(3, '0')}`, ownerId]).flat());
+    async function orderPage(query = '') {
+      const response = await fetch(base + 'customer/orders' + query, { headers: { authorization: `Bearer ${customer.token}` } });
+      assert.equal(response.status, 200);
+      return response.json();
+    }
+    const first = await orderPage('?search=TEST-PAGING&limit=50');
+    assert.equal(first.data.length, 50);
+    assert.equal(first.meta.total, 205);
+    const last = await orderPage('?search=TEST-PAGING&limit=50&page=5');
+    assert.equal(last.data.length, 5);
+    assert.equal(last.meta.page, 5);
+    assert(!last.data.some((o: any) => first.data.some((f: any) => f.id === o.id)));
+    assert.equal((await orderPage('?search=TEST-PAGING&limit=50&page=999')).meta.page, 5);
+    assert.equal((await orderPage('?search=TEST-PAGING&paymentStatus=PAID')).meta.total, 0);
+    assert.equal((await orderPage('?search=TEST-PAGING-000&orderStatus=PENDING')).meta.total, 1);
+    assert.equal((await orderPage('?search=%25')).meta.total, 0);
+    const [foreign] = await db.query("SELECT tracking_number FROM orders WHERE customer_id<>? LIMIT 1", [ownerId]);
+    assert.equal((await orderPage('?search=' + encodeURIComponent(foreign[0].tracking_number))).meta.total, 0);
+    for (const query of ['?page=0', '?limit=51', '?page=1.5', '?orderStatus=INVALID']) await call('customer/orders' + query, customer.token, undefined, 'GET', 400);
+    await db.query("DELETE FROM orders WHERE customer_id=? AND tracking_number LIKE 'TEST-PAGING-%'", [ownerId]);
+    const [pending] = await db.query("SELECT id FROM orders WHERE origin='LIVE' AND order_status='PENDING' AND payment_status='UNPAID' LIMIT 1");
+    const paymentOrder = await call(`orders/${pending[0].id}`, staff.token);
+    for (const method of ['Cash', 'Cash on delivery', 'Bank transfer', 'Card']) {
+      const cash = method === 'Cash' || method === 'Cash on delivery';
+      await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PARTIALLY_PAID', cashReceived: cash ? 10 : null, amountPaid: 10 }, 'PATCH');
+      assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).amountPaid, 10);
+      const edit = { customerId: paymentOrder.customerId, agentId: paymentOrder.agentId, deliveryAddress: paymentOrder.deliveryAddress,
+        paymentMethod: method, cashReceived: cash ? 10 : null, items: paymentOrder.items.map((i: any) => ({ productId: i.productId, quantity: i.quantity })),
+        packages: paymentOrder.packages.map((p: any) => ({ packageId: p.packageId, quantity: p.quantity })) };
+      await call(`orders/${paymentOrder.id}`, staff.token, edit, 'PUT');
+      assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).amountPaid, 10);
+      await call(`orders/${paymentOrder.id}`, staff.token, { ...edit, paymentMethod: method === 'Cash' ? 'Card' : 'Cash' }, 'PUT', 409);
+      await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PARTIALLY_PAID', cashReceived: cash ? 10 : null }, 'PATCH');
+      assert.equal((await call(`orders/${paymentOrder.id}`, staff.token)).amountPaid, 10);
+      await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PAID', cashReceived: cash ? paymentOrder.total + 20 : null, amountPaid: cash ? paymentOrder.total + 20 : paymentOrder.total }, 'PATCH');
+      const paid = await call(`orders/${paymentOrder.id}`, staff.token);
+      assert.equal(paid.amountPaid, paymentOrder.total);
+      assert.equal(paid.cashChange, cash ? 20 : null);
+      await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: method, paymentStatus: 'PAID', cashReceived: cash ? 1 : null, amountPaid: 1 }, 'PATCH', 400);
+    }
+    await call(`orders/${paymentOrder.id}/payment-status`, staff.token, { paymentMethod: paymentOrder.paymentMethod, paymentStatus: 'UNPAID', cashReceived: 0, amountPaid: 0 }, 'PATCH');
     const { signCustomer } = await import("../src/features/customer-auth/session.js");
     const tokenFor = async (customerId: number) => {
       const [rows] = await db.query("SELECT ca.id,ca.customer_id customerId,ca.token_version tokenVersion,c.full_name fullName,c.email FROM customer_accounts ca JOIN customers c ON c.id=ca.customer_id WHERE ca.customer_id=?", [customerId]);

@@ -84,6 +84,7 @@ export interface Order {
   paymentMethod: string;
   cashReceived: number | null;
   cashChange: number | null;
+  amountPaid?: number | null;
   deliveryAddress: string;
   createdAt: string;
 }
@@ -505,10 +506,11 @@ export class ApiService {
     paymentStatus: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID',
     paymentMethod: string,
     cashReceived: number | null,
+    amountPaid?: number,
   ): Observable<ApiResponse<unknown>> {
     return this.http.patch<ApiResponse<unknown>>(
       `${this.baseUrl}/orders/${orderId}/payment-status`,
-      { paymentStatus, paymentMethod, cashReceived },
+      { paymentStatus, paymentMethod, cashReceived, amountPaid },
     );
   }
 

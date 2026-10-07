@@ -133,8 +133,8 @@ export class DashboardPage implements OnInit {
   }
   statusClass(status: string): string { return status.toLowerCase().replaceAll('_', '-').replaceAll(' ', '-'); }
   titleCase(value: string | null): string { return value ? value.toLowerCase().split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ') : 'Not started'; }
-  orderAmount(order: Order): number { return order.items.reduce((total, item) => total + item.quantity * item.unitPrice, 0); }
-  orderItemSummary(order: Order): string { return order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', '); }
+  orderAmount(order: Order): number { return order.total; }
+  orderItemSummary(order: Order): string { return [...order.items.map((item) => `${item.productName} × ${item.quantity}`), ...order.packages.map((p) => `${p.name} × ${p.quantity}`)].join(', '); }
   money(value: number): string { return formatMoney(value); }
   greeting(): string { const hour = this.today.getHours(); return hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'; }
 }

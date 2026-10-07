@@ -85,6 +85,10 @@ Admins can use **Reports → Performance** for monthly agent sales rankings, fig
 
 In **Customers**, admins can select **View** for contact and account information, completed purchase totals, and paginated requests, orders, reviews and follow-ups. Admin order details also display the customer's saved review and link to their customer profile.
 
+Customer **My orders** supports server-side search (order number, product/package, agent or address), order/delivery/payment status filters, and 10/20/50 orders per page. Returning from order details restores the applied filters and page.
+
+Admin **Update payment** records the cumulative amount received for Cash, Cash on delivery, Bank transfer and Card. Partial payments must be below the order total; full bank/card payments must equal it, while cash/COD may include change. Order details show amount paid and balance, and payment history records the amount. Run `npm run db:migrate` before starting the updated API; older payments without a recorded amount remain unknown. Overview order amounts use the complete saved total, including packages.
+
 **Reports → Daily / Monthly / Overall reports** includes completed sales revenue and trends, top 10 fast-selling and slow-moving products with charts and tables, top customers and packages, order/payment status breakdowns, and current low-stock products. Product movement includes saved package components; slow movers include active stocked products with zero sales. See [report definitions and checks](docs/REPORTS.md).
 
 Daily, Monthly, Overall and Performance reports include **Print / Save PDF** and **Export CSV** for the loaded report. Printing hides navigation and editing controls; CSV includes the report period, timezone, load timestamp and unformatted numerical values. See [output conventions](docs/REPORTS.md#print-and-csv).
