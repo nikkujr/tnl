@@ -46,8 +46,8 @@ export class BusinessApi {
   delete(path: string) {
     return this.http.delete<void>(`${this.base}/${path}`);
   }
-  customerLogin(email: string, password: string) {
-    return this.post<{ token: string; user: SessionUser }>('customer-auth/login', {
+  signIn(email: string, password: string) {
+    return this.post<{ token: string; user: SessionUser }>('auth/sign-in', {
       email,
       password,
     });

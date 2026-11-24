@@ -36,18 +36,19 @@
 
 @if (showForm()) {
   <div class="modal-backdrop" (click)="showForm.set(false)">
-    <section class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-title"><div><span class="eyebrow">CRM</span><h2>{{ editingId ? 'Edit lead' : 'New lead' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
-      <form (ngSubmit)="save()">
+    <section class="modal contact-modal" role="dialog" aria-modal="true" aria-labelledby="lead-form-title" (click)="$event.stopPropagation()">
+      <div class="modal-title"><div><span class="eyebrow">CRM</span><h2 id="lead-form-title">{{ editingId ? 'Edit lead' : 'New lead' }}</h2></div><button (click)="showForm.set(false)">×</button></div>
+      <form #leadForm (ngSubmit)="save(leadForm)">
+        @if (saveError()) { <p class="error-banner" role="alert">{{ saveError() }}</p> }
         <div class="form-grid">
-          <label>Full name<input data-validation-field="fullName" name="leadName" [(ngModel)]="form.fullName" required></label>
+          <app-contact-fields kind="name" [entry]="form.name" label="Name" prefix="nameParts" />
           <label>Email<input data-validation-field="email" name="leadEmail" type="email" [(ngModel)]="form.email" required></label>
           <label>Phone<input data-validation-field="phone" name="leadPhone" [(ngModel)]="form.phone" required minlength="7" maxlength="16" placeholder="09XXXXXXXXX"></label>
           <label>Source<input data-validation-field="source" name="leadSource" [(ngModel)]="form.source" required></label>
           <label>Assigned agent<select data-validation-field="assignedAgentId" name="leadAgent" [(ngModel)]="form.assignedAgentId"><option [ngValue]="null">Unassigned</option>@for (agent of activeAgents(); track agent.id) { <option [ngValue]="agent.id">{{ agent.fullName }}</option> }</select></label>
           <label>Status<select data-validation-field="status" name="leadStatus" [(ngModel)]="form.status"><option value="NEW">New</option><option value="CONTACTED">Contacted</option><option value="QUALIFIED">Qualified</option><option value="LOST">Lost</option></select></label>
         </div>
-        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary">Save lead</button></footer>
+        <footer><button type="button" class="secondary-button" (click)="showForm.set(false)">Cancel</button><button class="primary" [disabled]="loading()">{{ loading() ? "Saving…" : "Save lead" }}</button></footer>
       </form>
     </section>
   </div>

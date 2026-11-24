@@ -91,19 +91,22 @@
 
 @if (showForm()) {
   <div class="modal-backdrop" (click)="showForm.set(false)">
-    <section class="modal" (click)="$event.stopPropagation()">
+    <section class="modal contact-modal" role="dialog" aria-modal="true" aria-labelledby="customer-form-title" (click)="$event.stopPropagation()">
       <div class="modal-title">
         <div>
           <span class="eyebrow">CRM</span>
-          <h2>{{ editingId ? 'Edit customer' : 'New customer' }}</h2>
+          <h2 id="customer-form-title">{{ editingId ? 'Edit customer' : 'New customer' }}</h2>
         </div>
         <button type="button" (click)="showForm.set(false)">×</button>
       </div>
-      <form (ngSubmit)="save()">
+      @if (saveNotice()) {
+        <p role="status">{{ saveNotice() }}</p>
+        <footer><button type="button" class="primary" (click)="showForm.set(false)">Done</button></footer>
+      } @else {
+      <form #customerForm (ngSubmit)="save(customerForm)">
+        @if (saveError()) { <p class="error-banner" role="alert">{{ saveError() }}</p> }
         <div class="form-grid">
-          <label
-            >Full name<input data-validation-field="fullName" name="customerName" [(ngModel)]="form.fullName" required minlength="2"
-          /></label>
+          <app-contact-fields kind="name" [entry]="form.name" label="Name" prefix="nameParts" />
           <label
             >Email<input data-validation-field="email" name="customerEmail" type="email" [(ngModel)]="form.email" required
           /></label>
@@ -132,15 +135,7 @@
               Customer explicitly agreed to marketing emails</span
             ></label
           >
-          <label class="wide"
-            >Address<textarea data-validation-field="address"
-              name="customerAddress"
-              [(ngModel)]="form.address"
-              rows="4"
-              required
-              minlength="5"
-            ></textarea>
-          </label>
+          <app-contact-fields kind="address" [entry]="form.address" label="Address" prefix="addressParts" />
         </div>
         @if (session()!.role === 'AGENT') {
           <p class="form-note">This customer will remain assigned to your agent account.</p>
@@ -148,9 +143,10 @@
         <footer>
           <button type="button" class="secondary-button" (click)="showForm.set(false)">
             Cancel</button
-          ><button class="primary">Save customer</button>
+          ><button class="primary" [disabled]="loading()">{{ loading() ? "Saving…" : "Save customer" }}</button>
         </footer>
       </form>
+      }
     </section>
   </div>
 }

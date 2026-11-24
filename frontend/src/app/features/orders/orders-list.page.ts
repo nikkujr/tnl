@@ -7,6 +7,7 @@ import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-d
 import { AppIconComponent } from '../../shared/app-icon.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { formatMoney } from '../../shared/money';
+import { orderRejectionDialog, selectedRejectionReason } from '../../shared/order-rejection';
 
 const STATUS_OPTIONS = [
   'All',
@@ -52,7 +53,7 @@ export class OrdersListPage implements OnInit, OnDestroy {
   readonly error = signal('');
   readonly notice = signal('');
   readonly actionDialog = signal<ActionDialogConfig | null>(null);
-  private dialogAction: (() => void) | null = null;
+  private dialogAction: ((values: Record<string, string | number>) => void) | null = null;
   private readonly lockBodyScroll = effect(() => {
     document.body.style.overflow = this.actionDialog() !== null ? 'hidden' : '';
   });
@@ -166,8 +167,17 @@ export class OrdersListPage implements OnInit, OnDestroy {
   }
 
   decideOrder(order: Order, decision: 'APPROVE' | 'REJECT'): void {
+    if (decision === 'REJECT') {
+      this.openDialog(orderRejectionDialog(order.trackingNumber),
+        (values) => this.submitDecision(order, decision, selectedRejectionReason(values)));
+      return;
+    }
+    this.submitDecision(order, decision);
+  }
+
+  private submitDecision(order: Order, decision: 'APPROVE' | 'REJECT', reason?: string): void {
     this.loading.set(true);
-    this.api.decideOrder(order.id, decision).subscribe({
+    this.api.decideOrder(order.id, decision, reason).subscribe({
       next: () => {
         this.showSuccess(decision === 'APPROVE' ? 'Order approved.' : 'Order rejected.');
         this.refreshAfterMutation();
@@ -202,7 +212,7 @@ export class OrdersListPage implements OnInit, OnDestroy {
     this.loadStats();
   }
 
-  private openDialog(config: ActionDialogConfig, action: () => void): void {
+  private openDialog(config: ActionDialogConfig, action: (values: Record<string, string | number>) => void): void {
     this.dialogAction = action;
     this.actionDialog.set(config);
   }
@@ -210,10 +220,10 @@ export class OrdersListPage implements OnInit, OnDestroy {
     this.actionDialog.set(null);
     this.dialogAction = null;
   }
-  confirmActionDialog(): void {
+  confirmActionDialog(values: Record<string, string | number>): void {
     const action = this.dialogAction;
     this.closeActionDialog();
-    action?.();
+    action?.(values);
   }
 
   private showSuccess(message: string): void {

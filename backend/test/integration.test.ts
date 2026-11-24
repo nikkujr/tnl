@@ -1082,6 +1082,86 @@ test(
           await call("customer/me", "GET", undefined, customerToken, 401);
         },
       );
+      await t.test("panel workflows preserve names and addresses and enforce cancellation and rejection rules", async () => {
+        const { hash } = await import("bcryptjs");
+        const { jsonValue } = await import("../src/shared/transaction.js");
+        const password = "panel-test-password";
+        const passwordHash = await hash(password, 4);
+        await db.query("UPDATE users SET password_hash=? WHERE id IN (1,2)", [passwordHash]);
+        for (const [email, role] of [["admin@example.test", "ADMIN"], ["agent@example.test", "AGENT"]]) {
+          const login = await call("auth/sign-in", "POST", { email, password }, "");
+          assert.equal(login.user.role, role);
+        }
+
+        const nameParts = { firstName: "Maria Teresa", middleName: "D.", lastName: "de los Santos" };
+        const addressParts = { street: "123 Test Road", barangay: "Centro", city: "Naga City", province: "Camarines Sur", postalCode: "4400" };
+        const customerInput = {
+          fullName: "Maria Teresa D. de los Santos", nameParts, email: "panel-customer@example.test",
+          phone: "09171234567", address: "123 Test Road, Centro, Naga City, Camarines Sur, 4400", addressParts,
+        };
+        const contact = await call("customers", "POST", customerInput, a, 201);
+        const [saved] = await db.query("SELECT name_parts,address_parts FROM customers WHERE id=?", [contact.id]);
+        assert.deepEqual(jsonValue(saved[0].name_parts), nameParts);
+        assert.deepEqual(jsonValue(saved[0].address_parts), addressParts);
+        await db.query("INSERT INTO customer_accounts(customer_id,password_hash,verified_at) VALUES(?,?,UTC_TIMESTAMP())", [contact.id, passwordHash]);
+        const login = await call("auth/sign-in", "POST", { email: customerInput.email, password }, "");
+        assert.equal(login.user.role, "CUSTOMER");
+        const customerAuth = login.token;
+        await call("auth/sign-in", "POST", { email: customerInput.email, password: "wrong-password" }, "", 401);
+
+        const [product] = await db.execute("INSERT INTO products(category_id,name,sku,price,stock_on_hand) VALUES(1,'Panel test item','PANEL-CHECK',75,10)");
+        const orderInput = {
+          customerId: contact.id, items: [{ productId: product.insertId, quantity: 2 }],
+          deliveryAddress: customerInput.address, deliveryAddressParts: addressParts, paymentMethod: "Cash on delivery",
+        };
+        const create = () => call("orders", "POST", orderInput, a, 201);
+        const cancelAsCustomer = (id: number, status = 200) => call(`customer/orders/${id}/cancel`, "POST", {}, customerAuth, status);
+        const pending = await create();
+        const otherOrder = await call("orders", "POST", { ...orderInput, customerId: 1 }, a, 201);
+        await cancelAsCustomer(otherOrder.id, 404);
+        await cancelAsCustomer(pending.id);
+        await cancelAsCustomer(pending.id);
+        assert.equal((await call(`customer/orders/${pending.id}`, "GET", undefined, customerAuth)).orderStatus, "CANCELLED");
+
+        const preparing = await create();
+        await call(`orders/${preparing.id}/decision`, "POST", { decision: "APPROVE" });
+        await cancelAsCustomer(preparing.id, 409);
+        await call(`orders/${preparing.id}/cancel`, "POST", {}, agent, 403);
+        const [[reserved]] = await db.query("SELECT stock_reserved FROM products WHERE id=?", [product.insertId]);
+        assert.equal(reserved.stock_reserved, 2);
+        await call(`orders/${preparing.id}/cancel`, "POST", {});
+        await call(`orders/${preparing.id}/cancel`, "POST", {});
+        const [[released]] = await db.query("SELECT stock_reserved,stock_on_hand FROM products WHERE id=?", [product.insertId]);
+        assert.deepEqual(released, { stock_reserved: 0, stock_on_hand: 10 });
+
+        const rejected = await create();
+        await call(`orders/${rejected.id}/decision`, "POST", { decision: "REJECT" }, a, 400);
+        await call(`orders/${rejected.id}/decision`, "POST", { decision: "REJECT", reason: "Item unavailable" });
+        const detail = await call(`customer/orders/${rejected.id}`, "GET", undefined, customerAuth);
+        assert.equal(detail.rejectionReason, "Item unavailable");
+        const staffDetail = await call(`orders/${rejected.id}`);
+        assert.deepEqual(jsonValue(staffDetail.deliveryAddressParts), addressParts);
+
+        const offers = await call("catalog", "GET", undefined, "");
+        const offer = offers.find((value: any) => value.kind === "PRODUCT" && value.id === product.insertId);
+        assert.ok(offer);
+        const submitted = await call("customer/requests", "POST", {
+          ...orderInput, reviewedTerms: [{ id: offer.id, kind: offer.kind, revision: offer.revision }],
+        }, customerAuth, 201);
+        await call(`customer/requests/${submitted.id}/cancel`, "POST", {}, customerAuth);
+        await call(`requests/${submitted.id}/convert`, "POST", {}, a, 409);
+        const requests = await call("customer/requests", "GET", undefined, customerAuth);
+        assert.equal(requests.find((request: any) => request.id === submitted.id)?.status, "CANCELLED");
+
+        await db.query("UPDATE orders SET created_at='2026-11-23 16:00:00',payment_status='PAID' WHERE id=?", [otherOrder.id]);
+        const period = "period=daily&date=2026-11-24";
+        const summary = await call(`dashboard?${period}`);
+        assert.ok(summary.revenueTrend.some((row: any) => row.label === "2026-11-24 00:00" && row.revenue >= 150));
+        const orders = await call(`orders?${period}&limit=200`);
+        assert.ok(orders.some((order: any) => order.id === otherOrder.id));
+        const previousDay = await call("orders?period=daily&date=2026-11-23&limit=200");
+        assert.ok(!previousDay.some((order: any) => order.id === otherOrder.id));
+      });
     } finally {
       if (server)
         await new Promise<void>((resolve) => server.close(() => resolve()));

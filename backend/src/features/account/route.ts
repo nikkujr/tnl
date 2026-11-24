@@ -1,3 +1,4 @@
+import { addressPartsSchema, formatAddress, formatName, namePartsSchema, storedParts } from "../../shared/contact-fields.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Router, type Request, type RequestHandler } from "express";
@@ -47,7 +48,7 @@ async function ownAccount(c: PoolConnection, req: Request) {
   const isCustomer = Boolean(req.customer);
   const [rows] = await c.query<any[]>(
     isCustomer
-      ? "SELECT ca.id,ca.customer_id customerId,ca.password_hash passwordHash,ca.token_version tokenVersion,c.email,c.full_name fullName,c.phone,c.address FROM customer_accounts ca JOIN customers c ON c.id=ca.customer_id WHERE ca.id=? AND ca.active=TRUE AND ca.verified_at IS NOT NULL FOR UPDATE"
+      ? "SELECT ca.id,ca.customer_id customerId,ca.password_hash passwordHash,ca.token_version tokenVersion,c.email,c.full_name fullName,c.phone,c.address,c.name_parts nameParts,c.address_parts addressParts FROM customer_accounts ca JOIN customers c ON c.id=ca.customer_id WHERE ca.id=? AND ca.active=TRUE AND ca.verified_at IS NOT NULL FOR UPDATE"
       : "SELECT id,email,full_name fullName,phone,role,password_hash passwordHash,token_version tokenVersion FROM users WHERE id=? AND active=TRUE FOR UPDATE",
     [isCustomer ? req.customer!.id : req.user!.id],
   );
@@ -72,6 +73,7 @@ function publicProfile(row: any) {
     email: row.email,
     phone: row.phone,
     address: row.address,
+    ...(row.role === "CUSTOMER" ? { nameParts: row.nameParts, addressParts: row.addressParts } : {}),
     role: row.role,
   };
 }
@@ -115,6 +117,8 @@ router.patch(
       .object({
         fullName: z.string().trim().min(2).max(160),
         phone,
+        nameParts: namePartsSchema.optional(),
+        addressParts: addressPartsSchema.optional(),
         address: z.string().trim().min(5).max(500).optional(),
       })
       .strict(),
@@ -134,18 +138,24 @@ router.patch(
               400,
               "An address is required for your customer profile",
             );
+          const fullName = req.body.nameParts ? formatName(req.body.nameParts) : req.body.fullName;
+          const address = req.body.addressParts ? formatAddress(req.body.addressParts) : req.body.address;
+          const nameParts = req.body.nameParts ?? (fullName === account.fullName ? account.nameParts : null);
+          const addressParts = req.body.addressParts ?? (address === account.address ? account.addressParts : null);
           await c.execute(
-            "UPDATE customers SET full_name=?,phone=?,address=? WHERE id=?",
+            "UPDATE customers SET full_name=?,name_parts=?,phone=?,address=?,address_parts=? WHERE id=?",
             [
-              req.body.fullName,
+              fullName,
+              storedParts(nameParts),
               req.body.phone,
-              req.body.address,
+              address,
+              storedParts(addressParts),
               account.customerId,
             ],
           );
-          account.address = req.body.address;
+          Object.assign(account, { fullName, address, nameParts, addressParts });
         } else {
-          if (req.body.address !== undefined)
+          if (req.body.address !== undefined || req.body.addressParts || req.body.nameParts)
             throw new HttpError(
               400,
               "Staff profiles do not include a delivery address",
@@ -158,7 +168,7 @@ router.patch(
         }
         return sessionResult({
           ...account,
-          fullName: req.body.fullName,
+          fullName: account.role === "CUSTOMER" ? account.fullName : req.body.fullName,
           phone: req.body.phone,
         });
       });

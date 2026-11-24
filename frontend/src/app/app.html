@@ -10,7 +10,7 @@
       >
       <div>
         <a href="/portal">Customer portal</a><a href="#tracking">Track order</a
-        ><a href="#staff-login">Staff sign in</a>
+        ><a href="/portal#sign-in">Sign in</a>
       </div>
     </nav>
     <section class="hero">
@@ -88,41 +88,6 @@
           </div>
         }
       </div>
-    </section>
-    <section class="staff-section" id="staff-login">
-      <div>
-        <span class="hero-kicker">Team workspace</span>
-        <h2>Run operations in one place.</h2>
-        <p>
-          Authorized administrators and agents can sign in to manage customers, orders, inventory,
-          campaigns, and deliveries.
-        </p>
-      </div>
-      <section class="login-card">
-        <div>
-          <span class="eyebrow">Secure workspace</span>
-          <h2>Staff sign in</h2>
-        </div>
-        @if (loginError()) {
-          <div class="error-banner">{{ loginError() }}</div>
-        }
-        <form (ngSubmit)="login()">
-          <label>Email<input data-validation-field="loginEmail" type="email" name="email" [(ngModel)]="loginEmail" required /></label
-          ><label
-            >Password<input data-validation-field="loginPassword"
-              type="password"
-              name="password"
-              [(ngModel)]="loginPassword"
-              required /></label
-          ><button class="primary" [disabled]="loading()">
-            {{ loading() ? 'Signing in…' : 'Sign in' }}
-          </button>
-        </form>
-        <div class="demo-accounts">
-          <span>Demo accounts</span><button (click)="useAccount('ADMIN')">Admin</button
-          ><button (click)="useAccount('AGENT')">Agent</button>
-        </div>
-      </section>
     </section>
     <app-guided-chat />
     <footer class="landing-footer">
@@ -383,7 +348,7 @@
   @if (showOrderForm()) {
     <div class="modal-backdrop" (click)="closeNewOrder()">
       <section
-        class="modal"
+        class="modal contact-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-order-title"
@@ -488,9 +453,7 @@
                 }
               </div>
             }
-            <label class="wide"
-              >Delivery address<input data-validation-field="deliveryAddress" name="address" [(ngModel)]="newOrder.deliveryAddress"
-            /></label>
+            <app-contact-fields kind="address" [entry]="newOrder.deliveryAddress" label="Delivery address" prefix="deliveryAddressParts" />
           </div>
           <p class="form-note">
             Stock availability is checked before submission. A tracking number is generated

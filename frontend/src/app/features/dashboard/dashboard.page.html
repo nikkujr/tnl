@@ -4,6 +4,22 @@
     <div class="live"><i></i><strong>{{ summary().activeDeliveries }}</strong><small>active deliveries</small></div>
   </div>
 
+  @if (session()?.role === 'ADMIN') {
+    <div class="period-controls" aria-label="Overview period">
+      <label>Period
+        <select aria-label="Period" [ngModel]="period()" (ngModelChange)="changePeriod($event)">
+          <option value="daily">Daily</option><option value="monthly">Monthly</option><option value="overall">Overall</option>
+        </select>
+      </label>
+      @if (period() === 'daily') {
+        <label>Date <input #dateInput type="date" [value]="selectedDate()" (change)="changeDate(dateInput.value)" /></label>
+      } @else if (period() === 'monthly') {
+        <label>Month <input #monthInput type="month" [value]="selectedMonth()" (change)="changeMonth(monthInput.value)" /></label>
+      }
+    </div>
+  }
+  @if (loading()) { <p role="status">Loading overview…</p> }
+
   <div class="metric-grid">
     @for (metric of metrics(); track metric.label; let index = $index) {
       <button type="button" class="metric metric-card" [class]="'metric metric-card metric-tone-'+index" (click)="openMetric(metric)" [attr.aria-label]="'Open '+metric.label"><div class="metric-head"><span class="metric-icon"><app-icon [name]="metric.icon" /></span><span class="metric-label">{{metric.label}}</span><app-icon class="metric-arrow" name="chevronRight" /></div><strong class="metric-value">{{metric.value}}</strong><div class="metric-foot"><b>{{metric.change}}</b><span>{{metric.note}}</span></div></button>
@@ -16,9 +32,9 @@
 
   <div class="dashboard-grid">
     <article class="panel chart-panel">
-      <div class="panel-title"><div><span class="eyebrow">Performance</span><h3>Revenue overview</h3></div><span class="period-button">Last 6 months</span></div>
-      <div class="chart">
-        @for (bar of revenueBars(); track bar.key; let last = $last) {
+      <div class="panel-title"><div><span class="eyebrow">Performance</span><h3>Revenue overview</h3></div>@if (session()?.role === 'AGENT') { <span class="period-button">Last 6 months</span> }</div>
+      <div class="chart" [style.grid-template-columns]="'repeat(' + (revenueBars().length || 1) + ', minmax(1.8rem, 1fr))'">
+        @for (bar of (loading() ? [] : revenueBars()); track bar.key; let last = $last) {
           <div><span [style.height.%]="bar.value" [class.current]="last" [attr.title]="bar.revenue | currency:'PHP':'symbol-narrow'"></span><small>{{ bar.month }}</small></div>
         }
       </div>
@@ -35,13 +51,9 @@
     <div class="panel-title"><div><span class="eyebrow">Operations</span><h3>Recent orders</h3></div><button (click)="goToOrders()">View all →</button></div>
     <div class="order-table">
       <div class="order-row header"><span>Order</span><span>Customer</span><span>Amount</span><span>Status</span><span>Payment</span><span>Action</span></div>
-      @for (order of recentOrders(); track order.id) {
-        <div class="order-row"><strong>{{ order.trackingNumber }}</strong><span><b>{{ order.customerName }}</b><small>{{ orderItemSummary(order) }}</small></span><strong>{{ orderAmount(order) | currency:'PHP':'symbol-narrow':'1.0-0' }}</strong><span><i [class]="'status ' + statusClass(displayStatus(order))">{{ displayStatus(order) }}</i></span><span>{{ titleCase(order.paymentStatus) }}</span><span class="table-actions"><button class="row-action" (click)="viewOrder(order)">View</button>@if(order.orderStatus==='PENDING'){<button class="row-action" (click)="editOrder(order)">Edit</button>}@if (session()!.role === 'ADMIN' && order.orderStatus === 'PENDING') { <button class="row-action approve" (click)="decideOrder(order, 'APPROVE')">Approve</button><button class="row-action reject" (click)="decideOrder(order, 'REJECT')">Reject</button> }@if(order.orderStatus!=='APPROVED'&&order.orderStatus!=='COMPLETED'){<button class="row-action reject" (click)="removeOrder(order)">Delete</button>}</span></div>
+      @for (order of (loading() ? [] : recentOrders()); track order.id) {
+        <div class="order-row"><strong>{{ order.trackingNumber }}</strong><span><b>{{ order.customerName }}</b><small>{{ orderItemSummary(order) }}</small></span><strong>{{ orderAmount(order) | currency:'PHP':'symbol-narrow':'1.0-0' }}</strong><span><i [class]="'status ' + statusClass(displayStatus(order))">{{ displayStatus(order) }}</i></span><span>{{ titleCase(order.paymentStatus) }}</span><span class="table-actions"><button class="row-action" (click)="viewOrder(order)">View</button>@if(order.orderStatus==='PENDING'){<button class="row-action" (click)="editOrder(order)">Edit</button>}@if (session()!.role === 'ADMIN' && order.orderStatus === 'PENDING') { <button class="row-action approve" (click)="decideOrder(order, 'APPROVE')">Approve</button><button class="row-action reject" (click)="decideOrder(order, 'REJECT')">Reject</button> }@if(order.orderStatus==='PENDING'||order.orderStatus==='REJECTED'){<button class="row-action reject" (click)="removeOrder(order)">Delete</button>}</span></div>
       } @empty { <div class="empty">No orders match those filters.</div> }
     </div>
   </article>
 </div>
-
-@if (confirmDialog.config(); as dialog) {
-  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
-}

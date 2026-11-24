@@ -20,6 +20,15 @@ declare global {
 }
 export const signCustomer = (user: CustomerSession) =>
   jwt.sign(user, config.JWT_SECRET, { audience: "customer", expiresIn: "8h" });
+export async function findCustomerLogin(email: string) {
+  const [rows] = await db.query<any[]>(
+    "SELECT ca.id,ca.customer_id customerId,ca.password_hash,ca.token_version tokenVersion,c.email,c.full_name fullName FROM customer_accounts ca JOIN customers c ON c.id=ca.customer_id WHERE c.email=? AND ca.active=TRUE AND ca.verified_at IS NOT NULL",
+    [email],
+  );
+  return rows[0];
+}
+
+export const dummyLoginHash = "$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";
 export const authenticateCustomer: RequestHandler = async (req, _res, next) => {
   try {
     const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");

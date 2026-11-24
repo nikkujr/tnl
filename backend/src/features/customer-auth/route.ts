@@ -1,3 +1,4 @@
+import { addressPartsSchema, formatAddress, formatName, namePartsSchema, storedParts } from "../../shared/contact-fields.js";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
 import { Router } from "express";
@@ -10,7 +11,7 @@ import { transaction, jsonValue } from "../../shared/transaction.js";
 import { normalizePhPhone } from "../../shared/phone.js";
 import { rateLimit } from "../../shared/rate-limit.js";
 import { enqueue, welcome } from "../automations/events.js";
-import { signCustomer } from "./session.js";
+import { dummyLoginHash, findCustomerLogin, signCustomer } from "./session.js";
 const router = Router(),
   email = z
     .string()
@@ -79,6 +80,8 @@ router.post(
     z.object({
       email,
       password,
+      nameParts: namePartsSchema.optional(),
+      addressParts: addressPartsSchema.optional(),
       fullName: z.string().trim().min(2).max(160),
       phone: z
         .string()
@@ -106,9 +109,11 @@ router.post(
             "REGISTER",
             input.email,
             {
-              fullName: input.fullName,
+              fullName: input.nameParts ? formatName(input.nameParts) : input.fullName,
+              nameParts: input.nameParts,
               phone: normalizePhPhone(input.phone),
-              address: input.address,
+              address: input.addressParts ? formatAddress(input.addressParts) : input.address,
+              addressParts: input.addressParts,
               passwordHash,
               marketingOptIn: input.marketingOptIn,
             },
@@ -192,12 +197,14 @@ router.post(
           throw new HttpError(400, "Invitation no longer matches this contact");
         if (!customer) {
           const [r] = await c.execute<any>(
-            "INSERT INTO customers(full_name,email,phone,address,marketing_opt_in,marketing_opted_at) VALUES(?,?,?,?,?,IF(?,UTC_TIMESTAMP(),NULL))",
+            "INSERT INTO customers(full_name,name_parts,email,phone,address,address_parts,marketing_opt_in,marketing_opted_at) VALUES(?,?,?,?,?,?,?,IF(?,UTC_TIMESTAMP(),NULL))",
             [
               payload.fullName,
+              storedParts(payload.nameParts),
               t.email,
               payload.phone,
               payload.address,
+              storedParts(payload.addressParts),
               payload.marketingOptIn,
               payload.marketingOptIn,
             ],
@@ -267,16 +274,8 @@ router.post(
   validation(z.object({ email, password })),
   async (req, res, next) => {
     try {
-      const [rows] = await db.query<any[]>(
-        "SELECT ca.id,ca.customer_id customerId,ca.password_hash,ca.token_version tokenVersion,c.email,c.full_name fullName FROM customer_accounts ca JOIN customers c ON c.id=ca.customer_id WHERE c.email=? AND ca.active=TRUE AND ca.verified_at IS NOT NULL",
-        [req.body.email],
-      );
-      const row = rows[0];
-      const valid = await bcrypt.compare(
-        req.body.password,
-        row?.password_hash ??
-          "$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW",
-      );
+      const row = await findCustomerLogin(req.body.email);
+      const valid = await bcrypt.compare(req.body.password, row?.password_hash ?? dummyLoginHash);
       if (!row || !valid) throw new HttpError(401, "Invalid email or password");
       const { password_hash, ...identity } = row;
       const user = { ...identity, role: "CUSTOMER" as const };

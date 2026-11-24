@@ -1,5 +1,4 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { map, Observable, tap } from 'rxjs';
 import { ApiService, SessionUser } from './api.service';
 
 function restoreSession(): SessionUser | null {
@@ -19,17 +18,6 @@ export class SessionService {
 
   readonly session = signal<SessionUser | null>(restoreSession());
   readonly isAdmin = computed(() => this.session()?.role === 'ADMIN');
-
-  login(email: string, password: string): Observable<{ token: string; user: SessionUser }> {
-    return this.api.login(email, password).pipe(
-      tap(({ data }) => {
-        sessionStorage.setItem('tnl_access_token', data.token);
-        sessionStorage.setItem('tnl_user', JSON.stringify(data.user));
-        this.session.set(data.user);
-      }),
-      map(({ data }) => data),
-    );
-  }
 
   setSession(data: { token: string; user: SessionUser }): void {
     sessionStorage.setItem('tnl_access_token', data.token);

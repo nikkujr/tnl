@@ -1,3 +1,4 @@
+import { type AddressParts, formatAddress, storedParts } from "../../shared/contact-fields.js";
 import { randomBytes } from "node:crypto";
 import type { PoolConnection } from "mysql2/promise";
 import { HttpError } from "../../shared/http.js";
@@ -223,6 +224,7 @@ export async function createSale(
     customerId: number;
     agentId?: number | null;
     deliveryAddress: string;
+    deliveryAddressParts?: AddressParts;
     paymentMethod: string;
     cashReceived?: number | null;
   },
@@ -253,12 +255,13 @@ export async function createSale(
     trackingNumber = `TNL-${randomBytes(10).toString("hex").toUpperCase()}`;
     try {
       const [r] = await c.execute<any>(
-        "INSERT INTO orders(tracking_number,customer_id,agent_id,delivery_address,payment_method,payment_status,cash_received,cash_change,amount_paid,sales_version) VALUES(?,?,?,?,?,?,?,?,?,'PACKAGE')",
+        "INSERT INTO orders(tracking_number,customer_id,agent_id,delivery_address,delivery_address_parts,payment_method,payment_status,cash_received,cash_change,amount_paid,sales_version) VALUES(?,?,?,?,?,?,?,?,?,?,'PACKAGE')",
         [
           trackingNumber,
           input.customerId,
           input.agentId ?? null,
-          input.deliveryAddress,
+          input.deliveryAddressParts ? formatAddress(input.deliveryAddressParts) : input.deliveryAddress,
+          storedParts(input.deliveryAddressParts),
           input.paymentMethod,
           payment.paymentStatus,
           payment.cashReceived,

@@ -12,16 +12,19 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { ContactFieldsComponent, contactEntry, contactText } from '../../shared/contact-fields.component';
 import { AppFormsModule } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BusinessApi, CatalogOffer } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
+import { ActionDialogComponent } from '../../shared/action-dialog.component';
+import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
 import { GuidedChatComponent } from '../../shared/guided-chat.component';
 import { AppIconComponent } from '../../shared/app-icon.component';
 type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'reset';
 @Component({
   selector: 'app-customer-portal',
-  imports: [AppFormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
+  imports: [ActionDialogComponent, ContactFieldsComponent, AppFormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
   templateUrl: './portal.page.html',
   styleUrls: ['../../shared/business.scss', './portal.page.scss'],
 })
@@ -34,6 +37,7 @@ export class PortalPage {
   readonly error = signal('');
   readonly notice = signal('');
   readonly busy = signal(false);
+  readonly confirmDialog = inject(ConfirmDialogService);
   readonly offers = signal<CatalogOffer[]>([]);
   readonly catalogKind = signal<'ALL' | 'PRODUCT' | 'PACKAGE'>('ALL');
   readonly filteredOffers = computed(() =>
@@ -87,11 +91,11 @@ export class PortalPage {
   mode: AuthMode = 'login';
   email = '';
   password = '';
-  fullName = '';
+  fullName = contactEntry();
   phone = '';
-  address = '';
+  address = contactEntry();
   marketingOptIn = false;
-  deliveryAddress = '';
+  deliveryAddress = contactEntry();
   paymentMethod = 'Cash on delivery';
   search = '';
   private magic = '';
@@ -113,7 +117,7 @@ export class PortalPage {
   }
   authDescription() {
     return {
-      login: 'Sign in to your offers, requests, and orders.',
+      login: 'Sign in to TNL Track.',
       register: 'Create an account, then verify your email to get started.',
       forgot: 'Enter your email and we’ll send you a reset link.',
       verify: 'Confirm your email to connect with your customer record.',
@@ -188,7 +192,7 @@ export class PortalPage {
     this.api.get('customer/me').subscribe({
       next: (r) => {
         this.profile.set(r.data);
-        this.deliveryAddress = r.data.address;
+        this.deliveryAddress = contactEntry(r.data.address, r.data.addressParts);
         this.marketingOptIn = Boolean(r.data.marketingOptIn);
       },
       error: (e) => this.fail(e),
@@ -241,6 +245,13 @@ export class PortalPage {
     summary?.focus({ preventScroll: true });
     summary?.scrollIntoView({ block: 'start' });
   }
+  readonly demoAccountsAvailable = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+
+  useDemoAccount(role: 'admin' | 'agent') {
+    this.email = role + '@tnl.local';
+    this.password = 'TnlDemo123!';
+  }
+
   auth() {
     this.error.set('');
     this.notice.set('');
@@ -250,9 +261,11 @@ export class PortalPage {
       request = this.api.post('customer-auth/register', {
         email: this.email,
         password: this.password,
-        fullName: this.fullName,
+        fullName: contactText(this.fullName, 'name'),
+        nameParts: this.fullName.parts ?? undefined,
         phone: this.phone,
-        address: this.address,
+        address: contactText(this.address, 'address'),
+        addressParts: this.address.parts ?? undefined,
         marketingOptIn: this.marketingOptIn,
       });
     else if (this.mode === 'forgot')
@@ -267,13 +280,17 @@ export class PortalPage {
         token: this.magic,
         password: this.password,
       });
-    else request = this.api.customerLogin(this.email, this.password);
+    else request = this.api.signIn(this.email, this.password);
     request.subscribe({
       next: (r) => {
         this.busy.set(false);
         this.password = '';
         if (r.data.token) {
           this.sessionService.setSession(r.data);
+          if (r.data.user.role !== 'CUSTOMER') {
+            void this.router.navigateByUrl(r.data.user.role === 'DELIVERY' ? '/delivery' : '/dashboard', { replaceUrl: true });
+            return;
+          }
           this.magic = '';
           this.router.navigate(['/portal'], {
             queryParams: {
@@ -292,6 +309,26 @@ export class PortalPage {
       error: (e) => this.fail(e),
     });
   }
+  async cancelRequest(id: number) {
+    const confirmed = await this.confirmDialog.open({
+      title: 'Cancel request?',
+      message: 'This request will be closed. You can submit a new request later.',
+      confirmLabel: 'Cancel request', tone: 'danger',
+    });
+    if (!confirmed || this.busy()) return;
+    this.busy.set(true);
+    this.error.set('');
+    this.notice.set('');
+    this.api.post('customer/requests/' + id + '/cancel').pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.requests.update((rows) => rows.map((row) => row.id === id ? { ...row, status: 'CANCELLED' } : row));
+        this.notice.set('Request cancelled.');
+      },
+      error: (error) => this.fail(error),
+    });
+  }
+
   add(offer: CatalogOffer) {
     if (this.session()?.role !== 'CUSTOMER') {
       this.notice.set('Sign in to submit an order request.');
@@ -336,7 +373,8 @@ export class PortalPage {
         packages: this.cart()
           .filter((l) => l.offer.kind === 'PACKAGE')
           .map((l) => ({ packageId: l.offer.id, quantity: l.quantity })),
-        deliveryAddress: this.deliveryAddress,
+        deliveryAddress: contactText(this.deliveryAddress, 'address'),
+        deliveryAddressParts: this.deliveryAddress.parts ?? undefined,
         paymentMethod: this.paymentMethod,
         reviewedTerms: this.cart().map((l) => ({
           kind: l.offer.kind,

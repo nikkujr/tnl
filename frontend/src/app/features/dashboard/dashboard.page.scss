@@ -35,6 +35,8 @@
 .panel-title h3 { margin: 4px 0 0; font: 700 16px/1.2 Georgia, serif; }
 .panel-title button { border: 0; color: var(--green, #465fff); background: transparent; font-size: 10px; font-weight: 700; }
 .period-button { display: inline-flex; align-items: center; gap: 6px; }
+.period-controls { display: flex; flex-wrap: wrap; gap: 1rem; margin-block: 1rem; }
+.period-controls label { display: grid; gap: .25rem; }
 
 .dashboard-grid { display: grid; grid-template-columns: 1.65fr 1fr; gap: 14px; margin-bottom: 14px; }
 .chart { height: 200px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; align-items: end; padding: 20px 28px; border-top: 1px solid var(--color-border-subtle, #eff0ee); background: repeating-linear-gradient(to bottom, transparent 0, transparent 49px, var(--color-border-subtle, #eef0ed) 50px); }
@@ -42,6 +44,8 @@
 .chart span { width: 70%; border-radius: 6px 6px 2px 2px; background: var(--color-border, #c4d4cd); }
 .chart span.current { background: var(--green, #465fff); }
 .chart small { color: var(--muted, #667085); font-size: 8px; }
+.chart { overflow-x: auto; gap: clamp(.3rem, 1vw, 1rem); }
+.chart small { white-space: nowrap; }
 
 .count { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--status-warning-text, #73472c); background: var(--status-warning-bg, #f8e1cf); font-size: 9px; }
 .attention-row { display: grid; grid-template-columns: 24px 1fr auto; gap: 11px; align-items: center; padding: 15px 20px; border-top: 1px solid var(--color-border-subtle, #eff0ee); }

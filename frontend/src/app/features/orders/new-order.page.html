@@ -210,14 +210,7 @@
                 >
               </div>
             }
-            <label class="wide"
-              >Delivery address<textarea data-validation-field="deliveryAddress"
-                name="address"
-                [(ngModel)]="deliveryAddress"
-                rows="3"
-                required
-              ></textarea>
-            </label>
+            <app-contact-fields kind="address" [entry]="deliveryAddress" label="Delivery address" prefix="deliveryAddressParts" />
           </div>
         </section>
         @if (session().role === 'ADMIN') {

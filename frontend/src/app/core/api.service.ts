@@ -1,3 +1,5 @@
+import type { ReportPeriodQuery } from '../features/reports/reports.model';
+import type { SavedContactParts } from '../shared/contact-fields.component';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -21,6 +23,7 @@ export interface Category {
   productCount: number;
 }
 export interface DashboardSummary {
+  revenueTrend?: Array<{ label: string; revenue: number }>;
   totalOrders: number;
   pendingOrders: number;
   completedOrders: number;
@@ -44,6 +47,8 @@ export interface DashboardNotification {
 }
 export interface Customer {
   id: number;
+  nameParts?: SavedContactParts;
+  addressParts?: SavedContactParts;
   fullName: string;
   email: string;
   phone: string;
@@ -68,6 +73,7 @@ export interface Product {
   category: string;
 }
 export interface Order {
+  rejectionReason?: string | null;
   origin?: "LIVE" | "IMPORTED";
   id: number;
   trackingNumber: string;
@@ -87,6 +93,7 @@ export interface Order {
   amountPaid?: number | null;
   paymentReference?: string | null;
   deliveryAddress: string;
+  deliveryAddressParts?: SavedContactParts;
   createdAt: string;
 }
 export interface OrderItem {
@@ -144,6 +151,7 @@ export interface TrackingResult {
 }
 export interface Lead {
   id: number;
+  nameParts?: SavedContactParts;
   fullName: string;
   email: string;
   phone: string;
@@ -250,6 +258,7 @@ export interface CreateOrderInput {
   items: Array<{ productId: number; quantity: number }>;
   packages?: Array<{ packageId: number; quantity: number }>;
   deliveryAddress: string;
+  deliveryAddressParts?: SavedContactParts;
   paymentMethod: string;
   cashReceived?: number | null;
 }
@@ -326,18 +335,8 @@ export class ApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiUrl;
 
-  login(
-    email: string,
-    password: string,
-  ): Observable<ApiResponse<{ token: string; user: SessionUser }>> {
-    return this.http.post<ApiResponse<{ token: string; user: SessionUser }>>(
-      `${this.baseUrl}/auth/login`,
-      { email, password },
-    );
-  }
-
-  getDashboard(): Observable<ApiResponse<DashboardSummary>> {
-    return this.http.get<ApiResponse<DashboardSummary>>(`${this.baseUrl}/dashboard`);
+  getDashboard(period?: ReportPeriodQuery): Observable<ApiResponse<DashboardSummary>> {
+    return this.http.get<ApiResponse<DashboardSummary>>(`${this.baseUrl}/dashboard`, period ? { params: { ...period } } : {});
   }
   logout(): Observable<unknown> {
     return this.http.post(`${this.baseUrl}/auth/logout`, {});
@@ -461,13 +460,14 @@ export class ApiService {
   }
 
   getOrders(
-    options: { page?: number; limit?: number; search?: string; status?: string } = {},
+    options: { page?: number; limit?: number; search?: string; status?: string; period?: ReportPeriodQuery } = {},
   ): Observable<ApiResponse<Order[]>> {
     let params = new HttpParams();
     if (options.page) params = params.set('page', options.page);
     if (options.limit) params = params.set('limit', options.limit);
     if (options.search) params = params.set('search', options.search);
     if (options.status) params = params.set('status', options.status);
+    for (const [key, value] of Object.entries(options.period ?? {})) params = params.set(key, value);
     return this.http.get<ApiResponse<Order[]>>(`${this.baseUrl}/orders`, { params });
   }
 
@@ -495,10 +495,17 @@ export class ApiService {
   decideOrder(
     orderId: number,
     decision: 'APPROVE' | 'REJECT',
+    reason?: string,
   ): Observable<ApiResponse<{ id: number; orderStatus: string }>> {
     return this.http.post<ApiResponse<{ id: number; orderStatus: string }>>(
       `${this.baseUrl}/orders/${orderId}/decision`,
-      { decision },
+      { decision, reason },
+    );
+  }
+
+  cancelOrder(orderId: number): Observable<ApiResponse<{ id: number; orderStatus: string }>> {
+    return this.http.post<ApiResponse<{ id: number; orderStatus: string }>>(
+      `${this.baseUrl}/orders/${orderId}/cancel`, {},
     );
   }
 

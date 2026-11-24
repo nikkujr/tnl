@@ -49,12 +49,16 @@
             <app-icon name="close" />Reject
           </button>
         }
-        @if (session().role === 'ADMIN') {
+        @if (session().role === 'ADMIN' && data.origin === 'LIVE' &&
+          (data.orderStatus === 'PENDING' || (data.orderStatus === 'APPROVED' && data.deliveryStatus === 'PREPARING'))) {
+          <button type="button" class="danger-button" [disabled]="loading()" (click)="cancelOrder()">Cancel order</button>
+        }
+        @if (session().role === 'ADMIN' && data.orderStatus !== 'CANCELLED' && data.orderStatus !== 'REJECTED') {
           <button type="button" class="secondary-button" (click)="updatePayment()">
             <app-icon name="commissions" />Payment status
           </button>
         }
-        @if (data.orderStatus !== 'APPROVED' && data.orderStatus !== 'COMPLETED') {
+        @if (data.orderStatus === 'PENDING' || data.orderStatus === 'REJECTED') {
           <button type="button" class="danger-button" (click)="removeOrder()">
             <app-icon name="delete" />Delete order
           </button>
@@ -74,6 +78,9 @@
   }
 
   @if (order(); as data) {
+    @if (data.rejectionReason) {
+      <p class="surface"><strong>Reason for rejection:</strong> {{ data.rejectionReason }}</p>
+    }
     @if(data.origin === 'LIVE' && (data.orderStatus === 'APPROVED' || data.orderStatus === 'COMPLETED')) {
       <app-delivery-panel [orderId]="data.id" (changed)="load(data.id)" />
     }

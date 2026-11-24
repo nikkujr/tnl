@@ -1,3 +1,4 @@
+import { addressPartsSchema, formatAddress, formatName, namePartsSchema, storedParts } from "../../shared/contact-fields.js";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../database/connection.js";
@@ -81,7 +82,7 @@ router.get("/", async (req, res, next) => {
     if (filterAgentId) args.push(filterAgentId);
     args.push(limit, offset);
     const [rows] = await db.query(
-      `SELECT c.id,c.full_name fullName,c.email,c.phone,c.address,c.marketing_opt_in marketingOptIn,c.assigned_agent_id assignedAgentId,
+      `SELECT c.id,c.full_name fullName,c.name_parts nameParts,c.email,c.phone,c.address,c.address_parts addressParts,c.marketing_opt_in marketingOptIn,c.assigned_agent_id assignedAgentId,
        u.full_name assignedAgentName,EXISTS(SELECT 1 FROM customer_accounts ca WHERE ca.customer_id=c.id) portalAccountExists,
        EXISTS(SELECT 1 FROM customer_accounts ca WHERE ca.customer_id=c.id AND ca.active=TRUE AND ca.verified_at IS NOT NULL) portalAccountActive FROM customers c LEFT JOIN users u ON u.id=c.assigned_agent_id
        WHERE (c.full_name LIKE ? OR c.email LIKE ? OR c.phone LIKE ? OR c.address LIKE ? OR u.full_name LIKE ?)${scope}
@@ -117,7 +118,7 @@ router.get(
       const id = Number(req.params.id);
       const view = String(req.query.view ?? "orders"), page = Number(req.query.page ?? 1), limit = Number(req.query.limit ?? 20);
       const [contacts] = await db.query<any[]>(
-        `SELECT c.id,c.full_name fullName,c.email,c.phone,c.address,c.created_at createdAt,
+        `SELECT c.id,c.full_name fullName,c.name_parts nameParts,c.email,c.phone,c.address,c.address_parts addressParts,c.created_at createdAt,
           c.marketing_opt_in marketingOptIn,c.marketing_opted_at marketingOptedAt,
           c.assigned_agent_id assignedAgentId,u.full_name assignedAgentName,
           ca.id IS NOT NULL portalAccountExists,
@@ -188,6 +189,8 @@ router.get(
 const createSchema = z.object({
   body: z.object({
     fullName: z.string().min(2).max(160),
+    nameParts: namePartsSchema.optional(),
+    addressParts: addressPartsSchema.optional(),
     email: z.email(),
     phone: phoneField,
     address: z.string().min(5).max(500),
@@ -205,12 +208,14 @@ router.post("/", validate(createSchema), async (req, res, next) => {
         : (req.body.assignedAgentId ?? null);
     const id = await transaction(async (c) => {
       const [result] = await c.execute<any>(
-        "INSERT INTO customers(full_name,email,phone,address,assigned_agent_id,marketing_opt_in,marketing_opted_at) VALUES(?,?,?,?,?,?,IF(?,UTC_TIMESTAMP(),NULL))",
+        "INSERT INTO customers(full_name,name_parts,email,phone,address,address_parts,assigned_agent_id,marketing_opt_in,marketing_opted_at) VALUES(?,?,?,?,?,?,?,?,IF(?,UTC_TIMESTAMP(),NULL))",
         [
-          req.body.fullName,
+          req.body.nameParts ? formatName(req.body.nameParts) : req.body.fullName,
+          storedParts(req.body.nameParts),
           req.body.email.toLowerCase(),
           req.body.phone,
-          req.body.address,
+          req.body.addressParts ? formatAddress(req.body.addressParts) : req.body.address,
+          storedParts(req.body.addressParts),
           agentId,
           req.body.marketingOptIn ?? false,
           req.body.marketingOptIn ?? false,
@@ -275,13 +280,19 @@ router.put(
         }
         const optIn =
           req.body.marketingOptIn ?? Boolean(contact.marketing_opt_in);
+        const fullName = req.body.nameParts ? formatName(req.body.nameParts) : req.body.fullName;
+        const address = req.body.addressParts ? formatAddress(req.body.addressParts) : req.body.address;
+        const nameParts = req.body.nameParts ?? (fullName === contact.full_name ? contact.name_parts : null);
+        const addressParts = req.body.addressParts ?? (address === contact.address ? contact.address_parts : null);
         await c.execute(
-          "UPDATE customers SET full_name=?,email=?,phone=?,address=?,assigned_agent_id=?,marketing_opt_in=?,marketing_opted_at=IF(?,UTC_TIMESTAMP(),marketing_opted_at) WHERE id=?",
+          "UPDATE customers SET full_name=?,name_parts=?,email=?,phone=?,address=?,address_parts=?,assigned_agent_id=?,marketing_opt_in=?,marketing_opted_at=IF(?,UTC_TIMESTAMP(),marketing_opted_at) WHERE id=?",
           [
-            req.body.fullName,
+            fullName,
+            storedParts(nameParts),
             req.body.email.toLowerCase(),
             req.body.phone,
-            req.body.address,
+            address,
+            storedParts(addressParts),
             agentId,
             optIn,
             optIn,
@@ -303,7 +314,7 @@ router.put(
             eid,
             "ASSIGNMENT",
             "Customer assigned",
-            req.body.fullName,
+            fullName,
             "/customers",
           );
         }

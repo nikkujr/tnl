@@ -14,6 +14,12 @@
             {{ o.deliveryStatus || o.orderStatus }} · Payment: {{ o.paymentStatus }} · Agent:
             {{ o.agentName || 'Office — no agent' }}
           </p>
+          @if (o.rejectionReason) { <p><strong>Reason for rejection:</strong> {{ o.rejectionReason }}</p> }
+          @if (o.origin === 'LIVE' && o.orderStatus === 'PENDING' && !o.deliveryStatus && o.paymentStatus === 'UNPAID') {
+            <button type="button" class="danger" [disabled]="cancelling()" (click)="cancelOrder()">Cancel order</button>
+          } @else if (o.origin === 'LIVE' && o.deliveryStatus === 'PREPARING' && o.orderStatus === 'APPROVED') {
+            <p>Call TNL Track to cancel an order that is being prepared.</p>
+          }
           <p>{{ o.deliveryAddress }}</p>
           @for (p of o.packages; track p.packageId) {
             <div class="row">
@@ -95,3 +101,7 @@
       }
 
 </main>
+
+@if (confirmDialog.config(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+}

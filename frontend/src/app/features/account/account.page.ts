@@ -1,5 +1,6 @@
 import { Component, DestroyRef, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ContactFieldsComponent, contactEntry, contactText, type SavedContactParts } from '../../shared/contact-fields.component';
 import { AppFormsModule } from '../../shared/app-forms.module';
 import { RouterLink } from '@angular/router';
 import { BusinessApi } from '../../core/business-api.service';
@@ -14,6 +15,8 @@ interface AccountProfile {
   email: string;
   phone: string | null;
   address: string | null;
+  nameParts?: SavedContactParts;
+  addressParts?: SavedContactParts;
   role: SessionUser['role'];
 }
 interface AccountUpdate {
@@ -23,7 +26,7 @@ interface AccountUpdate {
 }
 @Component({
   selector: 'app-account-page',
-  imports: [AppFormsModule, RouterLink, BreadcrumbComponent, AppIconComponent],
+  imports: [ContactFieldsComponent, AppFormsModule, RouterLink, BreadcrumbComponent, AppIconComponent],
   templateUrl: './account.page.html',
   styleUrl: './account.page.scss',
 })
@@ -52,7 +55,8 @@ export class AccountPage implements OnInit, OnDestroy {
   );
   fullName = '';
   phone = '';
-  address = '';
+  address = contactEntry();
+  customerName = contactEntry();
   currentPassword = '';
   newPassword = '';
   confirmPassword = '';
@@ -80,7 +84,8 @@ export class AccountPage implements OnInit, OnDestroy {
     this.profile.set(data);
     this.fullName = data.fullName;
     this.phone = data.phone ?? '';
-    this.address = data.address ?? '';
+    this.address = contactEntry(data.address ?? '', data.addressParts);
+    this.customerName = contactEntry(data.fullName, data.nameParts);
   }
   saveProfile() {
     if (this.saving() || !this.profile()) return;
@@ -88,9 +93,12 @@ export class AccountPage implements OnInit, OnDestroy {
     this.profileError.set('');
     this.profileNotice.set('');
     const body = {
-      fullName: this.fullName.trim(),
+      fullName: this.profile()!.role === 'CUSTOMER' ? contactText(this.customerName, 'name') : this.fullName.trim(),
       phone: this.phone.trim() || null,
-      ...(this.profile()!.role === 'CUSTOMER' ? { address: this.address.trim() } : {}),
+      ...(this.profile()!.role === 'CUSTOMER' ? {
+        nameParts: this.customerName.parts ?? undefined,
+        address: contactText(this.address, 'address'), addressParts: this.address.parts ?? undefined,
+      } : {}),
     };
     this.api
       .patch<AccountUpdate>('account/profile', body)

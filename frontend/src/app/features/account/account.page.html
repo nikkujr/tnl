@@ -69,7 +69,10 @@
                 <div class="alert success" role="status">{{ profileNotice() }}</div>
               }
               <div class="fields">
-                <label class="wide"
+                @if (data.role === 'CUSTOMER') {
+<app-contact-fields kind="name" [entry]="customerName" label="Name" prefix="nameParts" />
+} @else {
+<label class="wide"
                   >Full name<input data-validation-field="fullName"
                     name="fullName"
                     [(ngModel)]="fullName"
@@ -79,6 +82,7 @@
                     required
                     [disabled]="saving() !== null"
                 /></label>
+}
                 <label
                   >Sign-in email<input
                     type="email"
@@ -103,21 +107,7 @@
                   /><small>Use a Philippine mobile number.</small></label
                 >
                 @if (data.role === 'CUSTOMER') {
-                  <label class="wide"
-                    >Address<textarea data-validation-field="address"
-                      name="address"
-                      [(ngModel)]="address"
-                      autocomplete="street-address"
-                      minlength="5"
-                      maxlength="500"
-                      required
-                      [disabled]="saving() !== null"
-                    ></textarea
-                    ><small
-                      >Used as the starting address for future requests. Existing order addresses
-                      stay as submitted.</small
-                    ></label
-                  >
+                  <app-contact-fields kind="address" [entry]="address" label="Address" prefix="addressParts" />
                 }
               </div>
               <div class="form-footer">

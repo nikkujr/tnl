@@ -1,3 +1,4 @@
+import { formatAddress, storedParts } from "../../shared/contact-fields.js";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../database/connection.js";
@@ -16,7 +17,8 @@ import {
   saveSale,
   totalCents,
 } from "./sales.js";
-import { orderBody } from "./validation.js";
+import { idParams, orderBody } from "./validation.js";
+import { cancelOrder } from "./cancellation.js";
 import { assertAgentPackageSelections, enforceAgentPackageCreation } from "./creation-policy.js";
 import { deliveryStages, saleTotalSql } from "./queries.js";
 import { paymentEpisode } from "../automations/payment-episode.js";
@@ -25,6 +27,7 @@ import { event, orderChanged } from "../automations/events.js";
 import { completionFields, estimatedDeliveryAt } from "../delivery/model.js";
 import { advanceDelivery, lockOrder } from "../delivery/service.js";
 import { deliveryManagementRouter } from "../delivery/route.js";
+import { optionalReportPeriod, reportBounds } from "../reports/model.js";
 
 const router = Router();
 router.use(authenticate, authorize("ADMIN", "AGENT"));
@@ -80,6 +83,12 @@ router.get("/", async (req, res, next) => {
       args.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     if (STATUS_FILTERS[status]) filters.push(STATUS_FILTERS[status]);
+    const period = optionalReportPeriod(req.query);
+    const bounds = period && reportBounds(period);
+    if (bounds) {
+      filters.push("o.created_at>=? AND o.created_at<?");
+      args.push(bounds.start, bounds.end);
+    }
     const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
 
     const [countRows] = await db.query<any[]>(
@@ -88,12 +97,12 @@ router.get("/", async (req, res, next) => {
     );
     const [orders] = await db.query<any[]>(
       `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,o.origin origin,
-       c.full_name customerName,o.order_status orderStatus,o.delivery_status deliveryStatus,
+       c.full_name customerName,o.order_status orderStatus,o.delivery_status deliveryStatus,o.rejection_reason rejectionReason,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
-       o.cash_change cashChange,o.amount_paid amountPaid,o.payment_reference paymentReference,o.delivery_address deliveryAddress,
+       o.cash_change cashChange,o.amount_paid amountPaid,o.payment_reference paymentReference,o.delivery_address deliveryAddress,o.delivery_address_parts deliveryAddressParts,
        o.created_at createdAt,u.full_name agentName
        FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id${where}
-       ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
+       ORDER BY o.created_at DESC,o.id DESC LIMIT ? OFFSET ?`,
       [...args, limit, offset],
     );
     if (!orders.length)
@@ -197,9 +206,9 @@ router.get(
       const [orders] = await db.query<any[]>(
         `SELECT o.id,o.tracking_number trackingNumber,o.customer_id customerId,o.agent_id agentId,o.origin origin,
        c.full_name customerName,c.email customerEmail,c.phone customerPhone,
-       o.order_status orderStatus,o.delivery_status deliveryStatus,
+       o.order_status orderStatus,o.delivery_status deliveryStatus,o.rejection_reason rejectionReason,
        o.payment_status paymentStatus,o.payment_method paymentMethod,o.cash_received cashReceived,
-       o.cash_change cashChange,o.amount_paid amountPaid,o.payment_reference paymentReference,o.delivery_address deliveryAddress,
+       o.cash_change cashChange,o.amount_paid amountPaid,o.payment_reference paymentReference,o.delivery_address deliveryAddress,o.delivery_address_parts deliveryAddressParts,
        o.created_at createdAt,o.updated_at updatedAt,u.full_name agentName,u.email agentEmail
        FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN users u ON u.id=o.agent_id
        WHERE o.id=?${scope}`,
@@ -362,12 +371,15 @@ router.put(
           samePayment ? o.payment_status : req.body.paymentMethod === "Cash" ? undefined : "UNPAID",
           samePayment ? o.cash_received ?? o.amount_paid ?? undefined : undefined,
         );
+        const deliveryAddress = req.body.deliveryAddressParts ? formatAddress(req.body.deliveryAddressParts) : req.body.deliveryAddress;
+        const deliveryAddressParts = req.body.deliveryAddressParts ?? (deliveryAddress === o.delivery_address ? o.delivery_address_parts : null);
         await c.execute(
-          "UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,payment_method=?,payment_status=?,cash_received=?,cash_change=?,amount_paid=?,payment_reference=? WHERE id=?",
+          "UPDATE orders SET customer_id=?,agent_id=?,delivery_address=?,delivery_address_parts=?,payment_method=?,payment_status=?,cash_received=?,cash_change=?,amount_paid=?,payment_reference=? WHERE id=?",
           [
             req.body.customerId,
             agentId,
-            req.body.deliveryAddress,
+            deliveryAddress,
+            storedParts(deliveryAddressParts),
             req.body.paymentMethod,
             payment.paymentStatus,
             payment.cashReceived,
@@ -396,8 +408,21 @@ router.put(
     }
   },
 );
+router.post("/:id/cancel", authorize("ADMIN"), validate(z.object({ params: idParams })), async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    await transaction((c) => cancelOrder(c, id, { staffId: req.user!.id }));
+    res.json({ data: { id, orderStatus: "CANCELLED" } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const decisionSchema = z.object({
-  body: z.object({ decision: z.enum(["APPROVE", "REJECT"]) }),
+  body: z.discriminatedUnion("decision", [
+    z.object({ decision: z.literal("APPROVE") }),
+    z.object({ decision: z.literal("REJECT"), reason: z.string().trim().min(2).max(500) }),
+  ]),
   query: z.any(),
   params: z.object({ id: z.coerce.number().int().positive() }),
 });
@@ -452,15 +477,15 @@ router.post(
           );
         } else
           await c.execute(
-            "UPDATE orders SET order_status='REJECTED' WHERE id=?",
-            [id],
+            "UPDATE orders SET order_status='REJECTED',rejection_reason=? WHERE id=?",
+            [req.body.reason, id],
           );
         await logOrderEvent(
           c,
           id,
           req.user!.id,
           approve ? "APPROVED" : "REJECTED",
-          approve ? "Order approved; stock reserved." : "Order rejected.",
+          approve ? "Order approved; stock reserved." : req.body.reason,
         );
         await paymentEpisode(c, id);
         await orderChanged(

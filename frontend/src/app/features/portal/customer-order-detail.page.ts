@@ -6,11 +6,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
 import { BusinessApi } from '../../core/business-api.service';
 import { SessionService } from '../../core/session.service';
+import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
+import { ActionDialogComponent } from '../../shared/action-dialog.component';
 import { DeliveryPanelComponent } from '../delivery/delivery-panel.component';
 
 @Component({
   selector: 'app-customer-order-detail',
-  imports: [CurrencyPipe, DatePipe, AppFormsModule, RouterLink, DeliveryPanelComponent],
+  imports: [ActionDialogComponent, CurrencyPipe, DatePipe, AppFormsModule, RouterLink, DeliveryPanelComponent],
   templateUrl: './customer-order-detail.page.html',
   styleUrls: ['../../shared/business.scss', './portal.page.scss'],
 })
@@ -24,6 +26,8 @@ export class CustomerOrderDetailPage {
   readonly error = signal('');
   readonly notice = signal('');
   readonly loading = signal(false);
+  readonly cancelling = signal(false);
+  readonly confirmDialog = inject(ConfirmDialogService);
   readonly reviewSaving = signal(false);
   readonly reviewError = signal('');
   readonly reviewNotice = signal('');
@@ -56,6 +60,29 @@ export class CustomerOrderDetailPage {
       error: e => { this.loading.set(false); this.fail(e); },
     });
   }
+  async cancelOrder() {
+    const order = this.detail();
+    if (!order || this.cancelling()) return;
+    const confirmed = await this.confirmDialog.open({
+      title: 'Cancel order?', message: 'This order will be closed.',
+      confirmLabel: 'Cancel order', tone: 'danger',
+    });
+    if (!confirmed || this.detail()?.id !== order.id || this.cancelling()) return;
+    this.cancelling.set(true);
+    this.api.post('customer/orders/' + order.id + '/cancel').pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.cancelling.set(false);
+        this.notice.set('Order cancelled.');
+        this.load();
+      },
+      error: (error) => {
+        this.cancelling.set(false);
+        if (error.status === 409) this.load();
+        this.fail(error);
+      },
+    });
+  }
+
   followup() {
     const order = this.detail();
     if (!order) return;

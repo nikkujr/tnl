@@ -27,13 +27,13 @@ async function main() {
       let data = [];
       if (endpoint === 'catalog') { const search = new URL(request.url()).searchParams.get('search') || ''; data = emptyCatalog ? [] : offers.filter((o) => (o.name + ' ' + (o.description || '')).toLowerCase().includes(search.toLowerCase())); }
       if (endpoint === 'customer/me') data = { address: '123 Example Street', marketingOptIn: false };
-      if (endpoint === 'customer-auth/login') {
+      if (endpoint === 'auth/sign-in') {
         if (body.email === 'invalid@example.test') {
           return route.fulfill({ status: 401, json: { error: { message: 'Invalid email or password' } } });
         }
         data = { token: 'portal-layout-fixture', user: customer };
       }
-      if (endpoint.startsWith('customer-auth/') && endpoint !== 'customer-auth/login') data = { message: 'Check your email for the next step.' };
+      if (endpoint.startsWith('customer-auth/')) data = { message: 'Check your email for the next step.' };
       if (endpoint === 'customer/requests' && body) data = { id: 1 };
       return route.fulfill({ json: { data } });
     });
@@ -72,9 +72,12 @@ async function main() {
       assert.equal(await page.getByRole('alert').count(), 0, 'Switching mode retains stale error');
       await page.getByLabel('Email', { exact: true }).fill(customer.email);
       await page.getByLabel('Password', { exact: true }).fill('TestPassword123!');
-      await page.getByLabel('Full name').fill(customer.fullName);
+      await page.getByLabel('First name', { exact: true }).fill('Sam');
+      await page.getByLabel('Last name', { exact: true }).fill('Rivera');
       await page.getByLabel('PH mobile number').fill('09123456789');
-      await page.getByLabel('Address', { exact: true }).fill('123 Example Street');
+      await page.getByLabel('House number and street', { exact: true }).fill('123 Example Street');
+      await page.getByLabel('City or municipality', { exact: true }).fill('Naga City');
+      await page.getByLabel('Province or region', { exact: true }).fill('Camarines Sur');
       await fits('Registration');
       if (viewport.width === 390) await screenshot('register-mobile');
       await page.locator('.auth-submit').click();

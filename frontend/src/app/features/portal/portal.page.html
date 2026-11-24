@@ -9,7 +9,7 @@
         <button class="sign-out" (click)="logout()"><app-icon name="logout" />Sign out</button>
       } @else {
         <a class="portal-link" href="#offers">Browse offers</a>
-        <a class="portal-link staff-link" href="/">Staff sign in<app-icon name="chevronRight" /></a>
+        <a class="portal-link" href="/">Home</a>
       }
     </div>
   </header>
@@ -92,7 +92,7 @@
             ← Back to sign in
           </button>
         }
-        <form #authForm="ngForm" (ngSubmit)="authForm.valid && auth()" [attr.aria-busy]="busy()">
+        <form id="sign-in" #authForm="ngForm" (ngSubmit)="authForm.valid && auth()" [attr.aria-busy]="busy()">
           <h2 id="auth-title">{{ authTitle() }}</h2>
           <p class="auth-description">{{ authDescription() }}</p>
           @if (error()) {
@@ -137,15 +137,8 @@
               /></label>
             }
             @if (mode === 'register') {
-              <label
-                >Full name<input data-validation-field="fullName"
-                  name="fullName"
-                  [(ngModel)]="fullName"
-                  autocomplete="name"
-                  placeholder="Your full name"
-                  required
-                  minlength="2" /></label
-              ><label
+              <app-contact-fields kind="name" [entry]="fullName" label="Name" prefix="nameParts" />
+<label
                 >PH mobile number<input data-validation-field="phone"
                   name="phone"
                   type="tel"
@@ -153,17 +146,8 @@
                   [(ngModel)]="phone"
                   placeholder="09XXXXXXXXX"
                   required /></label
-              ><label class="wide"
-                >Address<textarea data-validation-field="address"
-                  name="address"
-                  [(ngModel)]="address"
-                  autocomplete="street-address"
-                  placeholder="Street, barangay, city"
-                  rows="2"
-                  required
-                  minlength="5"
-                ></textarea></label
-              ><label class="wide consent"
+              ><app-contact-fields kind="address" [entry]="address" label="Address" prefix="addressParts" />
+<label class="wide consent"
                 ><span
                   ><input data-validation-field="marketingOptIn" type="checkbox" name="optin" [(ngModel)]="marketingOptIn" />I would like
                   promotional campaigns, welcome emails, and purchase follow-ups.</span
@@ -176,6 +160,10 @@
               <button type="button" [disabled]="busy()" (click)="setMode('forgot')">
                 Forgot password?
               </button>
+              @if (demoAccountsAvailable) {
+                <button type="button" (click)="useDemoAccount('admin')">Demo admin</button>
+                <button type="button" (click)="useDemoAccount('agent')">Demo agent</button>
+              }
             </div>
           }
           <button class="primary auth-submit" [disabled]="busy()">
@@ -386,15 +374,8 @@
         }
         <strong>Total: {{ total() | currency: 'PHP' : 'symbol-narrow' }}</strong>
         <div class="fields">
-          <label
-            >Delivery address<textarea data-validation-field="deliveryAddress"
-              name="delivery"
-              [(ngModel)]="deliveryAddress"
-              required
-              minlength="5"
-              maxlength="500"
-            ></textarea></label
-          ><label
+          <app-contact-fields kind="address" [entry]="deliveryAddress" label="Delivery address" prefix="deliveryAddressParts" />
+<label
             >Payment method<select data-validation-field="paymentMethod" name="payment" [(ngModel)]="paymentMethod">
               <option>Cash on delivery</option>
               <option>Bank transfer</option>
@@ -423,6 +404,9 @@
               }
               @for (i of r.items; track i.productId) {
                 <small>{{ i.productName }} × {{ i.quantity }}</small>
+              }
+              @if (r.status === 'SUBMITTED') {
+                <button type="button" class="danger" [disabled]="busy()" (click)="cancelRequest(r.id)">Cancel request</button>
               }
               @if (r.declineReason) {
                 <p>{{ r.declineReason }}</p>
@@ -464,6 +448,7 @@
                 >{{ o.deliveryStatus || o.orderStatus }} · {{ o.paymentStatus }} ·
                 {{ o.createdAt | date: 'medium' }}</small
               ><small>Agent: {{ o.agentName || 'Office — no agent' }}</small>
+              @if (o.rejectionReason) { <small>Reason for rejection: {{ o.rejectionReason }}</small> }
             </div>
             <div>
               <strong>{{ o.total | currency: 'PHP' : 'symbol-narrow' }}</strong
@@ -500,3 +485,7 @@
     <span>TNL TRACK · Your customer space</span><a href="/">Back to home</a>
   </footer>
 </main>
+
+@if (confirmDialog.config(); as dialog) {
+  <app-action-dialog [config]="dialog" (cancelled)="confirmDialog.cancel()" (confirmed)="confirmDialog.confirm($event)" />
+}

@@ -2,6 +2,7 @@
 @use 'styles/design-tokens';
 
 * { box-sizing: border-box; }
+.contact-modal { max-height: calc(100dvh - 40px); overflow-y: auto; }
 html, body { min-height: 100%; margin: 0; }
 body {
   font-family: 'Inter Variable', Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

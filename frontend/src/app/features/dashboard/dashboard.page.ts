@@ -1,19 +1,22 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, of, Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AppFormsModule } from '../../shared/app-forms.module';
+import { fillTrend, type ReportPeriod, type ReportPeriodQuery } from '../reports/reports.model';
 import { ApiService, DashboardSummary, Order, Product } from '../../core/api.service';
 import { SessionService } from '../../core/session.service';
 import { ToastService } from '../../shared/toast.service';
 import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
-import { ActionDialogComponent } from '../../shared/action-dialog.component';
 import { AppIconComponent, AppIconName } from '../../shared/app-icon.component';
 import { formatMoney } from '../../shared/money';
 import { AgentRewardsComponent } from '../../shared/agent-rewards.component';
+import { orderRejectionDialog, selectedRejectionReason } from '../../shared/order-rejection';
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [CurrencyPipe, DatePipe, ActionDialogComponent, AppIconComponent, AgentRewardsComponent],
+  imports: [AppFormsModule, CurrencyPipe, DatePipe, AppIconComponent, AgentRewardsComponent],
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.scss'
 })
@@ -25,6 +28,21 @@ export class DashboardPage implements OnInit {
   readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly today = new Date();
+  private readonly destroyRef = inject(DestroyRef);
+  private request?: Subscription;
+  private readonly manilaDate = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(this.today);
+  readonly period = signal<ReportPeriod>('monthly');
+  readonly selectedDate = signal(this.manilaDate);
+  readonly selectedMonth = signal(this.manilaDate.slice(0, 7));
+  readonly periodQuery = computed<ReportPeriodQuery>(() => {
+    switch (this.period()) {
+      case 'daily': return { period: 'daily', date: this.selectedDate() };
+      case 'monthly': return { period: 'monthly', month: this.selectedMonth() };
+      case 'overall': return { period: 'overall' };
+    }
+  });
   readonly loading = signal(true);
   readonly summary = signal<DashboardSummary>({
     totalOrders: 0, pendingOrders: 0, completedOrders: 0, openOrders: 0, revenue: 0,
@@ -32,12 +50,26 @@ export class DashboardPage implements OnInit {
     monthlyRevenue: [], notifications: []
   });
   readonly orders = signal<Order[]>([]);
+  readonly pendingOrder = signal<Order | undefined>(undefined);
   readonly products = signal<Product[]>([]);
 
   readonly firstName = computed(() => this.session()?.fullName.split(' ')[0] ?? '');
   readonly recentOrders = computed(() => this.orders().slice(0, 4));
 
   readonly revenueBars = computed(() => {
+    const trend = this.summary().revenueTrend;
+    if (trend) {
+      const query = this.periodQuery();
+      const selection = query.period === 'daily' ? query.date : query.period === 'monthly' ? query.month : '';
+      const rows = fillTrend({ period: query.period, selection, trend }, (label) => ({ label, revenue: 0 }));
+      const maximum = Math.max(...rows.map((row) => row.revenue), 1);
+      return rows.map(({ label, revenue }) => ({
+        key: label,
+        month: query.period === 'daily' ? label.slice(11) : query.period === 'monthly' ? label.slice(8) : label,
+        revenue,
+        value: Math.max(0, (revenue / maximum) * 100),
+      }));
+    }
     const values = new Map(this.summary().monthlyRevenue.map((item) => [item.month, item.revenue]));
     const months = Array.from({ length: 6 }, (_, index) => {
       const date = new Date(this.today.getFullYear(), this.today.getMonth() - 5 + index, 1);
@@ -65,7 +97,7 @@ export class DashboardPage implements OnInit {
       ? this.products().filter((product) => product.stockOnHand <= product.lowStockThreshold).slice(0, 2)
         .map((product) => ({ title: product.name, detail: `${product.stockOnHand} left · threshold ${product.lowStockThreshold}`, action: 'Restock', destination: 'inventory' as const }))
       : [];
-    const pending = this.orders().find((order) => order.orderStatus === 'PENDING');
+    const pending = this.pendingOrder();
     return pending
       ? [...lowStock, { title: pending.trackingNumber, detail: 'Awaiting approval', action: 'Review', destination: 'orders' as const }]
       : lowStock;
@@ -75,17 +107,38 @@ export class DashboardPage implements OnInit {
     this.load();
   }
 
+  changePeriod(period: ReportPeriod): void {
+    this.period.set(period);
+    this.load();
+  }
+
+  changeDate(value: string): void {
+    if (!value) return;
+    this.selectedDate.set(value);
+    this.load();
+  }
+
+  changeMonth(value: string): void {
+    if (!value) return;
+    this.selectedMonth.set(value);
+    this.load();
+  }
+
   private load(): void {
+    this.request?.unsubscribe();
     this.loading.set(true);
     const isAdmin = this.session()?.role === 'ADMIN';
-    forkJoin({
-      dashboard: this.api.getDashboard(),
-      orders: this.api.getOrders(),
+    const period = isAdmin ? this.periodQuery() : undefined;
+    this.request = forkJoin({
+      dashboard: this.api.getDashboard(period),
+      orders: this.api.getOrders({ limit: 4, period }),
+      pending: this.api.getOrders({ status: 'Pending', limit: 1 }),
       products: isAdmin ? this.api.getProducts({ limit: 100 }) : of({ data: [] as Product[] })
-    }).subscribe({
-      next: ({ dashboard, orders, products }) => {
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ({ dashboard, orders, products, pending }) => {
         this.summary.set(dashboard.data);
         this.orders.set(orders.data);
+        this.pendingOrder.set(pending.data[0]);
         this.products.set(products.data);
         this.loading.set(false);
       },
@@ -108,9 +161,15 @@ export class DashboardPage implements OnInit {
   editOrder(order: Order): void { this.router.navigateByUrl(`/orders?edit=${order.id}`); }
   goToOrders(): void { this.router.navigateByUrl('/orders'); }
 
-  decideOrder(order: Order, decision: 'APPROVE' | 'REJECT'): void {
+  async decideOrder(order: Order, decision: 'APPROVE' | 'REJECT'): Promise<void> {
+    let reason: string | undefined;
+    if (decision === 'REJECT') {
+      const values = await this.confirmDialog.open(orderRejectionDialog(order.trackingNumber));
+      if (!values) return;
+      reason = selectedRejectionReason(values);
+    }
     this.loading.set(true);
-    this.api.decideOrder(order.id, decision).subscribe({
+    this.api.decideOrder(order.id, decision, reason).subscribe({
       next: () => { this.toast.success(decision === 'APPROVE' ? 'Order approved.' : 'Order rejected.'); this.load(); },
       error: (error) => { this.loading.set(false); this.toast.fail(error.error?.error?.message ?? 'Unable to update the order.'); }
     });

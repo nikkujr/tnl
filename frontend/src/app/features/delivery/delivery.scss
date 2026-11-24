@@ -306,3 +306,23 @@ textarea {
 .sla-stages li > div { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
 .sla-stages p { margin: 6px 0; }
 .sla-stages small { display: block; }
+.delivery-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border, #d8d4e4);
+  border-radius: .75rem;
+  background: var(--color-surface, #fff);
+}
+.delivery-table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+.delivery-table th, .delivery-table td {
+  padding: .75rem;
+  border-bottom: 1px solid var(--color-border, #d8d4e4);
+  vertical-align: top;
+}
+.delivery-table th:first-child { white-space: nowrap; }
+.delivery-table td small { display: block; margin-bottom: .25rem; }
+.delivery-table tbody tr:last-child > * { border-bottom: 0; }

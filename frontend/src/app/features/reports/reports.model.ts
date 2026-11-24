@@ -1,4 +1,5 @@
 export type ReportPeriod = 'daily' | 'monthly' | 'overall';
+export type ReportPeriodQuery = { period: 'daily'; date: string } | { period: 'monthly'; month: string } | { period: 'overall' };
 export interface ProductMovement {
   id: number;
   name: string;
@@ -31,7 +32,7 @@ export interface BusinessReport {
   stock: { activeProducts: number; lowStockProducts: number; availableUnits: number };
 }
 
-export function fillTrend(report: BusinessReport) {
+export function fillTrend<T extends { label: string; revenue: number }>(report: { period: ReportPeriod; selection: string; trend: T[] }, empty: (label: string) => T) {
   if (report.period === 'overall') return report.trend;
   const values = new Map(report.trend.map((row) => [row.label, row]));
   const count =
@@ -45,6 +46,6 @@ export function fillTrend(report: BusinessReport) {
       report.period === 'daily'
         ? `${report.selection} ${String(index).padStart(2, '0')}:00`
         : `${report.selection}-${String(index + 1).padStart(2, '0')}`;
-    return values.get(label) ?? { label, revenue: 0, orders: 0 };
+    return values.get(label) ?? empty(label);
   });
 }

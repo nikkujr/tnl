@@ -45,7 +45,8 @@ export class ReportsPage implements OnInit {
   }).format(new Date());
   date = this.today;
   month = this.today.slice(0, 7);
-  readonly trend = computed(() => (this.report() ? fillTrend(this.report()!) : []));
+  private readonly emptyTrendRow = (label: string) => ({ label, revenue: 0, orders: 0 });
+  readonly trend = computed(() => (this.report() ? fillTrend(this.report()!, this.emptyTrendRow) : []));
   readonly maximumRevenue = computed(() =>
     Math.max(1, ...this.trend().map((r) => Number(r.revenue))),
   );
@@ -112,7 +113,7 @@ export class ReportsPage implements OnInit {
     if (!data || this.loading()) return;
     const rows = [
       { section: 'Sales summary', ...data.totals },
-      ...fillTrend(data).map((row) => ({ section: 'Sales trend', ...row })),
+      ...fillTrend(data, this.emptyTrendRow).map((row) => ({ section: 'Sales trend', ...row })),
       ...data.fastProducts.map((row, index) => ({
         section: 'Fast-selling products',
         rank: index + 1,

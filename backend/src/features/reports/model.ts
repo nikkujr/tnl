@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { monthBounds, periodSchema } from "../performance/model.js";
+import { HttpError } from "../../shared/http.js";
 
 export const reportDateSchema = z
   .string()
@@ -16,6 +17,12 @@ export const reportQuerySchema = z.discriminatedUnion("period", [
   z.object({ period: z.literal("overall") }),
 ]);
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
+export function optionalReportPeriod(query: unknown): ReportQuery | null {
+  if (query == null || !Object.hasOwn(query as object, "period")) return null;
+  const parsed = reportQuerySchema.safeParse(query);
+  if (!parsed.success) throw new HttpError(400, "Choose a valid dashboard period and date.");
+  return parsed.data;
+}
 export function reportBounds(query: ReportQuery) {
   if (query.period === "overall") return null;
   if (query.period === "monthly") return monthBounds(query.month);

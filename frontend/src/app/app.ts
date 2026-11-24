@@ -11,6 +11,7 @@ import {
   signal,
   ViewChild,
 } from '@angular/core';
+import { ContactFieldsComponent, contactEntry, contactText } from './shared/contact-fields.component';
 import { AppFormsModule } from './shared/app-forms.module';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -34,13 +35,13 @@ import {
   DashboardSummary,
   Order,
   Product,
-  Role,
   TrackingResult,
 } from './core/api.service';
 
 @Component({
   selector: 'app-root',
   imports: [
+    ContactFieldsComponent,
     DatePipe,
     AppFormsModule,
     RouterOutlet,
@@ -81,7 +82,6 @@ export class App implements OnInit, OnDestroy {
   readonly today = new Date();
   readonly session = this.sessionService.session;
   readonly loading = signal(false);
-  readonly loginError = signal('');
   readonly mobileNavOpen = signal(false);
   private notificationRefreshTimer: ReturnType<typeof setInterval> | null = null;
   readonly showOrderForm = signal(false);
@@ -139,8 +139,6 @@ export class App implements OnInit, OnDestroy {
     this.summary().notifications.filter((item) => !item.readAt),
   );
 
-  loginEmail = 'admin@tnl.local';
-  loginPassword = 'TnlDemo123!';
   trackingNumber = '';
   editingOrderId: number | null = null;
   newOrder = {
@@ -148,7 +146,7 @@ export class App implements OnInit, OnDestroy {
     agentId: 0,
     items: [{ productId: 0, quantity: 1 }],
     packages: [] as Array<{ packageId: number; quantity: number }>,
-    deliveryAddress: '',
+    deliveryAddress: contactEntry(),
     paymentMethod: 'Bank transfer',
     cashReceived: 0,
   };
@@ -189,8 +187,15 @@ export class App implements OnInit, OnDestroy {
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe((event) => {
         this.routedPath.set(App.cleanPath(event.urlAfterRedirects));
-        if (this.session() && this.session()?.role !== 'CUSTOMER')
+        const user = this.session();
+        if (user && user.role !== 'CUSTOMER') {
           this.applyWorkspaceRoute(event.urlAfterRedirects);
+          if (!this.notificationRefreshTimer) {
+            this.restoreNotificationReadTime(user.id);
+            this.loadWorkspace();
+            this.startNotificationRefresh();
+          }
+        }
         const flash = sessionStorage.getItem('tnl_flash');
         if (flash) {
           sessionStorage.removeItem('tnl_flash');
@@ -205,26 +210,6 @@ export class App implements OnInit, OnDestroy {
     }
     if (this.session()?.role === 'CUSTOMER' && App.cleanPath(browserUrl) === '')
       this.router.navigateByUrl('/portal');
-  }
-
-  login(): void {
-    this.loading.set(true);
-    this.loginError.set('');
-    this.sessionService.login(this.loginEmail, this.loginPassword).subscribe({
-      next: (data) => {
-        this.restoreNotificationReadTime(data.user.id);
-        this.applyWorkspaceRoute(this.router.url);
-        this.loadWorkspace();
-        this.startNotificationRefresh();
-      },
-      error: (error) => {
-        this.loading.set(false);
-        this.loginError.set(
-          error.error?.error?.message ??
-            'Unable to sign in. Confirm that the API and database are running.',
-        );
-      },
-    });
   }
 
   logout(): void {
@@ -413,7 +398,7 @@ export class App implements OnInit, OnDestroy {
       packages:
         order?.packages.map((p) => ({ packageId: p.packageId, quantity: p.quantity })) ?? [],
       cashReceived: order?.cashReceived ?? 0,
-      deliveryAddress: order?.deliveryAddress ?? this.customers()[0]?.address ?? '',
+      deliveryAddress: contactEntry(order.deliveryAddress, order.deliveryAddressParts),
       paymentMethod: order?.paymentMethod ?? 'Bank transfer',
     };
     this.editingPackageNames = Object.fromEntries(
@@ -455,6 +440,8 @@ export class App implements OnInit, OnDestroy {
     this.loading.set(true);
     const input = {
       ...this.newOrder,
+      deliveryAddress: contactText(this.newOrder.deliveryAddress, 'address'),
+      deliveryAddressParts: this.newOrder.deliveryAddress.parts ?? undefined,
       agentId: this.session()?.role === 'AGENT' ? this.session()!.id : this.newOrder.agentId || null,
     };
     const request = this.editingOrderId
@@ -538,9 +525,5 @@ export class App implements OnInit, OnDestroy {
         } as Record<string, AppIconName>
       )[view] ?? 'gauge'
     );
-  }
-  useAccount(role: Role): void {
-    this.loginEmail = role === 'ADMIN' ? 'admin@tnl.local' : 'agent@tnl.local';
-    this.loginPassword = 'TnlDemo123!';
   }
 }

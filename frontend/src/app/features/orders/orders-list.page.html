@@ -71,7 +71,7 @@
               <button class="row-action approve" (click)="decideOrder(order, 'APPROVE')">Approve</button>
               <button class="row-action reject" (click)="decideOrder(order, 'REJECT')">Reject</button>
             }
-            @if (order.orderStatus !== 'APPROVED' && order.orderStatus !== 'COMPLETED') { <button class="row-action reject" (click)="removeOrder(order)">Delete</button> }
+            @if (order.orderStatus === 'PENDING' || order.orderStatus === 'REJECTED') { <button class="row-action reject" (click)="removeOrder(order)">Delete</button> }
           </span>
         </div>
       } @empty { <div class="empty">{{ loading() ? 'Loading…' : 'No orders match those filters.' }}</div> }
@@ -86,5 +86,5 @@
 </div>
 
 @if (actionDialog(); as dialog) {
-  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog()" />
+  <app-action-dialog [config]="dialog" (cancelled)="closeActionDialog()" (confirmed)="confirmActionDialog($event)" />
 }

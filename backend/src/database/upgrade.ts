@@ -8,6 +8,8 @@ export async function upgrade() {
   const columns: Record<string, Record<string, string>> = {
     users: { token_version: "INT UNSIGNED NOT NULL DEFAULT 0" },
     orders: {
+      rejection_reason: "VARCHAR(500) NULL",
+      delivery_address_parts: "JSON NULL",
       delivery_employee_id: "BIGINT UNSIGNED NULL",
       delivery_assignment_version: "INT UNSIGNED NOT NULL DEFAULT 0",
       estimated_delivery_at: "DATETIME NULL",
@@ -26,10 +28,13 @@ export async function upgrade() {
       sale_completed_at: "DATETIME NULL",
     },
     customers: {
+      name_parts: "JSON NULL",
+      address_parts: "JSON NULL",
       marketing_opt_in: "BOOLEAN NOT NULL DEFAULT FALSE",
       marketing_opted_at: "DATETIME NULL",
       unsubscribe_token: "CHAR(64) NULL",
     },
+    leads: { name_parts: "JSON NULL" },
     commissions: {
       breakdown: "JSON NULL",
       source: "ENUM('LEGACY','PACKAGE') NOT NULL DEFAULT 'LEGACY'",
@@ -81,6 +86,13 @@ export async function upgrade() {
     .map((s) => s.trim())
     .filter(Boolean))
     await db.query(statement);
+  const [requestColumns] = await db.query<any[]>(
+    "SELECT COLUMN_NAME name,COLUMN_TYPE type FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='customer_order_requests'",
+  );
+  if (!String(requestColumns.find((c) => c.name === "status")?.type).includes("CANCELLED"))
+    await db.query("ALTER TABLE customer_order_requests MODIFY status ENUM('SUBMITTED','CONVERTED','DECLINED','CANCELLED') NOT NULL DEFAULT 'SUBMITTED'");
+  if (!requestColumns.some((c) => c.name === "delivery_address_parts"))
+    await db.query("ALTER TABLE customer_order_requests ADD COLUMN delivery_address_parts JSON NULL");
   const defaults: Record<string, object> = {
     ORDER_UPDATES: {
       subject: "Order {{trackingNumber}} update",

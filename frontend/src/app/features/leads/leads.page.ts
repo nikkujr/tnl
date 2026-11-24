@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { AppFormsModule } from '../../shared/app-forms.module';
+import { ContactFieldsComponent, contactEntry, contactText } from '../../shared/contact-fields.component';
+import { AppFormsModule, applyServerFieldErrors } from '../../shared/app-forms.module';
 import { Agent, ApiService, Lead } from '../../core/api.service';
 import { ToastService } from '../../shared/toast.service';
 import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
@@ -9,7 +10,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 
 @Component({
   selector: 'app-leads-page',
-  imports: [AppFormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent],
+  imports: [ContactFieldsComponent, AppFormsModule, ActionDialogComponent, AppIconComponent, BreadcrumbComponent],
   templateUrl: './leads.page.html',
   styleUrl: './leads.page.scss'
 })
@@ -29,7 +30,7 @@ export class LeadsPage implements OnInit, OnDestroy {
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   editingId: number | null = null;
-  form = { fullName: '', email: '', phone: '', source: '', assignedAgentId: null as number | null, status: 'NEW' };
+  form = { name: contactEntry(), email: '', phone: '', source: '', assignedAgentId: null as number | null, status: 'NEW' };
 
   filtered(): Lead[] {
     return this.status === 'ALL' ? this.leads() : this.leads().filter((lead) => lead.status === this.status);
@@ -59,22 +60,33 @@ export class LeadsPage implements OnInit, OnDestroy {
 
   titleCase(value: string): string { return value.toLowerCase().split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' '); }
 
+  readonly saveError = signal('');
+
   openForm(item?: Lead): void {
+    this.saveError.set('');
     this.editingId = item?.id ?? null;
     this.form = {
-      fullName: item?.fullName ?? '', email: item?.email ?? '', phone: item?.phone ?? '', source: item?.source ?? '',
+      name: contactEntry(item?.fullName, item?.nameParts), email: item?.email ?? '', phone: item?.phone ?? '', source: item?.source ?? '',
       assignedAgentId: item?.assignedAgentId ?? null, status: item?.status === 'CONVERTED' ? 'QUALIFIED' : item?.status ?? 'NEW'
     };
     this.showForm.set(true);
   }
 
-  save(): void {
-    const input = { ...this.form } as Omit<Lead, 'id' | 'assignedAgentName'>;
+  save(form: HTMLFormElement): void {
+    if (this.loading()) return;
+    this.saveError.set('');
+    const { name, ...lead } = this.form;
+    const input = { ...lead, fullName: contactText(name, 'name'), nameParts: name.parts ?? undefined };
     const request = this.editingId ? this.api.updateLead(this.editingId, input) : this.api.createLead(input);
     this.loading.set(true);
     request.subscribe({
       next: () => { this.showForm.set(false); this.toast.success(this.editingId ? 'Lead updated.' : 'Lead created.'); this.load(); },
-      error: (error) => { this.loading.set(false); this.toast.fail(error.error?.error?.message ?? 'Unable to save lead.'); }
+      error: (error) => {
+        this.loading.set(false);
+        const failure = error.error?.error;
+        if (failure?.message === '' || applyServerFieldErrors(form, failure?.details?.issues ?? [])) return;
+        this.saveError.set(failure?.message ?? 'Unable to save lead.');
+      }
     });
   }
 

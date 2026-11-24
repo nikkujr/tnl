@@ -69,7 +69,7 @@ export async function orderChanged(
   orderId: number,
   type: string,
   status: string,
-  actorId: number,
+  actorId: number | null,
 ) {
   const [rows] = await c.query<any[]>(
     "SELECT o.*,c.full_name customer_name FROM orders o JOIN customers c ON c.id=o.customer_id WHERE o.id=?",

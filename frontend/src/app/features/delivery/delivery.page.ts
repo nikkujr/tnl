@@ -40,6 +40,37 @@ import { DeliverySlaComponent } from './delivery-sla.component';
       @if (loading() && !jobs().length) {
         <p role="status">Loading deliveries…</p>
       }
+      @if (!admin && visible().length) {
+        <div class="delivery-table-wrap" role="region" tabindex="0" aria-label="Assigned deliveries">
+          <table class="delivery-table">
+            <thead><tr>
+              <th scope="col">Order</th><th scope="col">Recipient and address</th>
+              <th scope="col">Status</th><th scope="col">Delivery timing</th>
+            </tr></thead>
+            <tbody>
+              @for (job of visible(); track job.id) {
+                <tr>
+                  <th scope="row"><a [routerLink]="['/delivery', job.id]">{{ job.trackingNumber }}</a></th>
+                  <td><strong>{{ job.recipientName }}</strong><br />{{ job.address }}</td>
+                  <td>
+                    {{ job.attemptId ? 'Active · ' : '' }}{{ job.deliveryStatus ? job.deliveryStatus.replaceAll('_', ' ').toLowerCase() : 'Awaiting status' }}
+                    @if (job.issueCount) { <small class="error">{{ job.issueCount }} unresolved issue(s)</small> }
+                    @if (job.tracking?.position; as position) {
+                      <small>{{ job.tracking!.state }} · {{ position.observedAt }}</small>
+                    }
+                  </td>
+                  <td>
+                    @if (job.deliveryStatus !== 'DELIVERED') {
+                      <small>{{ job.estimatedDeliveryAt ? (job.estimatedDeliveryAt | date: 'MMM d, h:mm a' : '+0800') + ' (Philippine time)' : 'Awaiting schedule' }}</small>
+                    }
+                    <app-delivery-sla [sla]="job.sla" [compact]="true" />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else if (admin) {
       <div class="job-grid">
         @for (j of visible(); track j.id) {
           <article class="delivery-card">
@@ -76,6 +107,9 @@ import { DeliverySlaComponent } from './delivery-sla.component';
           <p class="muted">No deliveries in this view.</p>
         }
       </div>
+      } @else if (!loading()) {
+        <p class="muted">No deliveries in this view.</p>
+      }
       <div class="actions">
         <button [disabled]="page === 1 || loading()" (click)="page = page - 1; load()">
           Previous</button

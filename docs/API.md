@@ -29,6 +29,8 @@ Returns an access token and the authenticated user.
 
 Delivery employees use this same login with role DELIVERY. `POST /auth/logout` invalidates the active staff session version and stops delivery location sharing. The delivery dashboard, dispatch, assignment, issue, GPS and private photo endpoints are specified in the [delivery HTTP contract](DELIVERY.md#http-contract).
 
+The shared sign-in form uses `POST /auth/sign-in` with `{email,password}`. It returns `{data:{token,user}}` for an active staff account or an active, verified customer account. The returned role determines the destination. Credentials matching both account types return 409 and require a different account password.
+
 ## My account
 
 Account endpoints accept active Admin/Agent/Delivery sessions or verified Customer sessions and always derive identity from the authenticated account. No submitted user/customer ID selects a profile.
@@ -42,6 +44,8 @@ Run migrations before using these endpoints. Staff tokens without a version are 
 ## Dashboard
 
 ### `GET /dashboard`
+
+The Overview can pass `period=daily&date=YYYY-MM-DD`, `period=monthly&month=YYYY-MM`, or `period=overall`. With a period, `revenue` and `revenueTrend` summarize paid orders by creation time in Asia/Manila, excluding cancelled and rejected orders. Trend buckets are hourly, daily, or monthly respectively. Operational counts describe current records. `GET /orders` accepts the same period parameters for recent-order filtering.
 
 Returns the role-scoped order counts, recognized paid revenue, total customers,
 product count, and low-stock count.
@@ -180,11 +184,13 @@ Admin only.
 
 Approval locks the order and product rows, reserves inventory, initializes
 delivery, and records both the inventory movement and delivery event.
+Rejection requires a trimmed 2–500 character `reason` with `decision: "REJECT"`. Staff details and owned customer orders expose it as `rejectionReason`.
 
 - `PATCH /orders/:id/payment-status` — Admin payment-state update
 - `PATCH /orders/:id/delivery-status` — Admin only; requires assignmentVersion and deliveryStatus; forward event/status update; DELIVERED additionally requires recipientName and a staged photoId, or recipientName and exceptionReason. Agents have read-only delivery access.
 - `PATCH /orders/:id/delivery-sla-policy` — Admin only; `{assignmentVersion,region,remoteDays}`. Region is BICOL/LUZON/VISAYAS/MINDANAO; allowance is an integer 0–3. Pending/approved live orders only, before dispatch; locks and audits policy changes.
 - `POST /orders/:id/delivery-prepared` — Admin only; `{assignmentVersion}`. Idempotently records preparation of an approved order awaiting dispatch.
+- `POST /orders/:id/cancel` lets admins cancel live orders awaiting approval or in Preparing. It releases recorded stock reservations and retains payment and order history for reconciliation. Refunds are handled separately.
 - `DELETE /orders/:id` — delete Pending or Rejected orders that are not linked to a customer request
 
 Delivery completion deducts reserved component stock once. Commission posts once only when the whole order is DELIVERED and PAID, evaluated in payment and delivery transactions. A repeated stage is a no-op; backward stages fail with 409. New package commission uses saved fixed/percentage rules and per-line centavo rounding; standalone products earn no commission. Earned sales cannot downgrade payment. Outputs include packages, saved terms/components, total, and commission breakdown.
@@ -309,7 +315,9 @@ All `/customer` routes derive customer ownership from the verified account.
 - GET /customer/orders and GET /customer/orders/:id return only owned orders, saved sales terms without commission, total, safe payment/delivery details, and (detail) stage timestamps and follow-ups. Other customers' IDs return 404.
 - GET /customer/orders/:id also returns nullable `agentId`, `canReview` and `review` (null or `{rating,review,createdAt}`). A delivered/completed, fully paid order with an agent can receive one immutable agent review. Office orders return `canReview:false` and `review:null`; the portal shows no review section for them.
 - POST /customer/orders/:id/review: `{rating:1..5,review:string}` rates the order's agent and requires an integer rating and 2..2000 characters of trimmed text. Only the verified owning customer can submit. Returns 201 `{rating,review,createdAt,reused:false}`; an identical retry returns 200 with `reused:true`. Orders without an agent, incomplete orders or a different second review return 409; another customer's order returns 404. Agent attribution comes from the order, never the request or the customer's current assignment. This endpoint does not collect delivery ratings.
-- GET /customer/requests returns owned submitted/converted/declined requests and saved terms.
+- POST /customer/orders/:id/cancel closes an owned, unpaid order awaiting approval. Preparing orders require an admin to cancel them. Orders owned by someone else return 404.
+- GET /customer/requests returns owned submitted, converted, declined, and cancelled requests with saved terms.
+- POST /customer/requests/:id/cancel closes an owned submitted request and notifies the assigned staff and admins. Repeating an already completed cancellation returns success.
 - POST /customer/requests requires reviewed catalog revisions and non-cash-on-entry payment selection:
 
 ```json
@@ -326,6 +334,8 @@ All `/customer` routes derive customer ownership from the verified account.
 ```
 
 Payment methods for requests are Cash on delivery, Bank transfer, Card. No online payment is collected. Availability and reviewed terms are checked; changed terms fail 409. Requests reserve no stock. Active assigned agent gets the request; otherwise the admin queue receives it.
+
+Contact writes can include `nameParts: {firstName,middleName,lastName}` for leads and customers. Customer writes and registration can include `addressParts: {street,barangay,city,province,postalCode}`. Order and request writes accept the same address object as `deliveryAddressParts`. Middle name, barangay, and postal code are optional. The server keeps the existing formatted name and address fields for display and compatibility. Existing records can retain their saved text until structured fields are entered.
 
 - POST /customer/orders/:id/followups: `{message}` (2..1000 characters); returns 201 `{id,reused}` and reuses an open follow-up. Ownership is checked before any write.
 

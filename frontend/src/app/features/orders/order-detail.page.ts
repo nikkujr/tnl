@@ -8,6 +8,7 @@ import { ActionDialogComponent, ActionDialogConfig } from '../../shared/action-d
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { DeliveryPanelComponent } from '../delivery/delivery-panel.component';
 import { DELIVERY_STEPS } from '../../shared/delivery-steps';
+import { orderRejectionDialog, selectedRejectionReason } from '../../shared/order-rejection';
 import {
   buildPaymentDialogFields,
   PaymentStatus,
@@ -19,6 +20,7 @@ const HISTORY_ICONS: Record<string, AppIconName> = {
   EDITED: 'edit',
   APPROVED: 'check',
   REJECTED: 'close',
+  CANCELLED: 'close',
   PAYMENT_UPDATED: 'commissions',
   DELIVERY_UPDATED: 'tracking',
 };
@@ -102,13 +104,44 @@ export class OrderDetailPage implements OnInit {
   decideOrder(decision: 'APPROVE' | 'REJECT'): void {
     const order = this.order();
     if (!order) return;
+    if (decision === 'REJECT') {
+      this.openDialog(orderRejectionDialog(order.trackingNumber),
+        (values) => this.submitDecision(order, decision, selectedRejectionReason(values)));
+      return;
+    }
+    this.submitDecision(order, decision);
+  }
+
+  private submitDecision(order: OrderDetail, decision: 'APPROVE' | 'REJECT', reason?: string): void {
     this.loading.set(true);
-    this.api.decideOrder(order.id, decision).subscribe({
+    this.api.decideOrder(order.id, decision, reason).subscribe({
       next: () => {
         this.showSuccess(decision === 'APPROVE' ? 'Order approved.' : 'Order rejected.');
         this.load(order.id);
       },
       error: (e) => this.handleError(e, 'Unable to update the order.'),
+    });
+  }
+
+  cancelOrder(): void {
+    const order = this.order();
+    if (!order) return;
+    this.openDialog({
+      title: 'Cancel order?',
+      message: order.paymentStatus === 'UNPAID'
+        ? `Cancel ${order.trackingNumber} and release any reserved stock.`
+        : `Cancel ${order.trackingNumber} and release any reserved stock. Handle any refund separately.`,
+      confirmLabel: 'Cancel order',
+      tone: 'danger',
+    }, () => {
+      this.loading.set(true);
+      this.api.cancelOrder(order.id).subscribe({
+        next: () => {
+          this.load(order.id);
+          this.showSuccess('Order cancelled.');
+        },
+        error: (e) => this.handleError(e, 'Unable to cancel the order.'),
+      });
     });
   }
 

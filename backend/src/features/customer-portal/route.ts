@@ -1,3 +1,4 @@
+import { addressPartsSchema, formatAddress, storedParts } from "../../shared/contact-fields.js";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../../database/connection.js";
@@ -6,7 +7,8 @@ import { HttpError, validate } from "../../shared/http.js";
 import { transaction, jsonValue } from "../../shared/transaction.js";
 import { pesos } from "../../shared/money.js";
 import { authenticateCustomer } from "../customer-auth/session.js";
-import { selection } from "../orders/validation.js";
+import { idParams, selection } from "../orders/validation.js";
+import { cancelOrder } from "../orders/cancellation.js";
 import {
   createSale,
   quote,
@@ -28,6 +30,38 @@ customerRouter.use(authenticateCustomer);
 staffRouter.use(authenticate, authorize("ADMIN", "AGENT"));
 const valid = (body: z.ZodType) =>
   validate(z.object({ body, query: z.any(), params: z.any() }));
+const validateId = validate(z.object({ params: idParams }));
+
+customerRouter.post("/orders/:id/cancel", validateId, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    await transaction((c) => cancelOrder(c, id, { customerId: req.customer!.customerId }));
+    res.json({ data: { id, orderStatus: "CANCELLED" } });
+  } catch (error) { next(error); }
+});
+
+customerRouter.post("/requests/:id/cancel", validateId, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const customer = req.customer!;
+    await transaction(async (c) => {
+      const [rows] = await c.query<any[]>(
+        "SELECT status,agent_id FROM customer_order_requests WHERE id=? AND customer_id=? FOR UPDATE",
+        [id, customer.customerId],
+      );
+      const request = rows[0];
+      if (!request) throw new HttpError(404, "Request not found");
+      if (request.status === "CANCELLED") return;
+      if (request.status !== "SUBMITTED")
+        throw new HttpError(409, "Only submitted requests can be cancelled. Check My Orders if it was already converted.");
+      await c.execute("UPDATE customer_order_requests SET status='CANCELLED' WHERE id=?", [id]);
+      const eventId = await event(c, "request.cancelled", "REQUEST", id, { customerId: customer.customerId });
+      await notify(c, await staffRecipients(c, request.agent_id), eventId, "REQUEST",
+        "Customer request cancelled", `${customer.fullName} cancelled request #${id}.`, "/requests");
+    });
+    res.json({ data: { id, status: "CANCELLED" } });
+  } catch (error) { next(error); }
+});
 export function customerSale(s: Sale) {
   return {
     items: s.items,
@@ -38,7 +72,7 @@ export function customerSale(s: Sale) {
 customerRouter.get("/me", async (req, res, next) => {
   try {
     const [rows] = await db.query<any[]>(
-      "SELECT id,full_name fullName,email,phone,address,marketing_opt_in marketingOptIn FROM customers WHERE id=?",
+      "SELECT id,full_name fullName,email,phone,address,address_parts addressParts,marketing_opt_in marketingOptIn FROM customers WHERE id=?",
       [req.customer!.customerId],
     );
     res.json({ data: rows[0] });
@@ -93,7 +127,7 @@ customerRouter.get("/orders", validate(z.object({ query: orderFilters, body: z.a
     const totalPages = Math.max(1, Math.ceil(total / filters.limit));
     const page = Math.min(filters.page, totalPages);
     const [rows] = await db.query<any[]>(
-      `SELECT o.id,o.tracking_number trackingNumber,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName ${from} ORDER BY o.created_at DESC,o.id DESC LIMIT ? OFFSET ?`,
+      `SELECT o.id,o.tracking_number trackingNumber,o.origin,o.order_status orderStatus,o.delivery_status deliveryStatus,o.rejection_reason rejectionReason,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName ${from} ORDER BY o.created_at DESC,o.id DESC LIMIT ? OFFSET ?`,
       [...args, filters.limit, (page - 1) * filters.limit],
     );
     res.json({
@@ -113,7 +147,7 @@ customerRouter.get("/orders/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const [rows] = await db.query<any[]>(
-      `SELECT o.id,o.tracking_number trackingNumber,CASE WHEN u.role='AGENT' THEN o.agent_id END agentId,o.order_status orderStatus,o.delivery_status deliveryStatus,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName,(${reportSaleSql} AND u.role='AGENT') reviewEligible FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?`,
+      `SELECT o.id,o.tracking_number trackingNumber,CASE WHEN u.role='AGENT' THEN o.agent_id END agentId,o.origin,o.order_status orderStatus,o.delivery_status deliveryStatus,o.rejection_reason rejectionReason,o.payment_status paymentStatus,o.payment_method paymentMethod,o.delivery_address deliveryAddress,o.created_at createdAt,u.full_name agentName,(${reportSaleSql} AND u.role='AGENT') reviewEligible FROM orders o LEFT JOIN users u ON u.id=o.agent_id WHERE o.id=? AND o.customer_id=?`,
       [id, req.customer!.customerId],
     );
     if (!rows[0]) throw new HttpError(404, "Order not found");
@@ -178,6 +212,7 @@ customerRouter.post(
   },
 );
 const requestBody = selection.safeExtend({
+  deliveryAddressParts: addressPartsSchema.optional(),
   deliveryAddress: z.string().trim().min(5).max(500),
   paymentMethod: z
     .enum(["Cash on delivery", "Bank transfer", "Card"])
@@ -250,12 +285,13 @@ customerRouter.post("/requests", valid(requestBody), async (req, res, next) => {
       );
       const agentId = contacts[0]?.assigned_agent_id ?? null;
       const [r] = await c.execute<any>(
-        "INSERT INTO customer_order_requests(customer_id,agent_id,snapshot,delivery_address,payment_method) VALUES(?,?,?,?,?)",
+        "INSERT INTO customer_order_requests(customer_id,agent_id,snapshot,delivery_address,delivery_address_parts,payment_method) VALUES(?,?,?,?,?,?)",
         [
           req.customer!.customerId,
           agentId,
           JSON.stringify(snapshot),
-          req.body.deliveryAddress,
+          req.body.deliveryAddressParts ? formatAddress(req.body.deliveryAddressParts) : req.body.deliveryAddress,
+          storedParts(req.body.deliveryAddressParts),
           req.body.paymentMethod,
         ],
       );
@@ -432,6 +468,7 @@ staffRouter.post(
             customerId: r.customer_id,
             agentId: r.agent_id,
             deliveryAddress: r.delivery_address,
+            deliveryAddressParts: jsonValue(r.delivery_address_parts) ?? undefined,
             paymentMethod: r.payment_method,
           },
           jsonValue<Sale>(r.snapshot),

@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { AppFormsModule } from '../../shared/app-forms.module';
+import { ContactFieldsComponent, contactEntry, contactText } from '../../shared/contact-fields.component';
+import { AppFormsModule, applyServerFieldErrors } from '../../shared/app-forms.module';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Agent, ApiService, Customer } from '../../core/api.service';
 import { BusinessApi } from '../../core/business-api.service';
@@ -17,6 +18,7 @@ import {
 @Component({
   selector: 'app-customers-page',
   imports: [
+    ContactFieldsComponent,
     AppFormsModule,
     RouterLink,
     ActionDialogComponent,
@@ -61,10 +63,10 @@ export class CustomersPage implements OnInit, OnDestroy {
 
   editingId: number | null = null;
   form = {
-    fullName: '',
+    name: contactEntry(),
     email: '',
     phone: '',
-    address: '',
+    address: contactEntry(),
     assignedAgentId: null as number | null,
     marketingOptIn: false,
   };
@@ -134,13 +136,18 @@ export class CustomersPage implements OnInit, OnDestroy {
     this.load();
   }
 
+  readonly saveError = signal('');
+  readonly saveNotice = signal('');
+
   openForm(customer?: Customer): void {
+    this.saveError.set('');
+    this.saveNotice.set('');
     this.editingId = customer?.id ?? null;
     this.form = {
-      fullName: customer?.fullName ?? '',
+      name: contactEntry(customer?.fullName, customer?.nameParts),
       email: customer?.email ?? '',
       phone: customer?.phone ?? '',
-      address: customer?.address ?? '',
+      address: contactEntry(customer?.address, customer?.addressParts),
       marketingOptIn: Boolean(customer?.marketingOptIn),
       assignedAgentId:
         customer?.assignedAgentId ?? (this.session()?.role === 'AGENT' ? this.session()!.id : null),
@@ -148,21 +155,26 @@ export class CustomersPage implements OnInit, OnDestroy {
     this.showForm.set(true);
   }
 
-  save(): void {
-    const input = { ...this.form };
+  save(form: HTMLFormElement): void {
+    if (this.loading() || this.saveNotice()) return;
+    this.saveError.set("");
+    const { name, address, ...contact } = this.form;
+    const input = { ...contact, fullName: contactText(name, "name"), nameParts: name.parts ?? undefined,
+      address: contactText(address, "address"), addressParts: address.parts ?? undefined };
     const request = this.editingId
       ? this.api.updateCustomer(this.editingId, input)
       : this.api.createCustomer(input);
     this.loading.set(true);
     request.subscribe({
       next: () => {
-        this.showForm.set(false);
-        this.toast.success(this.editingId ? 'Customer updated.' : 'Customer created.');
+        this.saveNotice.set(this.editingId ? 'Customer updated.' : 'Customer created.');
         this.load();
       },
       error: (error) => {
         this.loading.set(false);
-        this.toast.fail(error.error?.error?.message ?? 'Unable to save customer.');
+        const failure = error.error?.error;
+        if (failure?.message === '' || applyServerFieldErrors(form, failure?.details?.issues ?? [])) return;
+        this.saveError.set(failure?.message ?? 'Unable to save customer.');
       },
     });
   }

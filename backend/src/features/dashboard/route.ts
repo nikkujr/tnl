@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../../database/connection.js";
 import { authenticate, authorize } from "../../shared/auth.js";
 import { saleTotalSql } from "../orders/queries.js";
+import { optionalReportPeriod, reportBounds } from "../reports/model.js";
 
 const router = Router();
 router.get("/", authenticate, authorize("ADMIN", "AGENT"), async (req, res, next) => {
@@ -13,7 +14,7 @@ router.get("/", authenticate, authorize("ADMIN", "AGENT"), async (req, res, next
       SUM(order_status='PENDING') pendingOrders,SUM(order_status='COMPLETED') completedOrders,
       SUM(order_status IN ('PENDING','APPROVED')) openOrders,
       SUM(order_status='APPROVED' AND delivery_status IS NOT NULL AND delivery_status<>'DELIVERED') activeDeliveries,
-      COALESCE(SUM(CASE WHEN payment_status='PAID' THEN
+      COALESCE(SUM(CASE WHEN payment_status='PAID' AND order_status NOT IN ('CANCELLED','REJECTED') THEN
         ${saleTotalSql("orders")}
         ELSE 0 END),0) revenue
       FROM orders${agentFilter}`,
@@ -29,22 +30,21 @@ router.get("/", authenticate, authorize("ADMIN", "AGENT"), async (req, res, next
       "SELECT COUNT(*) totalProducts,SUM(stock_on_hand-stock_reserved<=low_stock_threshold) lowStockProducts FROM products WHERE active=TRUE",
     );
     const monthlyFilter = req.user!.role === "AGENT" ? " AND o.agent_id=?" : "";
-    const [monthlyRows] = await db.query<any[]>(
-      `SELECT DATE_FORMAT(o.created_at,'%Y-%m') month,
+    const period = optionalReportPeriod(req.query);
+    const bounds = period && reportBounds(period);
+    const bucket = period?.period === "daily" ? "%Y-%m-%d %H:00" : period?.period === "monthly" ? "%Y-%m-%d" : "%Y-%m";
+    const [revenueRows] = await db.query<any[]>(
+      `SELECT DATE_FORMAT(DATE_ADD(o.created_at, INTERVAL 8 HOUR),'${bucket}') label,
       COALESCE(SUM(${saleTotalSql("o")}),0) revenue
       FROM orders o
-      WHERE o.payment_status='PAID'
-        AND o.created_at>=DATE_FORMAT(DATE_SUB(CURRENT_DATE,INTERVAL 5 MONTH),'%Y-%m-01')
+      WHERE o.payment_status='PAID' AND o.order_status NOT IN ('CANCELLED','REJECTED')
+        ${bounds ? "AND o.created_at>=? AND o.created_at<?" : period ? "" : "AND o.created_at>=DATE_FORMAT(DATE_SUB(CURRENT_DATE,INTERVAL 5 MONTH),'%Y-%m-01')"}
         ${monthlyFilter}
-      GROUP BY DATE_FORMAT(o.created_at,'%Y-%m')
-      ORDER BY month`,
-      args,
+      GROUP BY label
+      ORDER BY label`,
+      [...(bounds ? [bounds.start, bounds.end] : []), ...args],
     );
-    const activityScope = req.user!.role === "AGENT" ? " AND agent_id=?" : "";
-    const customerActivityScope =
-      req.user!.role === "AGENT" ? " AND assigned_agent_id=?" : "";
-    const activityArgs =
-      req.user!.role === "AGENT" ? [req.user!.id, req.user!.id] : [];
+    const revenueTrend = revenueRows.map((row) => ({ label: String(row.label), revenue: Number(row.revenue) }));
     const [activityRows] = await db.query<any[]>(
       "SELECT CAST(id AS CHAR) id,type,title,message,link,read_at readAt,created_at createdAt FROM staff_notifications WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 100",
       [req.user!.id],
@@ -57,14 +57,12 @@ router.get("/", authenticate, authorize("ADMIN", "AGENT"), async (req, res, next
         completedOrders: Number(totals.completedOrders ?? 0),
         openOrders: Number(totals.openOrders ?? 0),
         activeDeliveries: Number(totals.activeDeliveries ?? 0),
-        revenue: Number(totals.revenue ?? 0),
+        revenue: period ? revenueTrend.reduce((total, row) => total + row.revenue, 0) : Number(totals.revenue ?? 0),
         totalCustomers: Number(totals.totalCustomers ?? 0),
         totalProducts: Number(totals.totalProducts ?? 0),
         lowStockProducts: Number(totals.lowStockProducts ?? 0),
-        monthlyRevenue: monthlyRows.map((row) => ({
-          month: row.month,
-          revenue: Number(row.revenue),
-        })),
+        monthlyRevenue: period ? [] : revenueTrend.map(({ label, revenue }) => ({ month: label, revenue })),
+        ...(period ? { revenueTrend } : {}),
         notifications: activityRows,
       },
     });

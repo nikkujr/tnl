@@ -1,5 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
+import { ContactFieldsComponent, contactEntry, contactText } from '../../shared/contact-fields.component';
 import { AppFormsModule } from '../../shared/app-forms.module';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -12,6 +13,7 @@ import { BusinessApi, SalesPackage } from '../../core/business-api.service';
 @Component({
   selector: 'app-new-order-page',
   imports: [
+    ContactFieldsComponent,
     CurrencyPipe,
     AppFormsModule,
     AppIconComponent,
@@ -82,7 +84,7 @@ export class NewOrderPage implements OnInit {
 
   customerId = 0;
   agentId = 0;
-  deliveryAddress = '';
+  deliveryAddress = contactEntry();
   paymentMethod = 'Bank transfer';
   cashReceived = 0;
   productSearch = '';
@@ -118,7 +120,8 @@ export class NewOrderPage implements OnInit {
         this.products.set(result.products?.data ?? []);
         if (result.agents) this.agents.set(result.agents.data);
         this.customerId = result.customers.data[0]?.id ?? 0;
-        this.deliveryAddress = result.customers.data[0]?.address ?? '';
+        const firstCustomer = result.customers.data[0];
+        this.deliveryAddress = contactEntry(firstCustomer?.address, firstCustomer?.addressParts);
         this.agentId = this.session().role === 'AGENT' ? this.session().id : 0;
         this.loading.set(false);
       },
@@ -261,7 +264,7 @@ export class NewOrderPage implements OnInit {
 
   updateAddress(): void {
     const customer = this.customers().find((item) => item.id === this.customerId);
-    if (customer) this.deliveryAddress = customer.address;
+    if (customer) this.deliveryAddress = contactEntry(customer.address, customer.addressParts);
   }
 
   total(): number {
@@ -316,7 +319,8 @@ export class NewOrderPage implements OnInit {
           packageId: line.package.id,
           quantity: line.quantity,
         })),
-        deliveryAddress: this.deliveryAddress,
+        deliveryAddress: contactText(this.deliveryAddress, 'address'),
+        deliveryAddressParts: this.deliveryAddress.parts ?? undefined,
         paymentMethod: this.paymentMethod,
         cashReceived: this.paymentMethod === 'Cash' ? Number(this.cashReceived) : null,
       })
