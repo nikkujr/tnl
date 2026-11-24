@@ -1,0 +1,36 @@
+@use './styles/form-control' as form;
+
+:host { display: block; grid-column: 1 / -1; min-width: 0; container-type: inline-size; }
+fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 10px; color: var(--ink); font-size: 12px; font-weight: 750; }
+.name-fields legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+label { @include form.field-label; min-width: 0; }
+input { @include form.control; @include form.focus-ring; width: 100%; }
+p { margin: 0 0 10px; color: var(--muted); overflow-wrap: anywhere; }
+.parts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 15px; }
+.address-fields { padding-top: 4px; }
+.address-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-bottom: 15px; }
+.secondary, .matches button {
+  background: var(--color-surface, #fff);
+  color: var(--ink, #1d2939);
+  border: 1px solid var(--line, #e4e7ec);
+  border-radius: 9px;
+  padding: 10px 12px;
+  min-height: 44px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.parts + .secondary { margin-top: 12px; }
+.secondary:disabled { opacity: .55; cursor: default; }
+.secondary:focus-visible, .matches button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.matches { display: grid; gap: 4px; margin: 0 0 6px; padding: 0; list-style: none; }
+.matches button { width: 100%; text-align: left; overflow-wrap: anywhere; }
+.matches button:hover { background: var(--color-surface-alt, #f7f5fa); }
+.provider, .search-status { display: block; margin-bottom: 12px; color: var(--muted); font-size: 11px; }
+.provider a { color: var(--green); }
+@container (min-width: 360px) {
+  .address-fields .parts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .street { grid-column: 1 / -1; }
+  .name-fields .parts { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+}

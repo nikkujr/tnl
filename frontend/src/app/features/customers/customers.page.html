@@ -115,7 +115,9 @@
               name="customerPhone"
               [(ngModel)]="form.phone"
               required
-              minlength="7"
+              type="tel"
+              autocomplete="tel"
+              minlength="11"
               maxlength="16"
               placeholder="09XXXXXXXXX"
           /></label>
@@ -129,7 +131,7 @@
               </select></label
             >
           }
-          <label class="wide"
+          <label class="wide marketing-consent"
             ><span
               ><input data-validation-field="marketingOptIn" name="marketingOptIn" type="checkbox" [(ngModel)]="form.marketingOptIn" />
               Customer explicitly agreed to marketing emails</span

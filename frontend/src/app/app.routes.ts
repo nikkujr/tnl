@@ -1,6 +1,8 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
 import { WorkspaceRouteComponent } from './shared/workspace-route.component';
 import { roleGuard } from './core/role.guard';
+import { SessionService } from './core/session.service';
 
 export const routes: Routes = [
   { path: 'delivery', canMatch: [roleGuard(['DELIVERY'])], loadComponent: () => import('./features/delivery/delivery.page').then(m => m.DeliveryPage) },
@@ -26,6 +28,16 @@ export const routes: Routes = [
   },
   {
     path: 'portal',
+    canActivate: [(route) => {
+      const user = inject(SessionService).session();
+      const router = inject(Router);
+      if (route.queryParamMap.has('verify') || route.queryParamMap.has('reset'))
+        return router.createUrlTree(['/'], { queryParams: route.queryParams, fragment: 'sign-in' });
+      if (user?.role === 'CUSTOMER' || route.queryParamMap.has('unsubscribe')) return true;
+      if (user) return router.parseUrl(user.role === 'DELIVERY' ? '/delivery' : '/dashboard');
+      if (route.fragment === 'offers') return true;
+      return router.createUrlTree(['/'], { queryParams: route.queryParams, fragment: 'sign-in' });
+    }],
     loadComponent: () => import('./features/portal/portal.page').then((m) => m.PortalPage),
   },
   {

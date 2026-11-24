@@ -43,7 +43,7 @@
         <div class="form-grid">
           <app-contact-fields kind="name" [entry]="form.name" label="Name" prefix="nameParts" />
           <label>Email<input data-validation-field="email" name="leadEmail" type="email" [(ngModel)]="form.email" required></label>
-          <label>Phone<input data-validation-field="phone" name="leadPhone" [(ngModel)]="form.phone" required minlength="7" maxlength="16" placeholder="09XXXXXXXXX"></label>
+          <label>Phone<input data-validation-field="phone" name="leadPhone" [(ngModel)]="form.phone" required type="tel" autocomplete="tel" minlength="11" maxlength="16" placeholder="09XXXXXXXXX"></label>
           <label>Source<input data-validation-field="source" name="leadSource" [(ngModel)]="form.source" required></label>
           <label>Assigned agent<select data-validation-field="assignedAgentId" name="leadAgent" [(ngModel)]="form.assignedAgentId"><option [ngValue]="null">Unassigned</option>@for (agent of activeAgents(); track agent.id) { <option [ngValue]="agent.id">{{ agent.fullName }}</option> }</select></label>
           <label>Status<select data-validation-field="status" name="leadStatus" [(ngModel)]="form.status"><option value="NEW">New</option><option value="CONTACTED">Contacted</option><option value="QUALIFIED">Qualified</option><option value="LOST">Lost</option></select></label>

@@ -3,7 +3,18 @@ import { z } from "zod";
 import { db } from "../../database/connection.js";
 import { packageCatalog } from "../packages/catalog.js";
 import { termsRevision } from "./terms.js";
+import { config } from "../../config.js";
+import { HttpError } from "../../shared/http.js";
+import { rateLimit } from "../../shared/rate-limit.js";
+import { searchAddresses } from "../delivery/geocoding.js";
 const router = Router();
+
+const addressQuery = z.object({ query: z.string().trim().min(3).max(200) }).strict();
+router.post("/address-search", rateLimit(30, 60000), async (req, res) => {
+  const input = addressQuery.safeParse(req.body);
+  if (!input.success) throw new HttpError(400, "Enter 3 to 200 characters to search for an address.");
+  res.json({ data: await searchAddresses(input.data.query, config.GEOAPIFY_API_KEY) });
+});
 async function offers() {
   const [products] = await db.query<any[]>(
     "SELECT p.id,p.name,p.sku,p.price,p.description,p.category_id categoryId,c.name category,p.stock_on_hand-p.stock_reserved available FROM products p JOIN categories c ON c.id=p.category_id WHERE p.active=TRUE ORDER BY p.name,p.id",

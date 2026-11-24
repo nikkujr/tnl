@@ -1,7 +1,7 @@
 <app-toast-container />
-@if (routedPath() === 'portal' || session()?.role === 'CUSTOMER') {
+@if (!accountLink() && (routedPath() === 'portal' || session()?.role === 'CUSTOMER')) {
   <router-outlet />
-} @else if (!session()) {
+} @else if (!session() || accountLink()) {
   <main class="landing-page">
     <nav class="landing-nav">
       <a class="landing-brand" href="#"
@@ -9,8 +9,7 @@
         ><span><strong>TNL TRACK</strong><small>Sales & delivery</small></span></a
       >
       <div>
-        <a href="/portal">Customer portal</a><a href="#tracking">Track order</a
-        ><a href="/portal#sign-in">Sign in</a>
+        <a href="#tracking">Track order</a><a href="#sign-in">Sign in</a>
       </div>
     </nav>
     <section class="hero">
@@ -88,6 +87,15 @@
           </div>
         }
       </div>
+    </section>
+    <section class="staff-section" id="sign-in" aria-label="TNL Track account access">
+      <div class="sign-in-intro" id="staff-login">
+        <h2>Access your TNL Track account</h2>
+        <p>Sign in to view your orders or open your team workspace.</p>
+      </div>
+      @defer (on immediate) {
+        <app-sign-in />
+      }
     </section>
     <app-guided-chat />
     <footer class="landing-footer">

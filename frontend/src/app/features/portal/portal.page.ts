@@ -21,7 +21,7 @@ import { ActionDialogComponent } from '../../shared/action-dialog.component';
 import { ConfirmDialogService } from '../../shared/confirm-dialog.service';
 import { GuidedChatComponent } from '../../shared/guided-chat.component';
 import { AppIconComponent } from '../../shared/app-icon.component';
-type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'reset';
+import { ToastService } from '../../shared/toast.service';
 @Component({
   selector: 'app-customer-portal',
   imports: [ActionDialogComponent, ContactFieldsComponent, AppFormsModule, CurrencyPipe, DatePipe, GuidedChatComponent, AppIconComponent, RouterLink],
@@ -36,6 +36,7 @@ export class PortalPage {
   readonly router = inject(Router);
   readonly error = signal('');
   readonly notice = signal('');
+  private readonly toast = inject(ToastService);
   readonly busy = signal(false);
   readonly confirmDialog = inject(ConfirmDialogService);
   readonly offers = signal<CatalogOffer[]>([]);
@@ -88,46 +89,13 @@ export class PortalPage {
   readonly profile = signal<any>(null);
   readonly cart = signal<Array<{ offer: CatalogOffer; quantity: number }>>([]);
   tab = 'catalog';
-  mode: AuthMode = 'login';
-  email = '';
-  password = '';
-  fullName = contactEntry();
-  phone = '';
-  address = contactEntry();
   marketingOptIn = false;
   deliveryAddress = contactEntry();
   paymentMethod = 'Cash on delivery';
   search = '';
-  private magic = '';
   unsubscribe = '';
-  setMode(mode: AuthMode) {
-    this.mode = mode;
-    this.password = '';
-    this.error.set('');
-    this.notice.set('');
-  }
-  authTitle() {
-    return {
-      login: 'Welcome back.',
-      register: 'Make yourself at home.',
-      forgot: 'Forgot your password?',
-      verify: 'Activate your account.',
-      reset: 'Choose a new password.',
-    }[this.mode];
-  }
-  authDescription() {
-    return {
-      login: 'Sign in to TNL Track.',
-      register: 'Create an account, then verify your email to get started.',
-      forgot: 'Enter your email and we’ll send you a reset link.',
-      verify: 'Confirm your email to connect with your customer record.',
-      reset: 'Use at least 8 characters for your new password.',
-    }[this.mode];
-  }
   constructor() {
     const query = this.route.snapshot.queryParamMap;
-    this.magic = query.get('verify') ?? query.get('reset') ?? '';
-    this.mode = query.has('verify') ? 'verify' : query.has('reset') ? 'reset' : 'login';
     this.unsubscribe = query.get('unsubscribe') ?? '';
     if (query.get('tab') === 'orders') this.tab = 'orders';
     this.orderSearch = query.get('orderSearch') ?? '';
@@ -245,70 +213,6 @@ export class PortalPage {
     summary?.focus({ preventScroll: true });
     summary?.scrollIntoView({ block: 'start' });
   }
-  readonly demoAccountsAvailable = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
-
-  useDemoAccount(role: 'admin' | 'agent') {
-    this.email = role + '@tnl.local';
-    this.password = 'TnlDemo123!';
-  }
-
-  auth() {
-    this.error.set('');
-    this.notice.set('');
-    this.busy.set(true);
-    let request;
-    if (this.mode === 'register')
-      request = this.api.post('customer-auth/register', {
-        email: this.email,
-        password: this.password,
-        fullName: contactText(this.fullName, 'name'),
-        nameParts: this.fullName.parts ?? undefined,
-        phone: this.phone,
-        address: contactText(this.address, 'address'),
-        addressParts: this.address.parts ?? undefined,
-        marketingOptIn: this.marketingOptIn,
-      });
-    else if (this.mode === 'forgot')
-      request = this.api.post('customer-auth/forgot-password', { email: this.email });
-    else if (this.mode === 'verify')
-      request = this.api.post('customer-auth/verify', {
-        token: this.magic,
-        ...(this.password ? { password: this.password } : {}),
-      });
-    else if (this.mode === 'reset')
-      request = this.api.post('customer-auth/reset-password', {
-        token: this.magic,
-        password: this.password,
-      });
-    else request = this.api.signIn(this.email, this.password);
-    request.subscribe({
-      next: (r) => {
-        this.busy.set(false);
-        this.password = '';
-        if (r.data.token) {
-          this.sessionService.setSession(r.data);
-          if (r.data.user.role !== 'CUSTOMER') {
-            void this.router.navigateByUrl(r.data.user.role === 'DELIVERY' ? '/delivery' : '/dashboard', { replaceUrl: true });
-            return;
-          }
-          this.magic = '';
-          this.router.navigate(['/portal'], {
-            queryParams: {
-              offerId: this.route.snapshot.queryParamMap.get('offerId'),
-              offerKind: this.route.snapshot.queryParamMap.get('offerKind'),
-            },
-            replaceUrl: true,
-          });
-          this.load();
-          this.loadCatalog();
-        } else {
-          this.notice.set(r.data.message);
-          if (this.mode === 'reset') this.mode = 'login';
-        }
-      },
-      error: (e) => this.fail(e),
-    });
-  }
   async cancelRequest(id: number) {
     const confirmed = await this.confirmDialog.open({
       title: 'Cancel request?',
@@ -409,7 +313,7 @@ export class PortalPage {
       next: (r) => {
         this.notice.set(r.data.message);
         this.unsubscribe = '';
-        this.router.navigate(['/portal'], { replaceUrl: true });
+        if (this.session()?.role === 'CUSTOMER') void this.router.navigate(['/portal'], { replaceUrl: true });
       },
       error: (e) => this.fail(e),
     });
@@ -423,15 +327,15 @@ export class PortalPage {
     this.orders.set([]);
     this.requests.set([]);
     this.cart.set([]);
-    this.mode = 'login';
     this.tab = 'catalog';
-    this.router.navigateByUrl('/portal');
+    void this.router.navigate(['/'], { fragment: 'sign-in' });
   }
   private fail(e: any) {
     this.busy.set(false);
     if (e.status === 401 && this.session()?.role === 'CUSTOMER') {
       this.logout();
-      this.notice.set('Your session expired. Sign in again.');
+      this.toast.warn('Your session expired. Sign in again.');
+      return;
     }
     this.error.set(e.error?.error?.message ?? 'Unable to complete this action.');
   }

@@ -11,6 +11,7 @@ import {
   signal,
   ViewChild,
 } from '@angular/core';
+import { SignInComponent } from './features/auth/sign-in.component';
 import { ContactFieldsComponent, contactEntry, contactText } from './shared/contact-fields.component';
 import { AppFormsModule } from './shared/app-forms.module';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
@@ -42,6 +43,7 @@ import {
   selector: 'app-root',
   imports: [
     ContactFieldsComponent,
+    SignInComponent,
     DatePipe,
     AppFormsModule,
     RouterOutlet,
@@ -87,6 +89,7 @@ export class App implements OnInit, OnDestroy {
   readonly showOrderForm = signal(false);
   /** Current URL path, cleaned of leading/trailing slashes and query/hash (e.g. 'orders/5', 'tracking', ''). */
   readonly routedPath = signal('');
+  readonly accountLink = signal(false);
   readonly isNewOrderPage = computed(() => this.routedPath() === 'orders/new');
   readonly isOrderDetailPage = computed(() => /^orders\/\d+$/.test(this.routedPath()));
   readonly isAgentDetailPage = computed(() => /^agents\/\d+$/.test(this.routedPath()));
@@ -182,13 +185,13 @@ export class App implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const browserUrl = `${window.location.pathname}${window.location.search}`;
-    this.routedPath.set(App.cleanPath(browserUrl));
+    this.readRoute(browserUrl);
     this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe((event) => {
-        this.routedPath.set(App.cleanPath(event.urlAfterRedirects));
+        this.readRoute(event.urlAfterRedirects);
         const user = this.session();
-        if (user && user.role !== 'CUSTOMER') {
+        if (user && user.role !== 'CUSTOMER' && !this.accountLink()) {
           this.applyWorkspaceRoute(event.urlAfterRedirects);
           if (!this.notificationRefreshTimer) {
             this.restoreNotificationReadTime(user.id);
@@ -202,14 +205,21 @@ export class App implements OnInit, OnDestroy {
           this.showSuccess(flash);
         }
       });
-    if (this.session() && this.session()?.role !== 'CUSTOMER') {
+    if (this.session() && this.session()?.role !== 'CUSTOMER' && !this.accountLink()) {
       this.restoreNotificationReadTime(this.session()!.id);
       this.applyWorkspaceRoute(browserUrl);
       this.loadWorkspace();
       this.startNotificationRefresh();
     }
-    if (this.session()?.role === 'CUSTOMER' && App.cleanPath(browserUrl) === '')
+    if (this.session()?.role === 'CUSTOMER' && this.routedPath() === '' && !this.accountLink())
       this.router.navigateByUrl('/portal');
+  }
+
+  private readRoute(url: string): void {
+    const path = App.cleanPath(url);
+    const params = this.router.parseUrl(url).queryParamMap;
+    this.routedPath.set(path);
+    this.accountLink.set((path === '' || path === 'portal') && (params.has('verify') || params.has('reset')));
   }
 
   logout(): void {

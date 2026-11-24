@@ -337,6 +337,8 @@ Payment methods for requests are Cash on delivery, Bank transfer, Card. No onlin
 
 Contact writes can include `nameParts: {firstName,middleName,lastName}` for leads and customers. Customer writes and registration can include `addressParts: {street,barangay,city,province,postalCode}`. Order and request writes accept the same address object as `deliveryAddressParts`. Middle name, barangay, and postal code are optional. The server keeps the existing formatted name and address fields for display and compatibility. Existing records can retain their saved text until structured fields are entered.
 
+`POST /catalog/address-search` accepts `{query}` and returns up to five Philippine address matches as `{label,parts}` for the address forms, including public registration. Search requires 3–200 characters and uses the server's configured Geoapify key. Missing parts are empty and can be completed manually. The endpoint is rate limited.
+
 - POST /customer/orders/:id/followups: `{message}` (2..1000 characters); returns 201 `{id,reused}` and reuses an open follow-up. Ownership is checked before any write.
 
 Staff `/requests` routes:

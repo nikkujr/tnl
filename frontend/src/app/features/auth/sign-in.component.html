@@ -1,0 +1,117 @@
+<section class="auth-card" aria-labelledby="auth-title">
+  @if (mode === 'login' || mode === 'register') {
+    <div class="auth-switch" aria-label="Account access">
+      <button
+        type="button"
+        [class.active]="mode === 'login'"
+        [attr.aria-pressed]="mode === 'login'"
+        [disabled]="busy()"
+        (click)="setMode('login')"
+      >
+        Sign in
+      </button>
+      <button
+        type="button"
+        [class.active]="mode === 'register'"
+        [attr.aria-pressed]="mode === 'register'"
+        [disabled]="busy()"
+        (click)="setMode('register')"
+      >
+        Create account
+      </button>
+    </div>
+  } @else {
+    <button class="back-link" type="button" [disabled]="busy()" (click)="setMode('login')">
+      ← Back to sign in
+    </button>
+  }
+  <form #signInForm #authForm="ngForm" (ngSubmit)="authForm.valid && auth(signInForm)" [attr.aria-busy]="busy()">
+    <h2 id="auth-title">{{ authTitle() }}</h2>
+    @if (mode !== 'login') { <p class="auth-description">{{ authDescription() }}</p> }
+    @if (error()) {
+      <div class="error" role="alert">
+        <app-icon name="alertCircle" /><span>{{ error() }}</span>
+      </div>
+    }
+    @if (notice()) {
+      <div class="notice" role="status">
+        <app-icon name="checkCircle" /><span>{{ notice() }}</span>
+      </div>
+    }
+    <div class="auth-fields">
+      @if (['login', 'register', 'forgot'].includes(mode)) {
+        <label class="wide"
+          >Email<input data-validation-field="email"
+            name="email"
+            type="email"
+            [(ngModel)]="email"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+        /></label>
+      }
+      @if (mode !== 'forgot') {
+        <label class="wide"
+          >{{
+            mode === 'verify'
+              ? 'Password for an invitation (leave blank for a registration link)'
+              : 'Password'
+          }}<input data-validation-field="password"
+            name="password"
+            type="password"
+            [(ngModel)]="password"
+            minlength="8"
+            maxlength="72"
+            [required]="mode !== 'verify'"
+            [autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
+            [placeholder]="
+              mode === 'login' ? 'Enter your password' : 'At least 8 characters'
+            "
+        /></label>
+      }
+      @if (mode === 'register') {
+        <app-contact-fields kind="name" [entry]="fullName" label="Name" prefix="nameParts" />
+        <label>PH mobile number
+          <input data-validation-field="phone" name="phone" type="tel" autocomplete="tel"
+            [(ngModel)]="phone" placeholder="09XXXXXXXXX" minlength="11" required />
+        </label>
+        <app-contact-fields kind="address" [entry]="address" label="Address" prefix="addressParts" />
+        <label class="consent">
+          <span><input data-validation-field="marketingOptIn" type="checkbox" name="optin"
+            [(ngModel)]="marketingOptIn" /> I would like promotional campaigns, welcome emails, and purchase follow-ups.</span>
+        </label>
+      }
+    </div>
+    @if (mode === 'login') {
+      <div class="forgot-link">
+        <button type="button" [disabled]="busy()" (click)="setMode('forgot')">
+          Forgot password?
+        </button>
+        @if (demoAccountsAvailable) {
+          <button type="button" (click)="useDemoAccount('admin')">Demo admin</button>
+          <button type="button" (click)="useDemoAccount('agent')">Demo agent</button>
+        }
+      </div>
+    }
+    <button class="primary auth-submit" [disabled]="busy()">
+      {{
+        busy()
+          ? 'Working…'
+          : mode === 'verify'
+            ? 'Activate account'
+            : mode === 'reset'
+              ? 'Reset password'
+              : mode === 'register'
+                ? 'Register and verify email'
+                : mode === 'forgot'
+                  ? 'Email reset link'
+                  : 'Sign in'
+      }}
+    </button>
+  </form>
+  <p class="auth-footnote">
+    <app-icon name="checkCircle" /><span
+      >Verify your email to connect your account with your existing orders.</span
+    >
+  </p>
+</section>

@@ -8,8 +8,7 @@
         <a class="portal-link" routerLink="/account"><app-icon name="account" />My account</a>
         <button class="sign-out" (click)="logout()"><app-icon name="logout" />Sign out</button>
       } @else {
-        <a class="portal-link" href="#offers">Browse offers</a>
-        <a class="portal-link" href="/">Home</a>
+        <a class="portal-link" routerLink="/" fragment="sign-in">Sign in</a>
       }
     </div>
   </header>
@@ -20,10 +19,10 @@
       <p>Your offers, requests, and deliveries, all in one place.</p>
     </div>
   }
-  @if (error() && session()?.role === 'CUSTOMER') {
+  @if (error()) {
     <div class="error" role="alert">{{ error() }}</div>
   }
-  @if (notice() && session()?.role === 'CUSTOMER') {
+  @if (notice()) {
     <div class="notice" role="status">{{ notice() }}</div>
   }
   @if (unsubscribe) {
@@ -33,163 +32,7 @@
       <button (click)="stopMarketing()">Unsubscribe from marketing</button>
     </section>
   }
-  @if (session()?.role !== 'CUSTOMER') {
-    <section class="portal-hero" aria-label="Customer portal">
-      <div class="portal-intro">
-        <span class="intro-badge"><app-icon name="account" />Your customer space</span>
-        <h1>A simpler way<br />to shop and track.</h1>
-        <p class="intro-description">
-          Find your next favorite, connect with your field agent, and follow your orders from here.
-        </p>
-        <div class="portal-benefits">
-          <div>
-            <span class="benefit-icon"><app-icon name="catalog" /></span>
-            <div>
-              <strong>Discover something good</strong>
-              <p>Explore the latest products and package offers.</p>
-            </div>
-          </div>
-          <div>
-            <span class="benefit-icon"><app-icon name="agents" /></span>
-            <div>
-              <strong>A little help from your agent</strong>
-              <p>Send a request and let your field agent handle the next steps.</p>
-            </div>
-          </div>
-          <div>
-            <span class="benefit-icon"><app-icon name="tracking" /></span>
-            <div>
-              <strong>Stay close to every order</strong>
-              <p>Check delivery progress and ask your agent for an update.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <section class="panel auth-card" aria-labelledby="auth-title">
-        @if (mode === 'login' || mode === 'register') {
-          <div class="auth-switch" aria-label="Account access">
-            <button
-              type="button"
-              [class.active]="mode === 'login'"
-              [attr.aria-pressed]="mode === 'login'"
-              [disabled]="busy()"
-              (click)="setMode('login')"
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              [class.active]="mode === 'register'"
-              [attr.aria-pressed]="mode === 'register'"
-              [disabled]="busy()"
-              (click)="setMode('register')"
-            >
-              Create account
-            </button>
-          </div>
-        } @else {
-          <button class="back-link" type="button" [disabled]="busy()" (click)="setMode('login')">
-            ← Back to sign in
-          </button>
-        }
-        <form id="sign-in" #authForm="ngForm" (ngSubmit)="authForm.valid && auth()" [attr.aria-busy]="busy()">
-          <h2 id="auth-title">{{ authTitle() }}</h2>
-          <p class="auth-description">{{ authDescription() }}</p>
-          @if (error()) {
-            <div class="error" role="alert">
-              <app-icon name="alertCircle" /><span>{{ error() }}</span>
-            </div>
-          }
-          @if (notice()) {
-            <div class="notice" role="status">
-              <app-icon name="checkCircle" /><span>{{ notice() }}</span>
-            </div>
-          }
-          <div class="fields auth-fields" [class.registration]="mode === 'register'">
-            @if (['login', 'register', 'forgot'].includes(mode)) {
-              <label class="wide"
-                >Email<input data-validation-field="email"
-                  name="email"
-                  type="email"
-                  [(ngModel)]="email"
-                  required
-                  autocomplete="email"
-                  placeholder="you@example.com"
-              /></label>
-            }
-            @if (mode !== 'forgot') {
-              <label class="wide"
-                >{{
-                  mode === 'verify'
-                    ? 'Password for an invitation (leave blank for a registration link)'
-                    : 'Password'
-                }}<input data-validation-field="password"
-                  name="password"
-                  type="password"
-                  [(ngModel)]="password"
-                  minlength="8"
-                  maxlength="72"
-                  [required]="mode !== 'verify'"
-                  [autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
-                  [placeholder]="
-                    mode === 'login' ? 'Enter your password' : 'At least 8 characters'
-                  "
-              /></label>
-            }
-            @if (mode === 'register') {
-              <app-contact-fields kind="name" [entry]="fullName" label="Name" prefix="nameParts" />
-<label
-                >PH mobile number<input data-validation-field="phone"
-                  name="phone"
-                  type="tel"
-                  autocomplete="tel"
-                  [(ngModel)]="phone"
-                  placeholder="09XXXXXXXXX"
-                  required /></label
-              ><app-contact-fields kind="address" [entry]="address" label="Address" prefix="addressParts" />
-<label class="wide consent"
-                ><span
-                  ><input data-validation-field="marketingOptIn" type="checkbox" name="optin" [(ngModel)]="marketingOptIn" />I would like
-                  promotional campaigns, welcome emails, and purchase follow-ups.</span
-                ></label
-              >
-            }
-          </div>
-          @if (mode === 'login') {
-            <div class="forgot-link">
-              <button type="button" [disabled]="busy()" (click)="setMode('forgot')">
-                Forgot password?
-              </button>
-              @if (demoAccountsAvailable) {
-                <button type="button" (click)="useDemoAccount('admin')">Demo admin</button>
-                <button type="button" (click)="useDemoAccount('agent')">Demo agent</button>
-              }
-            </div>
-          }
-          <button class="primary auth-submit" [disabled]="busy()">
-            {{
-              busy()
-                ? 'Working…'
-                : mode === 'verify'
-                  ? 'Activate account'
-                  : mode === 'reset'
-                    ? 'Reset password'
-                    : mode === 'register'
-                      ? 'Register and verify email'
-                      : mode === 'forgot'
-                        ? 'Email reset link'
-                        : 'Sign in'
-            }}
-          </button>
-        </form>
-        <p class="auth-footnote">
-          <app-icon name="checkCircle" /><span
-            >Verify your email to connect your account with your existing orders.</span
-          >
-        </p>
-      </section>
-    </section>
-  }
+
   @if (session()?.role === 'CUSTOMER') {
     <nav class="actions customer-navigation" aria-label="Customer navigation">
       <button

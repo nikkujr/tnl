@@ -4,20 +4,6 @@
     <div class="live"><i></i><strong>{{ summary().activeDeliveries }}</strong><small>active deliveries</small></div>
   </div>
 
-  @if (session()?.role === 'ADMIN') {
-    <div class="period-controls" aria-label="Overview period">
-      <label>Period
-        <select aria-label="Period" [ngModel]="period()" (ngModelChange)="changePeriod($event)">
-          <option value="daily">Daily</option><option value="monthly">Monthly</option><option value="overall">Overall</option>
-        </select>
-      </label>
-      @if (period() === 'daily') {
-        <label>Date <input #dateInput type="date" [value]="selectedDate()" (change)="changeDate(dateInput.value)" /></label>
-      } @else if (period() === 'monthly') {
-        <label>Month <input #monthInput type="month" [value]="selectedMonth()" (change)="changeMonth(monthInput.value)" /></label>
-      }
-    </div>
-  }
   @if (loading()) { <p role="status">Loading overview…</p> }
 
   <div class="metric-grid">
@@ -32,10 +18,10 @@
 
   <div class="dashboard-grid">
     <article class="panel chart-panel">
-      <div class="panel-title"><div><span class="eyebrow">Performance</span><h3>Revenue overview</h3></div>@if (session()?.role === 'AGENT') { <span class="period-button">Last 6 months</span> }</div>
-      <div class="chart" [style.grid-template-columns]="'repeat(' + (revenueBars().length || 1) + ', minmax(1.8rem, 1fr))'">
-        @for (bar of (loading() ? [] : revenueBars()); track bar.key; let last = $last) {
-          <div><span [style.height.%]="bar.value" [class.current]="last" [attr.title]="bar.revenue | currency:'PHP':'symbol-narrow'"></span><small>{{ bar.month }}</small></div>
+      <div class="panel-title"><div><span class="eyebrow">Performance</span><h3>Revenue overview</h3></div><span class="chart-period">{{ session()?.role === 'ADMIN' ? monthLabel() : 'Last 6 months' }}</span></div>
+      <div class="chart" [style.grid-template-columns]="'repeat(' + (revenueBars().length || 1) + ', minmax(0, 1fr))'">
+        @for (bar of (loading() ? [] : revenueBars()); track bar.key; let last = $last; let index = $index) {
+          <div><span [style.height.%]="bar.value" [class.current]="last" [attr.title]="bar.key + ' · ' + (bar.revenue | currency:'PHP':'symbol-narrow')"></span><small [class.minor-tick]="session()?.role === 'ADMIN' && index !== 0 && (index + 1) % 5 !== 0">{{ bar.month }}</small></div>
         }
       </div>
     </article>
@@ -53,7 +39,7 @@
       <div class="order-row header"><span>Order</span><span>Customer</span><span>Amount</span><span>Status</span><span>Payment</span><span>Action</span></div>
       @for (order of (loading() ? [] : recentOrders()); track order.id) {
         <div class="order-row"><strong>{{ order.trackingNumber }}</strong><span><b>{{ order.customerName }}</b><small>{{ orderItemSummary(order) }}</small></span><strong>{{ orderAmount(order) | currency:'PHP':'symbol-narrow':'1.0-0' }}</strong><span><i [class]="'status ' + statusClass(displayStatus(order))">{{ displayStatus(order) }}</i></span><span>{{ titleCase(order.paymentStatus) }}</span><span class="table-actions"><button class="row-action" (click)="viewOrder(order)">View</button>@if(order.orderStatus==='PENDING'){<button class="row-action" (click)="editOrder(order)">Edit</button>}@if (session()!.role === 'ADMIN' && order.orderStatus === 'PENDING') { <button class="row-action approve" (click)="decideOrder(order, 'APPROVE')">Approve</button><button class="row-action reject" (click)="decideOrder(order, 'REJECT')">Reject</button> }@if(order.orderStatus==='PENDING'||order.orderStatus==='REJECTED'){<button class="row-action reject" (click)="removeOrder(order)">Delete</button>}</span></div>
-      } @empty { <div class="empty">No orders match those filters.</div> }
+      } @empty { <div class="empty">No recent orders in this period.</div> }
     </div>
   </article>
 </div>

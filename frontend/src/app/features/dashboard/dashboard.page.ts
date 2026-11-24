@@ -1,10 +1,9 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { forkJoin, of, Subscription } from 'rxjs';
+import { forkJoin, interval, of, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { AppFormsModule } from '../../shared/app-forms.module';
-import { fillTrend, type ReportPeriod, type ReportPeriodQuery } from '../reports/reports.model';
+import { fillTrend, type ReportPeriodQuery } from '../reports/reports.model';
 import { ApiService, DashboardSummary, Order, Product } from '../../core/api.service';
 import { SessionService } from '../../core/session.service';
 import { ToastService } from '../../shared/toast.service';
@@ -16,7 +15,7 @@ import { orderRejectionDialog, selectedRejectionReason } from '../../shared/orde
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [AppFormsModule, CurrencyPipe, DatePipe, AppIconComponent, AgentRewardsComponent],
+  imports: [CurrencyPipe, DatePipe, AppIconComponent, AgentRewardsComponent],
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.scss'
 })
@@ -30,18 +29,14 @@ export class DashboardPage implements OnInit {
   readonly today = new Date();
   private readonly destroyRef = inject(DestroyRef);
   private request?: Subscription;
-  private readonly manilaDate = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(this.today);
-  readonly period = signal<ReportPeriod>('monthly');
-  readonly selectedDate = signal(this.manilaDate);
-  readonly selectedMonth = signal(this.manilaDate.slice(0, 7));
-  readonly periodQuery = computed<ReportPeriodQuery>(() => {
-    switch (this.period()) {
-      case 'daily': return { period: 'daily', date: this.selectedDate() };
-      case 'monthly': return { period: 'monthly', month: this.selectedMonth() };
-      case 'overall': return { period: 'overall' };
-    }
+  private readonly monthFormat = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit',
+  });
+  readonly currentMonth = signal<string | null>(null);
+  readonly monthLabel = computed(() => {
+    const month = this.currentMonth() ?? this.monthFormat.format(this.today);
+    const date = new Date(month + '-01T00:00:00Z');
+    return new Intl.DateTimeFormat('en-PH', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(date);
   });
   readonly loading = signal(true);
   readonly summary = signal<DashboardSummary>({
@@ -58,14 +53,13 @@ export class DashboardPage implements OnInit {
 
   readonly revenueBars = computed(() => {
     const trend = this.summary().revenueTrend;
-    if (trend) {
-      const query = this.periodQuery();
-      const selection = query.period === 'daily' ? query.date : query.period === 'monthly' ? query.month : '';
-      const rows = fillTrend({ period: query.period, selection, trend }, (label) => ({ label, revenue: 0 }));
+    const month = this.currentMonth();
+    if (trend && month) {
+      const rows = fillTrend({ period: 'monthly', selection: month, trend }, (label) => ({ label, revenue: 0 }));
       const maximum = Math.max(...rows.map((row) => row.revenue), 1);
       return rows.map(({ label, revenue }) => ({
         key: label,
-        month: query.period === 'daily' ? label.slice(11) : query.period === 'monthly' ? label.slice(8) : label,
+        month: label.slice(8),
         revenue,
         value: Math.max(0, (revenue / maximum) * 100),
       }));
@@ -105,30 +99,19 @@ export class DashboardPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
-  }
-
-  changePeriod(period: ReportPeriod): void {
-    this.period.set(period);
-    this.load();
-  }
-
-  changeDate(value: string): void {
-    if (!value) return;
-    this.selectedDate.set(value);
-    this.load();
-  }
-
-  changeMonth(value: string): void {
-    if (!value) return;
-    this.selectedMonth.set(value);
-    this.load();
+    if (this.session()?.role === 'ADMIN') {
+      interval(60_000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+        if (!this.loading() && this.monthFormat.format(new Date()) !== this.currentMonth()) this.load();
+      });
+    }
   }
 
   private load(): void {
     this.request?.unsubscribe();
     this.loading.set(true);
     const isAdmin = this.session()?.role === 'ADMIN';
-    const period = isAdmin ? this.periodQuery() : undefined;
+    const month = this.monthFormat.format(new Date());
+    const period: ReportPeriodQuery | undefined = isAdmin ? { period: 'monthly', month } : undefined;
     this.request = forkJoin({
       dashboard: this.api.getDashboard(period),
       orders: this.api.getOrders({ limit: 4, period }),
@@ -136,6 +119,7 @@ export class DashboardPage implements OnInit {
       products: isAdmin ? this.api.getProducts({ limit: 100 }) : of({ data: [] as Product[] })
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ dashboard, orders, products, pending }) => {
+        if (isAdmin) this.currentMonth.set(month);
         this.summary.set(dashboard.data);
         this.orders.set(orders.data);
         this.pendingOrder.set(pending.data[0]);

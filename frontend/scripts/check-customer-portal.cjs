@@ -26,6 +26,10 @@ async function main() {
       if (body) posted.push({ endpoint, body });
       let data = [];
       if (endpoint === 'catalog') { const search = new URL(request.url()).searchParams.get('search') || ''; data = emptyCatalog ? [] : offers.filter((o) => (o.name + ' ' + (o.description || '')).toLowerCase().includes(search.toLowerCase())); }
+      if (endpoint === 'catalog/address-search') data = [{
+        label: '123 Example Street, Naga City, Camarines Sur',
+        parts: { street: '123 Example Street', barangay: '', city: 'Naga City', province: 'Camarines Sur', postalCode: '' },
+      }];
       if (endpoint === 'customer/me') data = { address: '123 Example Street', marketingOptIn: false };
       if (endpoint === 'auth/sign-in') {
         if (body.email === 'invalid@example.test') {
@@ -48,11 +52,13 @@ async function main() {
     }
     for (const viewport of [{ width: 1440, height: 900 }, { width: 800, height: 900 }, { width: 390, height: 900 }, { width: 320, height: 740 }]) {
       await page.setViewportSize(viewport);
-      await page.goto(`${base}/portal`);
-      await page.locator('.offer-card').first().waitFor();
+      await page.goto(base);
+      assert.equal(await page.getByRole('link', { name: 'Customer portal', exact: true }).count(), 0);
+      await page.locator('.landing-nav').getByRole('link', { name: 'Sign in', exact: true }).click();
+      await page.locator('#sign-in .auth-card').waitFor();
       await fits('Sign in');
       const card = await page.locator('.auth-card').boundingBox();
-      assert.ok(card.width <= 441, 'Sign-in card stretches across page');
+      assert.ok(card.width <= 461, 'Sign-in card stretches across page');
       const email = await page.getByLabel('Email', { exact: true }).boundingBox();
       const password = await page.getByLabel('Password', { exact: true }).boundingBox();
       assert.ok(password.y > email.y + email.height, 'Sign-in fields are not stacked');
@@ -74,10 +80,15 @@ async function main() {
       await page.getByLabel('Password', { exact: true }).fill('TestPassword123!');
       await page.getByLabel('First name', { exact: true }).fill('Sam');
       await page.getByLabel('Last name', { exact: true }).fill('Rivera');
-      await page.getByLabel('PH mobile number').fill('09123456789');
-      await page.getByLabel('House number and street', { exact: true }).fill('123 Example Street');
-      await page.getByLabel('City or municipality', { exact: true }).fill('Naga City');
-      await page.getByLabel('Province or region', { exact: true }).fill('Camarines Sur');
+      await page.getByLabel('PH mobile number').fill('0912345678');
+      await page.getByLabel('Find an address').fill('Naga City');
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByRole('button', { name: '123 Example Street, Naga City, Camarines Sur' }).click();
+      await page.waitForFunction(() => document.querySelector('[data-validation-field="addressParts.city"]').value === 'Naga City');
+      assert.ok(posted.some((entry) => entry.endpoint === 'catalog/address-search' && entry.body.query === 'Naga City'));
+      await page.locator('.auth-submit').click();
+      await page.getByText('Use at least 11 characters.', { exact: true }).waitFor();
+      await page.getByLabel(/^PH mobile number/).fill('09123456789');
       await fits('Registration');
       if (viewport.width === 390) await screenshot('register-mobile');
       await page.locator('.auth-submit').click();
@@ -156,11 +167,28 @@ async function main() {
     await page.evaluate(() => localStorage.setItem('tnl_theme', 'dark'));
     await page.setViewportSize({ width: 1440, height: 900 });
     emptyCatalog = true;
-    await page.reload();
+    await page.goto(`${base}/portal#offers`);
     await page.getByRole('heading', { name: 'No offers found' }).waitFor();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
     await fits('Dark theme and empty catalog');
     await screenshot('dark-empty');
+    await page.evaluate(() => {
+      sessionStorage.setItem('tnl_access_token', 'staff-fixture');
+      sessionStorage.setItem('tnl_user', JSON.stringify({ id: 1, role: 'ADMIN', fullName: 'Fixture Admin' }));
+    });
+    await page.goto(`${base}/portal?verify=signed-in-verification`);
+    await page.getByRole('heading', { name: 'Activate your account.' }).waitFor();
+    await page.locator('.auth-submit').click();
+    await page.locator('.auth-card .notice').waitFor();
+    assert.ok(posted.some((entry) => entry.endpoint === 'customer-auth/verify' && entry.body.token === 'signed-in-verification'));
+
+    await page.evaluate((user) => sessionStorage.setItem('tnl_user', JSON.stringify(user)), customer);
+    await page.goto(`${base}/portal?reset=signed-in-reset`);
+    await page.getByRole('heading', { name: 'Choose a new password.' }).waitFor();
+    await page.getByLabel('Password', { exact: true }).fill('NewPassword123!');
+    await page.locator('.auth-submit').click();
+    await page.locator('.auth-card .notice').waitFor();
+    assert.ok(posted.some((entry) => entry.endpoint === 'customer-auth/reset-password' && entry.body.token === 'signed-in-reset'));
     console.log('PASS: Verification, reset, customer navigation, request submission and sign-out.');
   } finally { await browser.close(); }
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { searchPlaces } from "../src/features/delivery/geocoding.js";
+import { searchAddresses, searchPlaces } from "../src/features/delivery/geocoding.js";
 test("place search bounds and normalizes provider results without exposing the key", async () => {
   const places = await searchPlaces(
     "San Pablo & Laguna",
@@ -38,6 +38,25 @@ test("place search bounds and normalizes provider results without exposing the k
     ),
     [],
   );
+});
+
+test("address search supplies editable Philippine address parts", async () => {
+  const addresses = await searchAddresses("Naga City", "test-key", async () =>
+    Response.json({ results: [
+      {
+        lat: 13.62, lon: 123.19, formatted: "12 Example Street, Naga City, Philippines",
+        housenumber: "12", street: "Example Street", suburb: "Centro",
+        city: "Naga City", state: "Camarines Sur", postcode: "4400",
+      },
+      { lat: 13.62, lon: 123.19, formatted: "Naga City, Philippines", city: "Naga City" },
+    ] }),
+  );
+  assert.deepEqual(addresses[0].parts, {
+    street: "12 Example Street", barangay: "Centro", city: "Naga City",
+    province: "Camarines Sur", postalCode: "4400",
+  });
+  assert.equal(addresses[1].parts.street, "");
+  assert.equal(addresses[1].parts.city, "Naga City");
 });
 test("place search returns safe errors for missing keys and provider failures", async () => {
   await assert.rejects(
